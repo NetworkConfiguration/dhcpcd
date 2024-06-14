@@ -1678,11 +1678,6 @@ dhcp6_startdiscover(void *arg)
 	state->MRT = state->sol_max_rt;
 	state->MRC = SOL_MAX_RC;
 
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	free(state->new);
-	state->new = NULL;
-	state->new_len = 0;
-
 	/* If we fail to renew or confirm, our requested addreses will
 	 * be marked as stale.
 	 To re-request them, just mark them as not stale. */
@@ -1715,7 +1710,6 @@ dhcp6_startinform(void *arg)
 	state->MRT = state->inf_max_rt;
 	state->MRC = 0;
 
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
 		return;
@@ -1765,13 +1759,15 @@ dhcp6_fail(struct interface *ifp, bool drop)
 			script_runreason(ifp, "EXPIRE6");
 		dhcp_unlink(ifp->ctx, state->leasefile);
 		dhcp6_addrequestedaddrs(ifp);
-	} else if (state->new)
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	} else if (state->new) {
 		script_runreason(ifp, "TIMEOUT6");
+		// We need to keep the expire timeout alive
+	}
 
 	if (!dhcp6_startdiscoinform(ifp)) {
 		logwarnx("%s: no advertising IPv6 router wants DHCP",ifp->name);
 		state->state = DH6S_INIT;
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	}
 }
 
@@ -1791,6 +1787,7 @@ dhcp6_failconfirm(void *arg)
 
 	logmessage(llevel, "%s: failed to confirm prior DHCPv6 address",
 	    ifp->name);
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendconfirm, ifp);
 
 	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure. */
 	dhcp6_fail(ifp, false);
@@ -1824,6 +1821,7 @@ dhcp6_failrebindpd(void *arg)
 	struct interface *ifp = arg;
 
 	logerrx("%s: failed to rebind prior DHCPv6 delegation", ifp->name);
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendrebind, ifp);
 
 	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure.
 	 * 18.2 says REBIND rather than CONFIRM with PD but use CONFIRM timings. */
