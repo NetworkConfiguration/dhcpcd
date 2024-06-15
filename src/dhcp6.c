@@ -180,6 +180,7 @@ static const char * const dhcp6_statuses[] = {
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
 static void dhcp6_startdecline(struct interface *);
+static void dhcp6_startrequest(struct interface *);
 
 #ifdef SMALL
 #define dhcp6_hasprefixdelegation(a)	(0)
@@ -1416,10 +1417,37 @@ dhcp6_sendinform(void *arg)
 }
 
 static void
-dhcp6_senddiscover(void *arg)
+dhcp6_senddiscover2(void *arg)
 {
 
-	dhcp6_sendmessage(arg, dhcp6_senddiscover);
+	dhcp6_sendmessage(arg, dhcp6_senddiscover2);
+}
+
+static void
+dhcp6_senddiscover1(void *arg)
+{
+	/*
+	 * So the initial RT has elapsed.
+	 * If we have any ADVERTs we can now REQUEST them.
+	 * RFC 8415 15 and 18.2.1
+	 */
+	struct interface *ifp = arg;
+	struct dhcp6_state *state = D6_STATE(ifp);
+
+	if (state->recv == NULL || state->recv->type != DHCP6_ADVERTISE)
+		dhcp6_sendmessage(arg, dhcp6_senddiscover2);
+	else
+		dhcp6_startrequest(ifp);
+}
+
+static void
+dhcp6_senddiscover(void *arg)
+{
+	struct interface *ifp = arg;
+	struct dhcp6_state *state = D6_STATE(ifp);
+
+	dhcp6_sendmessage(arg,
+	    state->IMD != 0 ? dhcp6_senddiscover : dhcp6_senddiscover1);
 }
 
 static void
@@ -1877,7 +1905,6 @@ dhcp6_startrebind(void *arg)
 		    CNF_MAX_RD, dhcp6_failrebind, ifp);
 #endif
 }
-
 
 static void
 dhcp6_startrequest(struct interface *ifp)
@@ -3431,6 +3458,16 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			valid_op = false;
 			break;
 		}
+		if (state->recv_len && state->recv->type == DHCP6_ADVERTISE) {
+			/* We already have an advertismemnt.
+			 * RFC 8415 says we have to wait for the IRT to elapse.
+			 * To keep the same behaviour we won't do anything with
+			 * this. In the future we should make a lists of
+			 * ADVERTS and pick the "best" one. */
+			logdebugx("%s: discarding ADVERTISEMENT from %s",
+			    ifp->name, sfrom);
+			return;
+		}
 		/* RFC7083 */
 		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
 		if (o && ol == sizeof(uint32_t)) {
@@ -3556,7 +3593,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		else
 			loginfox("%s: ADV %s from %s",
 			    ifp->name, ia->saddr, sfrom);
-		dhcp6_startrequest(ifp);
+		// We will request when the IRT elapses
 		return;
 	}
 
@@ -3739,7 +3776,7 @@ dhcp6_openraw(void)
 {
 	int fd, v;
 
-	fd = socket(PF_INET6, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
+	fd = xsocket(PF_INET6, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
 	if (fd == -1)
 		return -1;
 
@@ -3913,20 +3950,16 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		case DH6S_INIT:
 			goto gogogo;
 		case DH6S_INFORM:
+			/* RFC 8415 21.23
+			 * If D6_OPTION_INFO_REFRESH_TIME does not exist
+			 * then we MUST refresh by IRT_DEFAULT seconds
+			 * and should not be influenced by only the
+			 * pl/vl time of the RA changing. */
 			if (state->state == DH6S_INIT ||
-			    state->state == DH6S_INFORMED ||
 			    (state->state == DH6S_DISCOVER &&
 			    !(ifp->options->options & DHCPCD_IA_FORCED) &&
 			    !ipv6nd_hasradhcp(ifp, true)))
-			{
-				/* We don't want log spam when the RA
-				 * has just adjusted it's prefix times. */
-				if (state->state != DH6S_INFORMED) {
-					state->new_start = true;
-					state->failed = false;
-				}
 				dhcp6_startinform(ifp);
-			}
 			break;
 		case DH6S_REQUEST:
 			if (ifp->options->options & DHCPCD_DHCP6 &&
@@ -4178,6 +4211,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 #ifndef SMALL
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
+	bool first;
 #endif
 
 	if (m == NULL)
@@ -4279,10 +4313,13 @@ delegated:
 		return 1;
 	if (fprintf(fp, "%s_delegated_dhcp6_prefix=", prefix) == -1)
 		return -1;
+	first = true;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->delegating_prefix == NULL)
 			continue;
-		if (ap != TAILQ_FIRST(&state->addrs)) {
+		if (first)
+			first = false;
+		else {
 			if (fputc(' ', fp) == EOF)
 				return -1;
 		}

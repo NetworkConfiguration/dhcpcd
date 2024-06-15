@@ -33,6 +33,7 @@ STATIC=
 DEVS=
 EMBEDDED=
 AUTH=
+NTP=
 POLL=
 SMALL=
 SANITIZE=no
@@ -74,6 +75,8 @@ for x do
 	--enable-privsep) PRIVSEP=yes;;
 	--disable-seccomp) SECCOMP=no;;
 	--enable-seccomp) SECCOMP=yes;;
+	--disable-ntp) NTP=no;;
+	--enable-ntp) NTP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
 	--sysconfdir) SYSCONFDIR=$var;;
@@ -810,6 +813,28 @@ else
 fi
 rm -f _clock_gettime.c _clock_gettime
 $abort && exit 1
+
+if [ -z "$CLOSEFROM" ]; then
+	printf "Testing for closefrom ... "
+	cat <<EOF >_closefrom.c
+#include <unistd.h>
+int main(void) {
+	closefrom(3);
+	return 0;
+}
+EOF
+	if $XCC _closefrom.c -o _closefrom 2>&3; then
+		CLOSEFROM=yes
+	else
+		CLOSEFROM=no
+	fi
+	echo "$CLOSEFROM"
+fi
+rm -f _closefrom.c _closefrom
+if [ "$CLOSEFROM" = no ]; then
+	echo "COMPAT_SRCS+=	compat/closefrom.c" >>$CONFIG_MK
+	echo "#include			\"compat/closefrom.h\"" >>$CONFIG_H
+fi
 
 printf "Testing ioctl request type ... "
 cat <<EOF >_ioctl.c
@@ -1920,6 +1945,10 @@ if ! $HOOKSET; then
 			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
 		fi
 	fi
+fi
+if [ "$NTP" = yes ]; then
+	# --enable-ntp
+	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 fi
 
 echo >>$CONFIG_H

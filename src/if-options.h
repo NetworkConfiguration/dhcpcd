@@ -49,6 +49,9 @@
 
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_REBOOT		5
+#define DEFAULT_REQUEST		180	/* secs to request, mirror DHCP6 */
+#define DEFAULT_FALLBACK	5	/* secs until fallback */
+#define DEFAULT_IPV4LL		5	/* secs until ipv4ll */
 
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
@@ -185,6 +188,9 @@
 #define O_NOCONFIGURE		O_BASE + 51
 #define O_RANDOMISE_HWADDR	O_BASE + 52
 #define O_ARP_PERSISTDEFENCE	O_BASE + 53
+#define O_REQUEST_TIME		O_BASE + 54
+#define O_FALLBACK_TIME		O_BASE + 55
+#define O_IPV4LL_TIME		O_BASE + 56
 
 extern const struct option cf_options[];
 
@@ -236,6 +242,9 @@ struct if_options {
 	uint32_t leasetime;
 	uint32_t timeout;
 	uint32_t reboot;
+	uint32_t request_time;
+	uint32_t fallback_time;
+	uint32_t ipv4ll_time;
 	unsigned long long options;
 	bool randomise_hwaddr;
 

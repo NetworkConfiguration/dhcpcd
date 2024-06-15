@@ -96,8 +96,14 @@ _maninstall: ${MAN5} ${MAN8}
 _confinstall:
 	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}
 	# Install a new default config if not present
-	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
-		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
+	if ! [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf ]; then \
+		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}; \
+		if [ "${UNCOMMENT_NTP}" = yes ]; then \
+			${SED} -i \
+			    -e 's/#option ntp_servers/option ntp_servers/' \
+			    ${DESTDIR}/${SYSCONFDIR}/dhcpcd.conf; \
+		fi; \
+	fi
 	
 eginstall:
 
