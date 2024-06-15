@@ -33,6 +33,7 @@ STATIC=
 DEVS=
 EMBEDDED=
 AUTH=
+NTP=
 POLL=
 SMALL=
 SANITIZE=no
@@ -74,6 +75,8 @@ for x do
 	--enable-privsep) PRIVSEP=yes;;
 	--disable-seccomp) SECCOMP=no;;
 	--enable-seccomp) SECCOMP=yes;;
+	--disable-ntp) NTP=no;;
+	--enable-ntp) NTP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
 	--sysconfdir) SYSCONFDIR=$var;;
@@ -1942,6 +1945,10 @@ if ! $HOOKSET; then
 			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
 		fi
 	fi
+fi
+if [ "$NTP" = yes ]; then
+	# --enable-ntp
+	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 fi
 
 echo >>$CONFIG_H
