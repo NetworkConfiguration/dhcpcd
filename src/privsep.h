@@ -192,7 +192,7 @@ ssize_t ps_sendmsg(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const struct msghdr *);
 ssize_t ps_sendcmd(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const void *data, size_t len);
-ssize_t ps_recvmsg(struct dhcpcd_ctx *, int, uint16_t, int);
+ssize_t ps_recvmsg(int, uint16_t, int);
 ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
 
