@@ -804,7 +804,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	int ret;
 #endif
 #ifdef INET6
-	struct in6_addr addr6;
+	struct in6_addr *local6 = NULL, *address6 = NULL;
 	int flags;
 #endif
 
@@ -882,19 +882,24 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 #endif
 #ifdef INET6
 	case AF_INET6:
-		memset(&addr6, 0, sizeof(addr6));
 		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
-			switch (rta->rta_type) {
+		switch (rta->rta_type) {
 			case IFA_ADDRESS:
-				memcpy(&addr6.s6_addr, RTA_DATA(rta),
-				       sizeof(addr6.s6_addr));
+				address6 = (struct in6_addr *)RTA_DATA(rta);
+				break;
+			case IFA_LOCAL:
+				local6 = (struct in6_addr *)RTA_DATA(rta);
 				break;
 			}
 		}
+		if (local6 != NULL)
+			address6 = local6;
+		if (address6 == NULL)
+			break; /* should be impossible */
 
 		/* Validate RTM_DELADDR really means address deleted
 		 * and anything else really means address exists. */
-		flags = if_addrflags6(ifp, &addr6, NULL);
+		flags = if_addrflags6(ifp, address6, NULL);
 		if (nlm->nlmsg_type == RTM_DELADDR) {
 			if (flags != -1)
 				break;
@@ -904,7 +909,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		}
 
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags,
+		    address6, ifa->ifa_prefixlen, ifa->ifa_flags,
 		    (pid_t)nlm->nlmsg_pid);
 		break;
 #endif
