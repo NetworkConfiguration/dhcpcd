@@ -2277,10 +2277,7 @@ printpidfile:
 
 #ifndef SMALL
 	if (ctx.options & DHCPCD_DUMPLEASE &&
-	    i > 0 &&
-	    ctx.ifc == 1 &&
-	    strlen(ctx.ifv[0]) == 1 &&
-	    ctx.ifv[0][0] == '-')
+	    ctx.ifc == 1 && ctx.ifv[0][0] == '-' && ctx.ifv[0][1] == '\0')
 	{
 		ctx.options |= DHCPCD_FORKED; /* pretend child process */
 #ifdef PRIVSEP
