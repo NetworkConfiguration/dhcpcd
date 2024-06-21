@@ -1198,8 +1198,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	anyglobal = ipv6_anyglobal(ifp) != NULL;
 
 	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&ia->addr, addr))
+		if (IN6_ARE_ADDR_EQUAL(&ia->addr, addr)) {
+			ia->addr_flags = addrflags;
 			break;
+		}
 	}
 
 	switch (cmd) {
@@ -1244,48 +1246,49 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			 * generate a new temporary address on
 			 * restart. */
 			ia->acquired = ia->created;
+			ia->addr_flags = addrflags;
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
-		ia->addr_flags = addrflags;
 		ia->flags &= ~IPV6_AF_STALE;
 #ifdef IPV6_MANAGETEMPADDR
 		if (ia->addr_flags & IN6_IFF_TEMPORARY)
 			ia->flags |= IPV6_AF_TEMPORARY;
 #endif
-		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) || ia->dadcallback) {
+
 #ifdef IPV6_POLLADDRFLAG
-			if (ia->addr_flags & IN6_IFF_TENTATIVE) {
-				eloop_timeout_add_msec(
-				    ia->iface->ctx->eloop,
-				    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
-				break;
-			}
-#endif
-
-			if (ia->dadcallback)
-				ia->dadcallback(ia);
-
-			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) &&
-			    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
-			{
-				/* Now run any callbacks.
-				 * Typically IPv6RS or DHCPv6 */
-				while ((cb =
-				    TAILQ_FIRST(&state->ll_callbacks)))
-				{
-					TAILQ_REMOVE(
-					    &state->ll_callbacks,
-					    cb, next);
-					cb->callback(cb->arg);
-					free(cb);
-				}
-			}
+		if ((IN6_IS_ADDR_LINKLOCAL(&ia->addr) || ia->dadcallback) &&
+		    ia->addr_flags & IN6_IFF_TENTATIVE)
+		{
+			eloop_timeout_add_msec(
+			    ia->iface->ctx->eloop,
+			    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 		}
 		break;
+#endif
+	default:
+		return;
 	}
 
 	if (ia == NULL)
 		return;
+
+	if (ia->dadcallback && ((ia->addr_flags &
+	    (IN6_IFF_DETACHED | IN6_IFF_TENTATIVE)) == 0 ||
+	    ia->addr_flags & IN6_IFF_DUPLICATED))
+		ia->dadcallback(ia);
+
+	if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) &&
+	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
+	{
+		/* Now run any callbacks.
+		 * Typically IPv6RS or DHCPv6 */
+		while ((cb = TAILQ_FIRST(&state->ll_callbacks)))
+		{
+			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+			cb->callback(cb->arg);
+			free(cb);
+		}
+	}
 
 	ctx->options &= ~DHCPCD_RTBUILD;
 	ipv6nd_handleifa(cmd, ia, pid);
@@ -1883,10 +1886,13 @@ ipv6_handleifa_addrs(int cmd,
     struct ipv6_addrhead *addrs, const struct ipv6_addr *addr, pid_t pid)
 {
 	struct ipv6_addr *ia, *ian;
-	uint8_t found, alldadcompleted;
+	int found = 0, alldadcompleted = 1;
 
-	alldadcompleted = 1;
-	found = 0;
+	if (cmd != RTM_NEWADDR && cmd != RTM_DELADDR) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
 		if (!IN6_ARE_ADDR_EQUAL(&addr->addr, &ia->addr)) {
 			if (ia->flags & IPV6_AF_ADDED &&
@@ -1894,8 +1900,25 @@ ipv6_handleifa_addrs(int cmd,
 				alldadcompleted = 0;
 			continue;
 		}
-		switch (cmd) {
-		case RTM_DELADDR:
+
+		ia->addr_flags = addr->addr_flags;
+
+		/* Check DAD.
+		 * On Linux we can get IN6_IFF_DUPLICATED via RTM_DELADDR. */
+		if (((ia->addr_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_TENTATIVE)) == 0 ||
+		    ia->addr_flags & IN6_IFF_DUPLICATED) &&
+		    (ia->flags & IPV6_AF_DADCOMPLETED) == 0)
+		{
+			found++;
+			if (ia->dadcallback)
+				ia->dadcallback(ia);
+			/* We need to set this here in-case the
+			 * dadcallback function checks it */
+			ia->flags |= IPV6_AF_DADCOMPLETED;
+		}
+
+		if (cmd == RTM_DELADDR) {
 			if (ia->flags & IPV6_AF_ADDED) {
 				logwarnx("%s: pid %d deleted address %s",
 				    ia->iface->name, pid, ia->saddr);
@@ -1906,22 +1929,6 @@ ipv6_handleifa_addrs(int cmd,
 				TAILQ_REMOVE(addrs, ia, next);
 				ipv6_freeaddr(ia);
 			}
-			break;
-		case RTM_NEWADDR:
-			ia->addr_flags = addr->addr_flags;
-			/* Safety - ignore tentative announcements */
-			if (ia->addr_flags &
-			    (IN6_IFF_DETACHED | IN6_IFF_TENTATIVE))
-				break;
-			if ((ia->flags & IPV6_AF_DADCOMPLETED) == 0) {
-				found++;
-				if (ia->dadcallback)
-					ia->dadcallback(ia);
-				/* We need to set this here in-case the
-				 * dadcallback function checks it */
-				ia->flags |= IPV6_AF_DADCOMPLETED;
-			}
-			break;
 		}
 	}
 
