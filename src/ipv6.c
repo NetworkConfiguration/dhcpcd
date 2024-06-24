@@ -1216,6 +1216,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			/* We'll free it at the end of the function. */
 		}
 		break;
+
 	case RTM_NEWADDR:
 		if (ia == NULL) {
 			ia = ipv6_newaddr(ifp, addr, prefix_len, 0);
@@ -1263,8 +1264,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			    ia->iface->ctx->eloop,
 			    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 		}
-		break;
 #endif
+
+		break;
+
 	default:
 		return;
 	}
