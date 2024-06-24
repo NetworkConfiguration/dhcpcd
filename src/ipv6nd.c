@@ -2163,7 +2163,7 @@ ipv6nd_handledata(void *arg, unsigned short events)
 }
 
 static void
-ipv6nd_startrs1(void *arg)
+ipv6nd_startrs2(void *arg)
 {
 	struct interface *ifp = arg;
 	struct rs_state *state;
@@ -2195,22 +2195,34 @@ ipv6nd_startrs1(void *arg)
 	ipv6nd_sendrsprobe(ifp);
 }
 
-void
-ipv6nd_startrs(struct interface *ifp)
+static void
+ipv6nd_startrs1(void *arg)
 {
+	struct interface *ifp = arg;
 	unsigned int delay;
 
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (!(ifp->options->options & DHCPCD_INITIAL_DELAY)) {
-		ipv6nd_startrs1(ifp);
+		ipv6nd_startrs2(ifp);
 		return;
 	}
 
 	delay = arc4random_uniform(MAX_RTR_SOLICITATION_DELAY * MSEC_PER_SEC);
 	logdebugx("%s: delaying IPv6 router solicitation for %0.1f seconds",
 	    ifp->name, (float)delay / MSEC_PER_SEC);
-	eloop_timeout_add_msec(ifp->ctx->eloop, delay, ipv6nd_startrs1, ifp);
-	return;
+	eloop_timeout_add_msec(ifp->ctx->eloop, delay, ipv6nd_startrs2, ifp);
+}
+
+void
+ipv6nd_startrs(struct interface *ifp)
+{
+
+	if (ipv6_linklocal(ifp) == NULL) {
+		logdebugx("%s: "
+		    "delaying IPv6 Router Solicitation for LL address",
+		    ifp->name);
+		ipv6_addlinklocalcallback(ifp, ipv6nd_startrs1, ifp);
+	} else
+		ipv6nd_startrs1(ifp);
 }
 
 static struct routeinfo *routeinfo_findalloc(struct ra *rap, const struct in6_addr *prefix, uint8_t prefix_len)
