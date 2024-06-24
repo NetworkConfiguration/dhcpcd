@@ -1397,18 +1397,17 @@ ipv6_addlinklocalcallback(struct interface *ifp,
 	state = ipv6_getstate(ifp);
 	TAILQ_FOREACH(cb, &state->ll_callbacks, next) {
 		if (cb->callback == callback && cb->arg == arg)
-			break;
+			return 0;
 	}
+
+	cb = malloc(sizeof(*cb));
 	if (cb == NULL) {
-		cb = malloc(sizeof(*cb));
-		if (cb == NULL) {
-			logerr(__func__);
-			return -1;
-		}
-		cb->callback = callback;
-		cb->arg = arg;
-		TAILQ_INSERT_TAIL(&state->ll_callbacks, cb, next);
+		logerr(__func__);
+		return -1;
 	}
+	cb->callback = callback;
+	cb->arg = arg;
+	TAILQ_INSERT_TAIL(&state->ll_callbacks, cb, next);
 	return 0;
 }
 
