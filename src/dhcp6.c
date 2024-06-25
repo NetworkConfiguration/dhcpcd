@@ -2394,7 +2394,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	i = e = 0;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (!(ap->flags & IPV6_AF_DELEGATED))
+		if (!(ap->flags & (IPV6_AF_DELEGATED | IPV6_AF_DELEGATEDPFX)))
 			ap->flags |= IPV6_AF_STALE;
 	}
 

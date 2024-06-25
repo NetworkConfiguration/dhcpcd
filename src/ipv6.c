@@ -2395,19 +2395,30 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
 {
 	struct interface *ifp;
 	const struct dhcp6_state *d6_state;
-	const struct ipv6_addr *addr;
+	const struct ipv6_addr *ia;
 	struct rt *rt;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		d6_state = D6_CSTATE(ifp);
-		if (d6_state && d6_state->state == dstate) {
-			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
-				rt = inet6_makeprefix(ifp, NULL, addr);
-				if (rt == NULL)
+		if (d6_state == NULL)
+			continue;
+
+		// Don't test the actual state as we could
+		// be between states with still valid routes
+
+		TAILQ_FOREACH(ia, &d6_state->addrs, next) {
+			if (dstate == DH6S_DELEGATED) {
+				// Reject route won't have IPV6_AF_ADDED
+				if (!(ia->flags & IPV6_AF_DELEGATEDPFX))
 					continue;
-				rt->rt_dflags |= RTDF_DHCP;
-				rt_proto_add(routes, rt);
-			}
+			} else if (!(ia->flags & IPV6_AF_ADDED))
+				continue;
+
+			rt = inet6_makeprefix(ifp, NULL, ia);
+			if (rt == NULL)
+				continue;
+			rt->rt_dflags |= RTDF_DHCP;
+			rt_proto_add(routes, rt);
 		}
 	}
 	return 0;
