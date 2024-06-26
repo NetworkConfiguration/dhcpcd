@@ -962,6 +962,7 @@ dhcpcd_startinterface(void *arg)
 				else if (ifo->options & DHCPCD_INFORM6)
 					d6_state = DH6S_INFORM;
 				else
+					/* CONFIRM lease triggered from RA */
 					d6_state = DH6S_CONFIRM;
 				if (dhcp6_start(ifp, d6_state) == -1)
 					logerr("%s: dhcp6_start", ifp->name);

@@ -4025,6 +4025,13 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			}
 			break;
 		case DH6S_CONFIRM:
+			/*
+			 * CONFIRM a prior lease from a RA.
+			 * This could be triggered by a roaming interface.
+			 * We could also get here if we are delegated to.
+			 * Now that we don't remove delegated addresses when
+			 * reading the lease file this is the safe path.
+			 */
 			init_state = DH6S_INIT;
 			goto gogogo;
 		default:
