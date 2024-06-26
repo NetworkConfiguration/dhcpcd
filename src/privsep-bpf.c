@@ -67,7 +67,7 @@ ps_bpf_recvbpf(void *arg, unsigned short events)
 		.ps_cmd = psp->psp_id.psi_cmd,
 	};
 
-	if (events != ELE_READ)
+	if (!(events & (ELE_READ | ELE_ERROR)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	bpf->bpf_flags &= ~BPF_EOF;
