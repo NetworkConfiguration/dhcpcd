@@ -3996,6 +3996,10 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
+
+	logerrx("%s: ifp=%s init_state=%d state=%u", __func__,
+	    ifp->name, init_state, state ? state->state : 9999999);
+
 	if (state != NULL) {
 		switch (init_state) {
 		case DH6S_INIT:

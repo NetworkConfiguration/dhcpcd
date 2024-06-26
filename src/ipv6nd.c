@@ -1638,9 +1638,11 @@ handle_flag:
 #define LOG_DHCP6	logdebug
 #endif
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
+		loginfox("%s: DHCP6 START FROM RA M", ifp->name);
 		if (new_data && dhcp6_start(ifp, DH6S_REQUEST) == -1)
 			LOG_DHCP6("dhcp6_start: %s", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
+		loginfox("%s: DHCP6 START FROM RA O", ifp->name);
 		if (new_data && dhcp6_start(ifp, DH6S_INFORM) == -1)
 			LOG_DHCP6("dhcp6_start: %s", ifp->name);
 	} else {

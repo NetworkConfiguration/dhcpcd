@@ -963,6 +963,7 @@ dhcpcd_startinterface(void *arg)
 					d6_state = DH6S_INFORM;
 				else
 					d6_state = DH6S_CONFIRM;
+				loginfox("%s: DHCP6 START FROM DHCPCD", ifp->name);
 				if (dhcp6_start(ifp, d6_state) == -1)
 					logerr("%s: dhcp6_start", ifp->name);
 			}
