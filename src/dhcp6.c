@@ -1187,14 +1187,14 @@ dhcp6_get_op(uint16_t type)
 }
 
 static void
-dhcp6_freedrop_addrs(struct interface *ifp, int drop,
+dhcp6_freedrop_addrs(struct interface *ifp, int drop, unsigned int notflags,
     const struct interface *ifd)
 {
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
 	if (state) {
-		ipv6_freedrop_addrs(&state->addrs, drop, ifd);
+		ipv6_freedrop_addrs(&state->addrs, drop, notflags, ifd);
 		if (drop)
 			rt_build(ifp->ctx, AF_INET6);
 	}
@@ -1208,7 +1208,7 @@ static void dhcp6_delete_delegates(struct interface *ifp)
 	if (ifp->ctx->ifaces) {
 		TAILQ_FOREACH(ifp0, ifp->ctx->ifaces, next) {
 			if (ifp0 != ifp)
-				dhcp6_freedrop_addrs(ifp0, 1, ifp);
+				dhcp6_freedrop_addrs(ifp0, 1, 0, ifp);
 		}
 	}
 }
@@ -1779,7 +1779,7 @@ dhcp6_fail(struct interface *ifp)
 		dhcp6_leaseextend(ifp);
 		dhcp6_bind(ifp, NULL, NULL);
 	} else {
-		dhcp6_freedrop_addrs(ifp, 1, NULL);
+		dhcp6_freedrop_addrs(ifp, 1, IPV6_AF_ANYDELEGATED, NULL);
 #ifndef SMALL
 		dhcp6_delete_delegates(ifp);
 #endif
@@ -2732,7 +2732,7 @@ out:
 	return bytes;
 
 ex:
-	dhcp6_freedrop_addrs(ifp, 0, NULL);
+	dhcp6_freedrop_addrs(ifp, 0, IPV6_AF_ANYDELEGATED, NULL);
 	dhcp_unlink(ifp->ctx, state->leasefile);
 	free(state->new);
 	state->new = NULL;
@@ -3082,7 +3082,6 @@ dhcp6_find_delegates(struct interface *ifp)
 	if (k) {
 		loginfox("%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
-		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
 		rt_build(ifp->ctx, AF_INET6);
 		dhcp6_script_try_run(ifp, 1);
@@ -4153,7 +4152,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		}
 #endif
 
-		dhcp6_freedrop_addrs(ifp, drop, NULL);
+		dhcp6_freedrop_addrs(ifp, drop, 0, NULL);
 		free(state->old);
 		state->old = state->new;
 		state->old_len = state->new_len;

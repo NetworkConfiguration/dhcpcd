@@ -842,7 +842,7 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
 	if (remove_ra)
 		TAILQ_REMOVE(rap->iface->ctx->ra_routers, rap, next);
-	ipv6_freedrop_addrs(&rap->addrs, drop_ra, NULL);
+	ipv6_freedrop_addrs(&rap->addrs, drop_ra, 0, NULL);
 	routeinfohead_free(&rap->rinfos);
 	free(rap->data);
 	free(rap);
