@@ -102,13 +102,6 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
-/* For some reason, glibc doesn't include newer flags from linux/if.h
- * However, we cannot include linux/if.h directly as it conflicts
- * with the glibc version. D'oh! */
-#ifndef IFF_LOWER_UP
-#define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
-#endif
-
 /* Buggy CentOS and RedHat */
 #ifndef SOL_NETLINK
 #define	SOL_NETLINK	270
@@ -542,6 +535,12 @@ static int if_carrier_from_flags(unsigned int flags)
 	return ((flags & (IFF_LOWER_UP | IFF_RUNNING)) ==
 		(IFF_LOWER_UP | IFF_RUNNING))
 #ifdef IFF_DORMANT
+		/*
+		 * IFF_DORMANT means L1 is up but waiting for an external
+		 * event, for example 802.1X
+		 * We treat this as DOWN, but then return true for if_roaming()
+		 * so that the interface status is persisted.
+		 */
 		&& !(flags & IFF_DORMANT)
 #endif
 		? LINK_UP : LINK_DOWN;
@@ -556,21 +555,27 @@ if_carrier(struct interface *ifp, __unused const void *ifadata)
 	return if_carrier_from_flags(ifp->flags);
 }
 
+
 bool
 if_roaming(struct interface *ifp)
 {
 
-	if (!ifp->wireless ||
-	    ifp->flags & IFF_RUNNING)
-		return false;
-
-#if defined(IFF_DORMANT)
-	return ifp->flags & IFF_DORMANT;
-#elif defined(IFF_LOWER_UP)
-	return (ifp->flags & (IFF_UP|IFF_LOWER_UP)) == (IFF_UP|IFF_LOWER_UP);
-#else
-	return false;
+	return
+#ifdef IFF_DORMANT
+	   ifp->flags & IFF_DORMANT ||
 #endif
+#ifdef IFF_LOWER_UP
+	   /*
+	    * IFF_DORMANT only occurs for supplicant initiated roaming.
+	    * For firmware initiated roaming we don't get IFF_DORMANT.
+	    * Seems weird that the driver can't set it though.
+	    * We can check that IFF_RUNNING is not set but UP and L1 are
+	    * to get the same effect.
+	    */
+	   (ifp->flags & (IFF_UP | IFF_LOWER_UP | IFF_RUNNING)) ==
+	       (IFF_UP | IFF_LOWER_UP) ||
+#endif
+	    false;
 }
 
 int
