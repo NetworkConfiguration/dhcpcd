@@ -1745,40 +1745,13 @@ dhcp6_startdiscoinform(struct interface *ifp)
 }
 
 static void
-dhcp6_leaseextend(struct interface *ifp)
-{
-	struct dhcp6_state *state = D6_STATE(ifp);
-	struct ipv6_addr *ia;
-
-	logwarnx("%s: extending DHCPv6 lease", ifp->name);
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		ia->flags |= IPV6_AF_EXTENDED;
-		/* Set infinite lifetimes. */
-		ia->prefix_pltime = ND6_INFINITE_LIFETIME;
-		ia->prefix_vltime = ND6_INFINITE_LIFETIME;
-	}
-}
-
-static void
-dhcp6_fail(struct interface *ifp)
+dhcp6_fail(struct interface *ifp, bool drop)
 {
 	struct dhcp6_state *state = D6_STATE(ifp);
 
 	state->failed = true;
 
-	/* RFC3315 18.1.2 says that prior addresses SHOULD be used on failure.
-	 * RFC2131 3.2.3 says that MAY chose to use the prior address.
-	 * Because dhcpcd was written first for RFC2131, we have the LASTLEASE
-	 * option which defaults to off as that makes the most sense for
-	 * mobile clients.
-	 * dhcpcd also has LASTLEASE_EXTEND to extend this lease past it's
-	 * expiry, but this is strictly not RFC compliant in any way or form. */
-	if (state->new != NULL &&
-	    ifp->options->options & DHCPCD_LASTLEASE_EXTEND)
-	{
-		dhcp6_leaseextend(ifp);
-		dhcp6_bind(ifp, NULL, NULL);
-	} else {
+	if (drop) {
 		dhcp6_freedrop_addrs(ifp, 1, IPV6_AF_ANYDELEGATED, NULL);
 #ifndef SMALL
 		dhcp6_delete_delegates(ifp);
@@ -1792,7 +1765,8 @@ dhcp6_fail(struct interface *ifp)
 			script_runreason(ifp, "EXPIRE6");
 		dhcp_unlink(ifp->ctx, state->leasefile);
 		dhcp6_addrequestedaddrs(ifp);
-	}
+	} else if (state->new)
+		script_runreason(ifp, "TIMEOUT6");
 
 	if (!dhcp6_startdiscoinform(ifp)) {
 		logwarnx("%s: no advertising IPv6 router wants DHCP",ifp->name);
@@ -1817,7 +1791,9 @@ dhcp6_failconfirm(void *arg)
 
 	logmessage(llevel, "%s: failed to confirm prior DHCPv6 address",
 	    ifp->name);
-	dhcp6_fail(ifp);
+
+	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure. */
+	dhcp6_fail(ifp, false);
 }
 
 static void
@@ -1827,7 +1803,7 @@ dhcp6_failrequest(void *arg)
 	int llevel = dhcp6_failloglevel(ifp);
 
 	logmessage(llevel, "%s: failed to request DHCPv6 address", ifp->name);
-	dhcp6_fail(ifp);
+	dhcp6_fail(ifp, true);
 }
 
 static void
@@ -1838,17 +1814,20 @@ dhcp6_failinform(void *arg)
 
 	logmessage(llevel, "%s: failed to request DHCPv6 information",
 	    ifp->name);
-	dhcp6_fail(ifp);
+	dhcp6_fail(ifp, true);
 }
 
 #ifndef SMALL
 static void
-dhcp6_failrebind(void *arg)
+dhcp6_failrebindpd(void *arg)
 {
 	struct interface *ifp = arg;
 
 	logerrx("%s: failed to rebind prior DHCPv6 delegation", ifp->name);
-	dhcp6_fail(ifp);
+
+	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure.
+	 * 18.2 says REBIND rather than CONFIRM with PD but use CONFIRM timings. */
+	dhcp6_fail(ifp, false);
 }
 
 static int
@@ -1875,47 +1854,39 @@ dhcp6_startrebind(void *arg)
 {
 	struct interface *ifp;
 	struct dhcp6_state *state;
-#ifndef SMALL
-	int pd;
-#endif
 
 	ifp = arg;
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendrenew, ifp);
 	state = D6_STATE(ifp);
-	if (state->state == DH6S_RENEW)
-		logwarnx("%s: failed to renew DHCPv6, rebinding", ifp->name);
-	else
-		loginfox("%s: rebinding prior DHCPv6 lease", ifp->name);
-	state->state = DH6S_REBIND;
+
+	state->IMD = REB_MAX_DELAY;
+	state->IRT = REB_TIMEOUT;
+	state->MRT = REB_MAX_RT;
 	state->RTC = 0;
 	state->MRC = 0;
 
+	if (state->state == DH6S_RENEW)
+		logwarnx("%s: failed to renew DHCPv6, rebinding", ifp->name);
+	else {
+		loginfox("%s: rebinding prior DHCPv6 lease", ifp->name);
+
 #ifndef SMALL
-	/* RFC 3633 section 12.1 */
-	pd = dhcp6_hasprefixdelegation(ifp);
-	if (pd) {
-		state->IMD = CNF_MAX_DELAY;
-		state->IRT = CNF_TIMEOUT;
-		state->MRT = CNF_MAX_RT;
-	} else
+		/* RFC 8415 18.2.5 */
+		if (dhcp6_hasprefixdelegation(ifp)) {
+			state->IMD = CNF_MAX_DELAY;
+			state->IRT = CNF_TIMEOUT;
+			state->MRT = CNF_MAX_RT;
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    CNF_MAX_RD, dhcp6_failrebindpd, ifp);
+		}
 #endif
-	{
-		state->IMD = REB_MAX_DELAY;
-		state->IRT = REB_TIMEOUT;
-		state->MRT = REB_MAX_RT;
 	}
 
+	state->state = DH6S_REBIND;
 	if (dhcp6_makemessage(ifp) == -1)
 		logerr("%s: %s", __func__, ifp->name);
 	else
 		dhcp6_sendrebind(ifp);
-
-#ifndef SMALL
-	/* RFC 3633 section 12.1 */
-	if (pd)
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    CNF_MAX_RD, dhcp6_failrebind, ifp);
-#endif
 }
 
 static void
@@ -1984,7 +1955,7 @@ dhcp6_startexpire(void *arg)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendrebind, ifp);
 
 	logerrx("%s: DHCPv6 lease expired", ifp->name);
-	dhcp6_fail(ifp);
+	dhcp6_fail(ifp, true);
 }
 
 static void
@@ -1993,7 +1964,7 @@ dhcp6_faildecline(void *arg)
 	struct interface *ifp = arg;
 
 	logerrx("%s: failed to decline duplicated DHCPv6 addresses", ifp->name);
-	dhcp6_fail(ifp);
+	dhcp6_fail(ifp, true);
 }
 
 static void
@@ -2686,8 +2657,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 
 	if (state->expire != ND6_INFINITE_LIFETIME &&
-	    (time_t)state->expire < now - mtime &&
-	    !(ifp->options->options & DHCPCD_LASTLEASE_EXTEND))
+	    (time_t)state->expire < now - mtime)
 	{
 		logdebugx("%s: discarding expired lease", ifp->name);
 		bytes = 0;
@@ -3475,7 +3445,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			 * acknowledgement of one. */
 			loginfox("%s: %s acknowledged DECLINE6",
 			    ifp->name, sfrom);
-			dhcp6_fail(ifp);
+			dhcp6_fail(ifp, true);
 			return;
 		default:
 			valid_op = false;
