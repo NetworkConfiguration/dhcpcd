@@ -1409,9 +1409,15 @@ get_lease(struct interface *ifp,
 			const struct ipv4_addr *ia;
 
 			ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-			assert(ia != NULL);
-			lease->mask = ia->mask;
-			lease->brd = ia->brd;
+			if (ia == NULL) {
+				lease->mask.s_addr =
+				    ipv4_getnetmask(lease->addr.s_addr);
+				lease->brd.s_addr =
+				    lease->addr.s_addr | ~lease->mask.s_addr;
+			} else {
+				lease->mask = ia->mask;
+				lease->brd = ia->brd;
+			}
 		}
 	} else {
 		if (get_option_addr(ctx, &lease->mask, bootp, len,
