@@ -53,6 +53,8 @@
 #include "logerr.h"
 #include "privsep.h"
 
+/* We expect to have open 3 SEQPACKET and one RAW fd */
+
 static void
 ps_bpf_recvbpf(void *arg, unsigned short events)
 {
@@ -65,7 +67,7 @@ ps_bpf_recvbpf(void *arg, unsigned short events)
 		.ps_cmd = psp->psp_id.psi_cmd,
 	};
 
-	if (events != ELE_READ)
+	if (!(events & (ELE_READ | ELE_ERROR)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	bpf->bpf_flags &= ~BPF_EOF;
@@ -160,6 +162,9 @@ ps_bpf_start_bpf(struct ps_process *psp)
 	ps_freeprocesses(ctx, psp);
 
 	psp->psp_bpf = bpf_open(&psp->psp_ifp, psp->psp_filter, ia);
+#ifdef DEBUG_FD
+	logdebugx("pid %d bpf_fd=%d", getpid(), psp->psp_bpf->bpf_fd);
+#endif
 	if (psp->psp_bpf == NULL)
 		logerr("%s: bpf_open",__func__);
 #ifdef PRIVSEP_RIGHTS
@@ -328,7 +333,7 @@ ps_bpf_send(const struct interface *ifp, const struct in_addr *ia,
 	if (ia != NULL)
 		psm.ps_id.psi_addr.psa_in_addr = *ia;
 
-	return ps_sendpsmdata(ctx, ctx->ps_root->psp_fd, &psm, data, len);
+	return ps_sendpsmdata(ctx, PS_ROOT_FD(ctx), &psm, data, len);
 }
 
 #ifdef ARP

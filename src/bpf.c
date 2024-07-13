@@ -45,7 +45,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <paths.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -155,6 +154,11 @@ bpf_open(const struct interface *ifp,
 	struct bpf_version pv = { .bv_major = 0, .bv_minor = 0 };
 	struct ifreq ifr = { .ifr_flags = 0 };
 	int ibuf_len = 0;
+#ifdef O_CLOEXEC
+#define BPF_OPEN_FLAGS O_RDWR | O_NONBLOCK | O_CLOEXEC
+#else
+#define BPF_OPEN_FLAGS O_RDWR | O_NONBLOCK
+#endif
 #ifdef BIOCIMMEDIATE
 	unsigned int flags;
 #endif
@@ -167,25 +171,19 @@ bpf_open(const struct interface *ifp,
 		return NULL;
 	bpf->bpf_ifp = ifp;
 
-#ifdef _PATH_BPF
-	bpf->bpf_fd = open(_PATH_BPF, O_RDWR | O_NONBLOCK
-#ifdef O_CLOEXEC
-		| O_CLOEXEC
-#endif
-	);
-#else
-	char device[32];
-	int n = 0;
+	/* /dev/bpf is a cloner on modern kernels */
+	bpf->bpf_fd = open("/dev/bpf", BPF_OPEN_FLAGS);
 
-	do {
-		snprintf(device, sizeof(device), "/dev/bpf%d", n++);
-		bpf->bpf_fd = open(device, O_RDWR | O_NONBLOCK
-#ifdef O_CLOEXEC
-				| O_CLOEXEC
-#endif
-		);
-	} while (bpf->bpf_fd == -1 && errno == EBUSY);
-#endif
+	/* Support older kernels where /dev/bpf is not a cloner */
+	if (bpf->bpf_fd == -1) {
+		char device[32];
+		int n = 0;
+
+		do {
+			snprintf(device, sizeof(device), "/dev/bpf%d", n++);
+			bpf->bpf_fd = open(device, BPF_OPEN_FLAGS);
+		} while (bpf->bpf_fd == -1 && errno == EBUSY);
+	}
 
 	if (bpf->bpf_fd == -1)
 		goto eexit;
@@ -612,16 +610,19 @@ static const struct bpf_insn bpf_bootp_base[] = {
 #define BPF_BOOTP_BASE_LEN	__arraycount(bpf_bootp_base)
 
 static const struct bpf_insn bpf_bootp_read[] = {
-	/* Make sure it's from and to the right port. */
-	BPF_STMT(BPF_LD + BPF_W + BPF_IND, 0),
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (BOOTPS << 16) + BOOTPC, 1, 0),
+	/* Make sure it's to the right port.
+	 * RFC2131 makes no mention of enforcing a source port. */
+	BPF_STMT(BPF_LD + BPF_H + BPF_IND, offsetof(struct udphdr, uh_dport)),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, BOOTPC, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 #define BPF_BOOTP_READ_LEN	__arraycount(bpf_bootp_read)
 
 #ifdef BIOCSETWF
 static const struct bpf_insn bpf_bootp_write[] = {
-	/* Make sure it's from and to the right port. */
+	/* Make sure it's from and to the right port.
+	 * RFC2131 makes no mention of encforcing a source port,
+	 * but dhcpcd does enforce it for sending. */
 	BPF_STMT(BPF_LD + BPF_W + BPF_IND, 0),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (BOOTPC << 16) + BOOTPS, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),

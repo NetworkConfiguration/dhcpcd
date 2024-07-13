@@ -1,5 +1,6 @@
 SUBDIRS=	src hooks
 
+PACKAGE=	dhcpcd
 VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' src/defs.h
 
 DIST!=		if test -d .git; then echo "dist-git"; \
@@ -8,11 +9,11 @@ FOSSILID?=	current
 GITREF?=	HEAD
 
 DISTSUFFIX=
-DISTPREFIX?=	dhcpcd-${VERSION}${DISTSUFFIX}
-DISTFILEGZ?=	${DISTPREFIX}.tar.gz
+DISTPREFIX?=	${PACKAGE}-${VERSION}${DISTSUFFIX}
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
-DISTINFOSIGN=	${DISTINFO}.asc
+DISTINFOMD=	${DISTINFO}.md
+DISTSIGN=	${DISTFILE}.asc
 
 CLEANFILES+=	*.tar.xz
 
@@ -49,29 +50,41 @@ clean:
 
 distclean: clean
 	rm -f config.h config.mk config.log \
-		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
+		${DISTFILE} ${DISTINFO} ${DISTINFOMD} ${DISTSIGN}
 	rm -f *.diff *.patch *.orig *.rej
 	for x in ${SUBDIRS} tests; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 dist-git:
-	git archive --prefix=${DISTPREFIX}/ ${GITREF} | xz >${DISTFILE}
+	git archive --prefix=${DISTPREFIX}/ v${VERSION} | xz >${DISTFILE}
 
 dist-inst:
 	mkdir /tmp/${DISTPREFIX}
 	cp -RPp * /tmp/${DISTPREFIX}
 	(cd /tmp/${DISTPREFIX}; make clean)
-	tar -cvjpf ${DISTFILE} -C /tmp ${DISTPREFIX}
+	tar -cvJpf ${DISTFILE} -C /tmp ${DISTPREFIX}
 	rm -rf /tmp/${DISTPREFIX}
 
 dist: ${DIST}
 
 distinfo: dist
-	rm -f ${DISTINFO} ${DISTINFOSIGN}
-	${CKSUM} ${DISTFILE} >${DISTINFO}
-	#printf "SIZE (${DISTFILE}) = %s\n" $$(wc -c <${DISTFILE}) >>${DISTINFO}
-	${PGP} --clearsign --output=${DISTINFOSIGN} ${DISTINFO}
-	chmod 644 ${DISTINFOSIGN}
-	ls -l ${DISTFILE} ${DISTINFO} ${DISTINFOSIGN}
+	rm -f ${DISTINFO} ${DISTSIGN}
+	${SHA256} ${DISTFILE} >${DISTINFO}
+	wc -c <${DISTFILE} \
+		| xargs printf 'Size   (${DISTFILE}) = %s\n' >>${DISTINFO}
+	${PGP} --armour --detach-sign ${DISTFILE}
+	chmod 644 ${DISTSIGN}
+	ls -l ${DISTFILE} ${DISTINFO} ${DISTSIGN}
+
+${DISTINFOMD}: ${DISTINFO}
+	echo '```' >${DISTINFOMD}
+	cat ${DISTINFO} >>${DISTINFOMD}
+	echo '```' >>${DISTINFOMD}
+
+release: distinfo ${DISTINFOMD}
+	gh release create v${VERSION} \
+		--title "${PACKAGE} ${VERSION}" --draft --generate-notes \
+		--notes-file ${DISTINFOMD} \
+		${DISTFILE} ${DISTSIGN}
 
 snapshot:
 	rm -rf /tmp/${DISTPREFIX}
@@ -87,7 +100,7 @@ _import: dist
 	tar xvpf ${DISTFILE} -C ${DESTDIR} --strip 1
 	@${ECHO}
 	@${ECHO} "============================================================="
-	@${ECHO} "dhcpcd-${VERSION} imported to ${DESTDIR}"
+	@${ECHO} "${PACKAGE}-${VERSION} imported to ${DESTDIR}"
 
 import:
 	${MAKE} _import DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`
@@ -100,7 +113,7 @@ _import-src: clean
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=${DESTDIR} $@ || exit $$?; cd ..; done
 	@${ECHO}
 	@${ECHO} "============================================================="
-	@${ECHO} "dhcpcd-${VERSION} imported to ${DESTDIR}"
+	@${ECHO} "${PACKAGE}-${VERSION} imported to ${DESTDIR}"
 
 import-src:
 	${MAKE} _import-src DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`

@@ -168,6 +168,10 @@ const struct option cf_options[] = {
 	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
 	{"configure",       no_argument,       NULL, O_CONFIGURE},
 	{"noconfigure",     no_argument,       NULL, O_NOCONFIGURE},
+	{"arp_persistdefence", no_argument,    NULL, O_ARP_PERSISTDEFENCE},
+	{"request_time",    required_argument, NULL, O_REQUEST_TIME},
+	{"fallback_time",   required_argument, NULL, O_FALLBACK_TIME},
+	{"ipv4ll_time",     required_argument, NULL, O_IPV4LL_TIME},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -193,7 +197,10 @@ add_environ(char ***array, const char *value, int uniq)
 	l = strlen(match);
 
 	while (list && list[i]) {
-		if (match && strncmp(list[i], match, l) == 0) {
+		/* We know that it must contain '=' due to the above test */
+		size_t listl = (size_t)(strchr(list[i], '=') - list[i]);
+
+		if (l == listl && strncmp(list[i], match, l) == 0) {
 			if (uniq) {
 				n = strdup(value);
 				if (n == NULL) {
@@ -955,11 +962,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'w':
 		ifo->options |= DHCPCD_WAITIP;
-		if (arg != NULL && arg[0] != '\0') {
-			if (arg[0] == '4' || arg[1] == '4')
+		p = UNCONST(arg);
+		// Generally it's --waitip=46, but some expect
+		// --waitip="4 6" to work as well.
+		// It's easier to allow it rather than have confusing docs.
+		while (p != NULL && p[0] != '\0') {
+			if (p[0] == '4' || p[1] == '4')
 				ifo->options |= DHCPCD_WAITIP4;
-			if (arg[0] == '6' || arg[1] == '6')
+			if (p[0] == '6' || p[1] == '6')
 				ifo->options |= DHCPCD_WAITIP6;
+			p = strskipwhite(++p);
 		}
 		break;
 	case 'y':
@@ -1825,6 +1837,8 @@ err_sla:
 			t |= OT_ADDRIPV6;
 		else if (strcasecmp(arg, "string") == 0)
 			t |= OT_STRING;
+		else if (strcasecmp(arg, "uri") == 0)
+			t |= OT_URI;
 		else if (strcasecmp(arg, "byte") == 0)
 			t |= OT_UINT8;
 		else if (strcasecmp(arg, "bitflags") == 0)
@@ -2327,6 +2341,38 @@ invalid_token:
 	case O_NOCONFIGURE:
 		ifo->options &= ~DHCPCD_CONFIGURE;
 		break;
+	case O_ARP_PERSISTDEFENCE:
+		ifo->options |= DHCPCD_ARP_PERSISTDEFENCE;
+		break;
+	case O_REQUEST_TIME:
+		ARG_REQUIRED;
+		ifo->request_time =
+		    (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid request time: %s", arg);
+			return -1;
+		}
+		break;
+#ifdef INET
+	case O_FALLBACK_TIME:
+		ARG_REQUIRED;
+		ifo->request_time =
+		    (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid fallback time: %s", arg);
+			return -1;
+		}
+		break;
+	case O_IPV4LL_TIME:
+		ARG_REQUIRED;
+		ifo->ipv4ll_time =
+		    (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid ipv4ll time: %s", arg);
+			return -1;
+		}
+		break;
+#endif
 	default:
 		return 0;
 	}
@@ -2397,7 +2443,7 @@ finish_config(struct if_options *ifo)
 		    ~(DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
 }
 
-struct if_options *
+static struct if_options *
 default_config(struct dhcpcd_ctx *ctx)
 {
 	struct if_options *ifo;
@@ -2410,6 +2456,11 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->options |= DHCPCD_IF_UP | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
+	ifo->request_time = DEFAULT_REQUEST;
+#ifdef INET
+	ifo->fallback_time = DEFAULT_FALLBACK;
+	ifo->ipv4ll_time = DEFAULT_IPV4LL;
+#endif
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
 	rb_tree_init(&ifo->routes, &rt_compare_list_ops);
@@ -2451,7 +2502,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		default_options |= DHCPCD_CONFIGURE | DHCPCD_DAEMONISE |
 		    DHCPCD_GATEWAY;
 #ifdef INET
-		skip = socket(PF_INET, SOCK_DGRAM, 0);
+		skip = xsocket(PF_INET, SOCK_DGRAM, 0);
 		if (skip != -1) {
 			close(skip);
 			default_options |= DHCPCD_IPV4 | DHCPCD_ARP |
@@ -2459,7 +2510,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		}
 #endif
 #ifdef INET6
-		skip = socket(PF_INET6, SOCK_DGRAM, 0);
+		skip = xsocket(PF_INET6, SOCK_DGRAM, 0);
 		if (skip != -1) {
 			close(skip);
 			default_options |= DHCPCD_IPV6 | DHCPCD_IPV6RS |

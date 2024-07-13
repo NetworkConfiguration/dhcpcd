@@ -13,4 +13,6 @@
 #include <stdint.h>
 
 uint32_t arc4random(void);
+void arc4random_buf(void *, size_t);
+
 #endif

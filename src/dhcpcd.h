@@ -116,10 +116,6 @@ struct passwd;
 struct dhcpcd_ctx {
 	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	char vendor[256];
-	bool stdin_valid;	/* It's possible stdin, stdout and stderr */
-	bool stdout_valid;	/* could be closed when dhcpcd starts. */
-	bool stderr_valid;
-	int stderr_fd;	/* FD for logging to stderr */
 	int fork_fd;	/* FD for the fork init signal pipe */
 	const char *cffile;
 	unsigned long long options;
@@ -265,6 +261,7 @@ extern const char *dhcpcd_default_script;
 
 int dhcpcd_ifafwaiting(const struct interface *);
 int dhcpcd_afwaiting(const struct dhcpcd_ctx *);
+void dhcpcd_daemonised(struct dhcpcd_ctx *);
 void dhcpcd_daemonise(struct dhcpcd_ctx *);
 
 void dhcpcd_signal_cb(int, void *);

@@ -55,6 +55,7 @@
 #define	PS_CTL_EOF		0x0019
 #define	PS_LOGREOPEN		0x0020
 #define	PS_STOPPROCS		0x0021
+#define	PS_DAEMONISED		0x0022
 
 /* Domains */
 #define	PS_ROOT			0x0101
@@ -113,7 +114,9 @@
 #define PRIVSEP_RIGHTS
 #endif
 
-#ifdef __linux__
+#define PS_ROOT_FD(ctx) ((ctx)->ps_root ? (ctx)->ps_root->psp_fd : -1)
+
+#if !defined(DISABLE_SECCOMP) && defined(__linux__)
 # include <linux/version.h>
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
 #  define HAVE_SECCOMP
@@ -201,6 +204,7 @@ int ps_stop(struct dhcpcd_ctx *);
 int ps_stopwait(struct dhcpcd_ctx *);
 int ps_entersandbox(const char *, const char **);
 int ps_managersandbox(struct dhcpcd_ctx *, const char *);
+ssize_t ps_daemonised(struct dhcpcd_ctx *);
 
 int ps_unrollmsg(struct msghdr *, struct ps_msghdr *, const void *, size_t);
 ssize_t ps_sendpsmmsg(struct dhcpcd_ctx *, int,
@@ -211,7 +215,7 @@ ssize_t ps_sendmsg(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const struct msghdr *);
 ssize_t ps_sendcmd(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const void *data, size_t len);
-ssize_t ps_recvmsg(struct dhcpcd_ctx *, int, unsigned short, uint16_t, int);
+ssize_t ps_recvmsg(int, unsigned short, uint16_t, int);
 ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
 

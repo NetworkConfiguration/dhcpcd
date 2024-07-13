@@ -60,6 +60,9 @@
 #include <linux/if_arp.h>
 #endif
 
+/* Inlcude this *after* net/if.h so we get IFF_DORMANT */
+#include <linux/if.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -97,13 +100,6 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 /* Support older kernels */
 #ifndef IFLA_WIRELESS
 #define IFLA_WIRELESS (IFLA_MASTER + 1)
-#endif
-
-/* For some reason, glibc doesn't include newer flags from linux/if.h
- * However, we cannot include linux/if.h directly as it conflicts
- * with the glibc version. D'oh! */
-#ifndef IFF_LOWER_UP
-#define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
 #endif
 
 /* Buggy CentOS and RedHat */
@@ -182,18 +178,20 @@ static const char *mproc =
 	"cpu model"
 #elif defined(__frv__)
 	"System"
+#elif defined(__hppa__)
+	"model"
 #elif defined(__i386__) || defined(__x86_64__)
 	"vendor_id"
 #elif defined(__ia64__)
 	"vendor"
-#elif defined(__hppa__)
-	"model"
 #elif defined(__m68k__)
 	"MMU"
 #elif defined(__mips__)
 	"system type"
 #elif defined(__powerpc__) || defined(__powerpc64__)
 	"machine"
+#elif defined(__riscv)
+	"uarch"
 #elif defined(__s390__) || defined(__s390x__)
 	"Manufacturer"
 #elif defined(__sh__)
@@ -502,15 +500,22 @@ setup_priv:
 void
 if_closesockets_os(struct dhcpcd_ctx *ctx)
 {
-	struct priv *priv;
+	struct priv *priv = ctx->priv;
 
-	if (ctx->priv != NULL) {
-		priv = (struct priv *)ctx->priv;
-		if (priv->route_fd != -1)
-			close(priv->route_fd);
-		if (priv->generic_fd != -1)
-			close(priv->generic_fd);
+	if (priv == NULL)
+		return;
+
+	if (priv->route_fd != -1) {
+		close(priv->route_fd);
+		priv->route_fd = -1;
 	}
+	if (priv->generic_fd != -1) {
+		close(priv->generic_fd);
+		priv->generic_fd = -1;
+	}
+
+	free(priv);
+	ctx->priv = NULL;
 }
 
 int
@@ -530,26 +535,54 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 	return if_ioctl(ifp->ctx, SIOCSIFHWADDR, &ifr, sizeof(ifr));
 }
 
+static int if_carrier_from_flags(unsigned int flags)
+{
+
+#ifdef IFF_LOWER_UP
+	return ((flags & (IFF_LOWER_UP | IFF_RUNNING)) ==
+		(IFF_LOWER_UP | IFF_RUNNING))
+#ifdef IFF_DORMANT
+		/*
+		 * IFF_DORMANT means L1 is up but waiting for an external
+		 * event, for example 802.1X
+		 * We treat this as DOWN, but then return true for if_roaming()
+		 * so that the interface status is persisted.
+		 */
+		&& !(flags & IFF_DORMANT)
+#endif
+		? LINK_UP : LINK_DOWN;
+#else
+	return flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
+#endif
+}
+
 int
 if_carrier(struct interface *ifp, __unused const void *ifadata)
 {
-
-	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
+	return if_carrier_from_flags(ifp->flags);
 }
+
 
 bool
 if_roaming(struct interface *ifp)
 {
 
-#ifdef IFF_LOWER_UP
-	if (!ifp->wireless ||
-	    ifp->flags & IFF_RUNNING ||
-	    (ifp->flags & (IFF_UP | IFF_LOWER_UP)) != (IFF_UP | IFF_LOWER_UP))
-		return false;
-	return true;
-#else
-	return false;
+	return
+#ifdef IFF_DORMANT
+	   ifp->flags & IFF_DORMANT ||
 #endif
+#ifdef IFF_LOWER_UP
+	   /*
+	    * IFF_DORMANT only occurs for supplicant initiated roaming.
+	    * For firmware initiated roaming we don't get IFF_DORMANT.
+	    * Seems weird that the driver can't set it though.
+	    * We can check that IFF_RUNNING is not set but UP and L1 are
+	    * to get the same effect.
+	    */
+	   (ifp->flags & (IFF_UP | IFF_LOWER_UP | IFF_RUNNING)) ==
+	       (IFF_UP | IFF_LOWER_UP) ||
+#endif
+	    false;
 }
 
 int
@@ -783,7 +816,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	int ret;
 #endif
 #ifdef INET6
-	struct in6_addr addr6;
+	struct in6_addr *local6 = NULL, *address6 = NULL;
 	int flags;
 #endif
 
@@ -861,19 +894,24 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 #endif
 #ifdef INET6
 	case AF_INET6:
-		memset(&addr6, 0, sizeof(addr6));
 		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
-			switch (rta->rta_type) {
+		switch (rta->rta_type) {
 			case IFA_ADDRESS:
-				memcpy(&addr6.s6_addr, RTA_DATA(rta),
-				       sizeof(addr6.s6_addr));
+				address6 = (struct in6_addr *)RTA_DATA(rta);
+				break;
+			case IFA_LOCAL:
+				local6 = (struct in6_addr *)RTA_DATA(rta);
 				break;
 			}
 		}
+		if (local6 != NULL)
+			address6 = local6;
+		if (address6 == NULL)
+			break; /* should be impossible */
 
 		/* Validate RTM_DELADDR really means address deleted
 		 * and anything else really means address exists. */
-		flags = if_addrflags6(ifp, &addr6, NULL);
+		flags = if_addrflags6(ifp, address6, NULL);
 		if (nlm->nlmsg_type == RTM_DELADDR) {
 			if (flags != -1)
 				break;
@@ -883,7 +921,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		}
 
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags,
+		    address6, ifa->ifa_prefixlen, ifa->ifa_flags,
 		    (pid_t)nlm->nlmsg_pid);
 		break;
 #endif
@@ -1052,7 +1090,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	}
 
 	dhcpcd_handlecarrier(ifp,
-	    ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
+	    if_carrier_from_flags(ifi->ifi_flags),
 	    ifi->ifi_flags);
 	return 0;
 }
@@ -2041,7 +2079,8 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	size_t len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
-	bool matches_addr = false;
+	struct in6_addr *local = NULL, *address = NULL;
+	uint32_t *flags = NULL;
 
 	ifa = NLMSG_DATA(nlm);
 	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET6)
@@ -2052,17 +2091,26 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFA_ADDRESS:
-			if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, (struct in6_addr *)RTA_DATA(rta)))
-				ia->ifa_found = matches_addr = true;
-			else
-				matches_addr = false;
+			address = (struct in6_addr *)RTA_DATA(rta);
+			break;
+		case IFA_LOCAL:
+			local = (struct in6_addr *)RTA_DATA(rta);
 			break;
 		case IFA_FLAGS:
-			if (matches_addr)
-				memcpy(&ia->ifa_flags, RTA_DATA(rta), sizeof(ia->ifa_flags));
+			flags = (uint32_t *)RTA_DATA(rta);
 			break;
 		}
 	}
+
+	if (local) {
+	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, local))
+			ia->ifa_found = true;
+	} else if (address) {
+	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, address))
+			ia->ifa_found = true;
+	}
+	if (flags && ia->ifa_found)
+		memcpy(&ia->ifa_flags, flags, sizeof(ia->ifa_flags));
 	return 0;
 }
 
@@ -2168,26 +2216,28 @@ if_setup_inet6(const struct interface *ifp)
 	int ra;
 	char path[256];
 
-	/* The kernel cannot make stable private addresses.
+	/* Modern linux kernels can make a stable private address.
 	 * However, a lot of distros ship newer kernel headers than
-	 * the kernel itself so sweep that error under the table. */
+	 * the kernel itself so we sweep that error under the table
+	 * from old kernels and just make them ourself regardless. */
 	if (if_disable_autolinklocal(ctx, ifp->index) == -1 &&
 	    errno != ENODEV && errno != ENOTSUP && errno != EINVAL)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
 
-	/*
-	 * If not doing autoconf, don't disable the kernel from doing it.
-	 * If we need to, we should have another option actively disable it.
-	 */
-	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
-		logdebugx("%s: leaving autoconf up to the kernel, noop here",
-			 ifp->name);
+	/* If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it. */
+	if (!(ifp->options->options & DHCPCD_IPV6RS))
 		return;
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
 	ra = check_proc_int(ifp->name, ctx, path);
-	if (ra != 1 && ra != -1) {
+	if (ra == -1) {
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		if (errno != ENOENT)
+			logerr("%s: %s", __func__, path);
+	} else if (ra != 0) {
 		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
@@ -2199,7 +2249,9 @@ if_setup_inet6(const struct interface *ifp)
 		 * error as such so just log it and continue */
 		if (errno != ENOENT)
 			logerr("%s: %s", __func__, path);
-	} else if (ra != 0) {
+	} else if (ra != 0 && ra != 2) {
+    /* Skip setting accept_ra if it is already disabled
+     *  or has been configured to force overwrite */
 		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}

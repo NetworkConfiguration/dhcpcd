@@ -38,7 +38,7 @@ CLEANFILES+=	*.tar.xz
 
 .SUFFIXES:	.in
 
-.in: Makefile ${TOP}/config.mk
+.in:
 	${SED} ${SED_RUNDIR} ${SED_DBDIR} ${SED_LIBDIR} ${SED_HOOKDIR} \
 		${SED_SYS} ${SED_SCRIPT} ${SED_DATADIR} \
 		${SED_SERVICEEXISTS} ${SED_SERVICECMD} ${SED_SERVICESTATUS} \
@@ -51,7 +51,7 @@ all: ${TOP}/config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 dev:
 	cd dev && ${MAKE}
 
-.c.o: Makefile ${TOP}/config.mk
+.c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
 CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
@@ -64,8 +64,8 @@ dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.c.in
 
 if-options.c: dhcpcd-embedded.h
 
-.depend: ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS}
-	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS} > .depend
+.depend: ${SRCS} ${PCRYPT_SRCS} ${PCOMPAT_SRC}
+	${CC} ${CPPFLAGS} -MM ${SRCS} ${PCRYPT_SRCS} ${PCOMPAT_SRCS} > .depend
 
 depend: .depend
 
@@ -96,8 +96,14 @@ _maninstall: ${MAN5} ${MAN8}
 _confinstall:
 	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}
 	# Install a new default config if not present
-	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
-		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
+	if ! [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf ]; then \
+		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}; \
+		if [ "${UNCOMMENT_NTP}" = yes ]; then \
+			${SED} -i \
+			    -e 's/#option ntp_servers/option ntp_servers/' \
+			    ${DESTDIR}/${SYSCONFDIR}/dhcpcd.conf; \
+		fi; \
+	fi
 	
 eginstall:
 

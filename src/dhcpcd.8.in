@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 31, 2022
+.Dd June 17, 2024
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -186,13 +186,16 @@ The
 .Fl w , Fl Fl waitip
 option is enabled in this instance to maintain compatibility with older
 versions.
-Using a single interface also affects the
+Using a single interface,
+optionally further limited to an address protocol,
+also affects the
 .Fl k ,
 .Fl N ,
 .Fl n
 and
 .Fl x
-options, where the same interface will need to be specified, as a lack of an
+options, where the same interface and any address protocol
+will need to be specified, as a lack of an
 interface will imply Manager mode which this is not.
 To force starting in Manager mode with only one interface, the
 .Fl M , Fl Fl manager
@@ -452,9 +455,9 @@ variable for use in
 .Pa @SCRIPT@ .
 .It Fl p , Fl Fl persistent
 .Nm
-normally de-configures the
+de-configures the
 .Ar interface
-when it exits.
+when it exits unless this option is enabled.
 Sometimes, this isn't desirable if, for example, you have root mounted over
 NFS or SSH clients connect to this host and they need to be notified of
 the host shutting down.
@@ -713,7 +716,9 @@ Use the
 or
 .Fl 6
 flags to specify an address family.
-If a lease is piped in via standard input then that is dumped.
+If a lease is piped in via standard input then use the special interface named
+.Ar -
+to dump it.
 In this case, specifying an address family is mandatory.
 .It Fl V , Fl Fl variables
 Display a list of option codes, the associated variable and encoding for use in

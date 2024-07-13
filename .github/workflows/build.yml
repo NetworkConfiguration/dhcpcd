@@ -1,0 +1,105 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CC: clang
+
+jobs:
+  ubuntu:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, ubuntu-22.04 ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Configure
+      run: ./configure --prefix=/usr
+
+    - name: Build
+      run: make
+
+    - name: Tests
+      run: make tests
+
+  openbsd:
+    runs-on: macos-12
+    steps:
+    - name: Bootstrap OpenBSD-latest
+      uses: mario-campos/emulate@v1
+      with:
+        operating-system: openbsd-latest
+
+    - name: Install Dependencies
+      run: pkg_add git
+
+    - name: Build
+      run: |
+        git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
+        cd build
+        [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
+        echo "configure"
+        ./configure --prefix=/usr
+        echo "building"
+        make
+
+    - name: Tests
+      run: |
+        ulimit -n 1024
+        cd build
+        make tests
+
+  freebsd:
+    runs-on: macos-12
+    steps:
+    - name: Bootstrap FreeBSD-latest
+      uses: mario-campos/emulate@v1
+      with:
+        operating-system: freebsd-latest
+
+    - name: Install Dependencies
+      run: pkg install -y git
+
+    - name: Build
+      run: |
+        git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
+        cd build
+        [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
+        echo "configure"
+        ./configure --prefix=/usr
+        echo "building"
+        make
+
+    - name: Tests
+      run: |
+         cd build
+         make tests
+
+  netbsd:
+    runs-on: macos-12
+    steps:
+    - name: Bootstrap NetBSD-latest
+      uses: mario-campos/emulate@v1
+      with:
+        operating-system: netbsd-latest
+
+    - name: Build
+      run: |
+        git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
+        cd build
+        [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
+        echo "configure"
+        ./configure --prefix=/usr
+        echo "building"
+        make
+
+    - name: Tests
+      run: |
+        cd build
+        make tests

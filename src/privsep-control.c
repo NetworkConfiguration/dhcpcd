@@ -36,6 +36,8 @@
 #include "logerr.h"
 #include "privsep.h"
 
+/* We expect to have open 2 SEQPACKET, 2 STREAM and 2 file STREAM fds */
+
 static int
 ps_ctl_startcb(struct ps_process *psp)
 {
@@ -64,27 +66,12 @@ ps_ctl_startcb(struct ps_process *psp)
 	    ctx->options & DHCPCD_MANAGER ? NULL : *ctx->ifv, af);
 }
 
-static ssize_t
-ps_ctl_recvmsgcb(void *arg, struct ps_msghdr *psm, __unused struct msghdr *msg)
-{
-	struct dhcpcd_ctx *ctx = arg;
-
-	if (psm->ps_cmd != PS_CTL_EOF) {
-		errno = ENOTSUP;
-		return -1;
-	}
-
-	ctx->ps_control_client = NULL;
-	return 0;
-}
-
 static void
 ps_ctl_recvmsg(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
-	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events,
-	    ps_ctl_recvmsgcb, psp->psp_ctx) == -1)
+	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events, NULL, NULL) == -1)
 		logerr(__func__);
 }
 
@@ -175,22 +162,26 @@ ps_ctl_recv(void *arg, unsigned short events)
 	char buf[BUFSIZ];
 	ssize_t len;
 
-	if (!(events & ELE_READ))
+	if (!(events & (ELE_READ | ELE_HANGUP)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	len = read(ctx->ps_ctl->psp_work_fd, buf, sizeof(buf));
-	if (len == 0)
-		return;
-	if (len == -1) {
-		logerr("%s: read", __func__);
-		eloop_exit(ctx->eloop, EXIT_FAILURE);
-		return;
+	if (events & ELE_READ) {
+		len = read(ctx->ps_ctl->psp_work_fd, buf, sizeof(buf));
+		if (len == -1)
+			logerr("%s: read", __func__);
+		else if (len == 0)
+			// FIXME: Why does this happen?
+			;
+		else if (ctx->ps_control_client == NULL)
+			logerrx("%s: clientfd #%d disconnected (len=%zd)",
+			    __func__, ctx->ps_ctl->psp_work_fd, len);
+		else {
+			errno = 0;
+			if (control_queue(ctx->ps_control_client,
+			    buf, (size_t)len) == -1)
+				logerr("%s: control_queue", __func__);
+		}
 	}
-	if (ctx->ps_control_client == NULL) /* client disconnected */
-		return;
-	errno = 0;
-	if (control_queue(ctx->ps_control_client, buf, (size_t)len) == -1)
-		logerr("%s: control_queue", __func__);
 }
 
 static void
@@ -205,8 +196,6 @@ ps_ctl_listen(void *arg, unsigned short events)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->ps_control->fd, buf, sizeof(buf));
-	if (len == 0)
-		return;
 	if (len == -1) {
 		logerr("%s: read", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -230,14 +219,16 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 		.psi_cmd = PS_CTL,
 	};
 	struct ps_process *psp;
-	int data_fd[2], listen_fd[2];
+	int work_fd[2], listen_fd[2];
 	pid_t pid;
 
-	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, data_fd) == -1 ||
+	if_closesockets(ctx);
+
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, work_fd) == -1 ||
 	    xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, listen_fd) == -1)
 		return -1;
 #ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_fdpair(data_fd) == -1 ||
+	if (ps_rights_limit_fdpair(work_fd) == -1 ||
 	    ps_rights_limit_fdpair(listen_fd) == -1)
 		return -1;
 #endif
@@ -250,24 +241,25 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	if (pid == -1)
 		return -1;
 	else if (pid != 0) {
-		psp->psp_work_fd = data_fd[1];
-		close(data_fd[0]);
+		psp->psp_work_fd = work_fd[0];
+		close(work_fd[1]);
+		close(listen_fd[1]);
 		ctx->ps_control = control_new(ctx,
-		    listen_fd[1], FD_SENDLEN | FD_LISTEN);
+		    listen_fd[0], FD_SENDLEN | FD_LISTEN);
 		if (ctx->ps_control == NULL)
 			return -1;
-		close(listen_fd[0]);
 		return pid;
 	}
 
-	psp->psp_work_fd = data_fd[0];
-	close(data_fd[1]);
+	close(work_fd[0]);
+	close(listen_fd[0]);
+
+	psp->psp_work_fd = work_fd[1];
 	if (eloop_event_add(ctx->eloop, psp->psp_work_fd, ELE_READ,
 	    ps_ctl_recv, ctx) == -1)
 		return -1;
 
-	ctx->ps_control = control_new(ctx, listen_fd[0], 0);
-	close(listen_fd[1]);
+	ctx->ps_control = control_new(ctx, listen_fd[1], 0);
 	if (ctx->ps_control == NULL)
 		return -1;
 	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd, ELE_READ,

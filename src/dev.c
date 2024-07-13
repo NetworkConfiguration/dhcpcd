@@ -150,7 +150,7 @@ dev_start1(struct dhcpcd_ctx *ctx, const struct dev_dhcpcd *dev_dhcpcd)
 	dp = opendir(DEVDIR);
 	if (dp == NULL) {
 		logdebug("dev: %s", DEVDIR);
-		return 0;
+		return -1;
 	}
 
 	r = 0;

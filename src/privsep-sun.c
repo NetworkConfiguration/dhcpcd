@@ -45,7 +45,7 @@ ps_root_doioctl6(unsigned long req, void *data, size_t len)
 {
 	int s, err;
 
-	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	s = xsocket(PF_INET6, SOCK_DGRAM, 0);
 	if (s != -1)
 		err = ioctl(s, req, data, len);
 	else
@@ -63,7 +63,7 @@ ps_root_doroute(void *data, size_t len)
 	int s;
 	ssize_t err;
 
-	s = socket(PF_ROUTE, SOCK_RAW, 0);
+	s = xsocket(PF_ROUTE, SOCK_RAW, 0);
 	if (s != -1)
 		err = write(s, data, len);
 	else
@@ -105,7 +105,7 @@ ssize_t
 ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
 {
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL6,
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IOCTL6,
 	    request, data, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
@@ -115,7 +115,7 @@ ssize_t
 ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_ROUTE, 0, data, len) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_ROUTE, 0, data, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }

@@ -125,6 +125,8 @@ dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 		printf(" binhex");
 	else if (opt->type & OT_STRING)
 		printf(" string");
+	else if (opt->type & OT_URI)
+		printf(" uri");
 	if (opt->type & OT_RFC3361)
 		printf(" rfc3361");
 	if (opt->type & OT_RFC3442)
@@ -413,26 +415,23 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 }
 
 /* Check for a valid name as per RFC952 and RFC1123 section 2.1 */
-static int
+static ssize_t
 valid_domainname(char *lbl, int type)
 {
-	char *slbl, *lst;
+	char *slbl = lbl, *lst = NULL;
 	unsigned char c;
-	int start, len, errset;
+	int len = 0;
+	bool start = true, errset = false;
 
 	if (lbl == NULL || *lbl == '\0') {
 		errno = EINVAL;
 		return 0;
 	}
 
-	slbl = lbl;
-	lst = NULL;
-	start = 1;
-	len = errset = 0;
 	for (;;) {
 		c = (unsigned char)*lbl++;
 		if (c == '\0')
-			return 1;
+			return lbl - slbl - 1;
 		if (c == ' ') {
 			if (lbl - 1 == slbl) /* No space at start */
 				break;
@@ -440,7 +439,7 @@ valid_domainname(char *lbl, int type)
 				break;
 			/* Skip to the next label */
 			if (!start) {
-				start = 1;
+				start = true;
 				lst = lbl - 1;
 			}
 			if (len)
@@ -459,13 +458,13 @@ valid_domainname(char *lbl, int type)
 		{
 			if (++len > NS_MAXLABEL) {
 				errno = ERANGE;
-				errset = 1;
+				errset = true;
 				break;
 			}
 		} else
 			break;
 		if (start)
-			start = 0;
+			start = false;
 	}
 
 	if (!errset)
@@ -473,7 +472,7 @@ valid_domainname(char *lbl, int type)
 	if (lst) {
 		/* At least one valid domain, return it */
 		*lst = '\0';
-		return 1;
+		return lst - slbl;
 	}
 	return 0;
 }
@@ -518,6 +517,10 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		if (!(type & (OT_ASCII | OT_RAW | OT_ESCSTRING | OT_ESCFILE)) &&
 		    (!isascii(c) && !isprint(c)))
 		{
+			errno = EINVAL;
+			break;
+		}
+		if (type & OT_URI && isspace(c)) {
 			errno = EINVAL;
 			break;
 		}
@@ -665,7 +668,7 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 			goto err;
 		if (sl == 0)
 			goto done;
-		if (valid_domainname(domain, opt->type) == -1)
+		if (!valid_domainname(domain, opt->type))
 			goto err;
 		return efprintf(fp, "%s", domain);
 	}
@@ -678,7 +681,58 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 		return print_rfc3442(fp, data, dl);
 #endif
 
-	if (opt->type & OT_STRING) {
+	/* Produces a space separated list of URIs.
+	 * This is valid as a URI cannot contain a space. */
+	if ((opt->type & (OT_ARRAY | OT_URI)) == (OT_ARRAY | OT_URI)) {
+#ifdef SMALL
+		errno = ENOTSUP;
+		return -1;
+#else
+		char buf[UINT16_MAX + 1];
+		uint16_t sz;
+		bool first = true;
+
+		while (dl) {
+			if (dl < 2) {
+				errno = EINVAL;
+				goto err;
+			}
+
+			memcpy(&u16, data, sizeof(u16));
+			sz = ntohs(u16);
+			data += sizeof(u16);
+			dl -= sizeof(u16);
+
+			if (sz == 0)
+				continue;
+			if (sz > dl) {
+				errno = EINVAL;
+				goto err;
+			}
+
+			if (print_string(buf, sizeof(buf),
+			    opt->type, data, sz) == -1)
+				goto err;
+
+			if (first)
+				first = false;
+			else if (fputc(' ', fp) == EOF)
+				goto err;
+
+			if (fprintf(fp, "%s", buf) == -1)
+				goto err;
+
+			data += sz;
+			dl -= sz;
+		}
+
+		if (fputc('\0', fp) == EOF)
+			goto err;
+		return 0;
+#endif
+	}
+
+	if (opt->type & (OT_STRING | OT_URI)) {
 		char buf[1024];
 
 		if (print_string(buf, sizeof(buf), opt->type, data, dl) == -1)

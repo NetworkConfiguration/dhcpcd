@@ -30,7 +30,6 @@
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
-#include <sys/termios.h>	/* For TCGETS */
 
 #include <linux/audit.h>
 #include <linux/filter.h>
@@ -40,10 +39,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>	/* For TCGETS */
 #include <unistd.h>
 
 #include "common.h"
@@ -106,11 +107,15 @@ ssize_t
 ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 {
 
-	if (ps_sendmsg(ctx, ctx->ps_root->psp_fd, PS_ROUTE,
+	if (ps_sendmsg(ctx, PS_ROOT_FD(ctx), PS_ROUTE,
 	    (unsigned long)protocol, msg) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
+
+#ifdef DISABLE_SECCOMP
+#warning SECCOMP has been disabled
+#else
 
 #if (BYTE_ORDER == LITTLE_ENDIAN)
 # define SECCOMP_ARG_LO	0
@@ -232,7 +237,11 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #elif defined(__or1k__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_OPENRISC
 #elif defined(__powerpc64__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
+#  if (BYTE_ORDER == LITTLE_ENDIAN)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64LE
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
+#  endif
 #elif defined(__powerpc__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC
 #elif defined(__riscv)
@@ -292,11 +301,20 @@ static struct sock_filter ps_seccomp_filter[] = {
 #if defined(__x86_64__) && defined(__ILP32__) && defined(__X32_SYSCALL_BIT)
 	SECCOMP_ALLOW(__NR_clock_gettime & ~__X32_SYSCALL_BIT),
 #endif
+#ifdef __NR_clock_gettime32
+	SECCOMP_ALLOW(__NR_clock_gettime32),
+#endif
 #ifdef __NR_clock_gettime64
 	SECCOMP_ALLOW(__NR_clock_gettime64),
 #endif
 #ifdef __NR_close
 	SECCOMP_ALLOW(__NR_close),
+#endif
+#ifdef __NR_dup2
+	SECCOMP_ALLOW(__NR_dup2), // daemonising dups stderr to stdin(/dev/null)
+#endif
+#ifdef __NR_dup3
+	SECCOMP_ALLOW(__NR_dup3),
 #endif
 #ifdef __NR_epoll_ctl
 	SECCOMP_ALLOW(__NR_epoll_ctl),
@@ -344,11 +362,19 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFVLAN),
 	/* printf over serial terminal requires this */
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS),
+	/* dumping leases on musl requires this */
+	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TIOCGWINSZ),
 	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
 	 * which lives in the impossible to include linux/wireless.h header */
 #endif
+#ifdef __NR_madvise /* needed for musl */
+	SECCOMP_ALLOW(__NR_madvise),
+#endif
 #ifdef __NR_mmap
 	SECCOMP_ALLOW(__NR_mmap),
+#endif
+#ifdef __NR_mmap2
+	SECCOMP_ALLOW(__NR_mmap2),
 #endif
 #ifdef __NR_munmap
 	SECCOMP_ALLOW(__NR_munmap),
@@ -490,3 +516,4 @@ ps_seccomp_enter(void)
 	}
 	return 0;
 }
+#endif /* !DISABLE_SECCOMP */

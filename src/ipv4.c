@@ -967,6 +967,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		if (mask->s_addr != INADDR_ANY &&
 		    mask->s_addr != ia->mask.s_addr)
 			return;
+		ia->addr_flags = addrflags;
 		TAILQ_REMOVE(&state->addrs, ia, next);
 		break;
 	default:

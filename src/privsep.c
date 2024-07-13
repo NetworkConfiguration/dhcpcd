@@ -172,8 +172,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
-	    (ctx->logfile == NULL &&
-	    (!ctx->stderr_valid || isatty(STDERR_FILENO) == 1)))
+	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
 	{
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
@@ -300,19 +299,16 @@ ps_rights_limit_fdpair(int fd[])
 }
 
 static int
-ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
+ps_rights_limit_stdio()
 {
 	const int iebadf = CAPH_IGNORE_EBADF;
 	int error = 0;
 
-	if (ctx->stdin_valid &&
-	    caph_limit_stream(STDIN_FILENO, CAPH_READ | iebadf) == -1)
+	if (caph_limit_stream(STDIN_FILENO, CAPH_READ | iebadf) == -1)
 		error = -1;
-	if (ctx->stdout_valid &&
-	    caph_limit_stream(STDOUT_FILENO, CAPH_WRITE | iebadf) == -1)
+	if (caph_limit_stream(STDOUT_FILENO, CAPH_WRITE | iebadf) == -1)
 		error = -1;
-	if (ctx->stderr_valid &&
-	    caph_limit_stream(STDERR_FILENO, CAPH_WRITE | iebadf) == -1)
+	if (caph_limit_stream(STDERR_FILENO, CAPH_WRITE | iebadf) == -1)
 		error = -1;
 
 	return error;
@@ -412,16 +408,23 @@ ps_startprocess(struct ps_process *psp,
 		return pid;
 	}
 
-
+	/* If we are not the root process, close un-needed stuff. */
+	if (ctx->ps_root != psp) {
+		ps_root_close(ctx);
 #ifdef PLUGIN_DEV
-	/* If we are not the root process, stop listening to devices. */
-	if (ctx->ps_root != psp)
 		dev_stop(ctx);
 #endif
+	}
 
 	ctx->options |= DHCPCD_FORKED;
 	if (ctx->ps_log_fd != -1)
 		logsetfd(ctx->ps_log_fd);
+
+#ifdef DEBUG_FD
+	logerrx("pid %d log_fd=%d data_fd=%d psp_fd=%d",
+	    getpid(), ctx->ps_log_fd, ctx->ps_data_fd, psp->psp_fd);
+#endif
+
 	eloop_clear(ctx->eloop, -1);
 	eloop_forked(ctx->eloop);
 	eloop_signal_set_cb(ctx->eloop,
@@ -457,24 +460,12 @@ ps_startprocess(struct ps_process *psp,
 			ctx->ps_log_root_fd = -1;
 		}
 #ifdef PRIVSEP_RIGHTS
-		if (ps_rights_limit_stdio(ctx) == -1) {
+		if (ps_rights_limit_stdio() == -1) {
 			logerr("ps_rights_limit_stdio");
 			goto errexit;
 		}
 #endif
 	}
-
-	if (ctx->ps_inet != psp)
-		ctx->ps_inet = NULL;
-	if (ctx->ps_ctl != psp)
-		ctx->ps_ctl = NULL;
-
-#if 0
-	char buf[1024];
-	errno = 0;
-	ssize_t xx = recv(psp->psp_fd, buf, sizeof(buf), MSG_PEEK);
-	logerr("pid %d test fd %d recv peek %zd", getpid(), psp->psp_fd, xx);
-#endif
 
 	if (eloop_event_add(ctx->eloop, psp->psp_fd, ELE_READ,
 	    recv_msg, psp) == -1)
@@ -541,11 +532,11 @@ ps_stopprocess(struct ps_process *psp)
 			err = -1;
 		}
 #endif
-		psp->psp_fd = -1;
 	}
 
 	/* Don't wait for the process as it may not respond to the shutdown
-	 * request. We'll reap the process on receipt of SIGCHLD. */
+	 * request. We'll reap the process on receipt of SIGCHLD where we
+	 * also close the fd. */
 	return err;
 }
 
@@ -623,6 +614,9 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 #elif defined(HAVE_PLEDGE)
 	if (sandbox != NULL)
 		*sandbox = "pledge";
+	// There is no need to use unveil(2) because we are in an empty chroot
+	// This is encouraged by Theo de Raadt himself:
+	// https://www.mail-archive.com/misc@openbsd.org/msg171655.html
 	return pledge(_pledge, NULL);
 #elif defined(HAVE_SECCOMP)
 	if (sandbox != NULL)
@@ -668,7 +662,7 @@ ps_managersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 #ifdef PRIVSEP_RIGHTS
 	if ((ctx->pf_inet_fd != -1 &&
 	    ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1) ||
-	     ps_rights_limit_stdio(ctx) == -1)
+	     ps_rights_limit_stdio() == -1)
 	{
 		logerr("%s: cap_rights_limit", __func__);
 		return -1;
@@ -1069,8 +1063,7 @@ nobufs:
 }
 
 ssize_t
-ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, unsigned short events,
-    uint16_t cmd, int wfd)
+ps_recvmsg(int rfd, unsigned short events, uint16_t cmd, int wfd)
 {
 	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	uint8_t controlbuf[sizeof(struct sockaddr_storage)] = { 0 };
@@ -1089,23 +1082,36 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, unsigned short events,
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = recvmsg(rfd, &msg, 0);
-	if (len == -1)
+	if (len == -1) {
 		logerr("%s: recvmsg", __func__);
-	if (len == -1 || len == 0) {
-		if (ctx->options & DHCPCD_FORKED)
-			eloop_exit(ctx->eloop,
-			    len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 
 	iov[0].iov_len = (size_t)len;
 	len = ps_sendcmdmsg(wfd, cmd, &msg);
-	if (len == -1) {
+	if (len == -1)
 		logerr("%s: ps_sendcmdmsg", __func__);
-		if (ctx->options & DHCPCD_FORKED)
-			eloop_exit(ctx->eloop, EXIT_FAILURE);
-	}
 	return len;
+}
+
+ssize_t
+ps_daemonised(struct dhcpcd_ctx *ctx)
+{
+	struct ps_process *psp;
+	ssize_t err = 0;
+
+	dhcpcd_daemonised(ctx);
+
+	/* Echo the message to all processes */
+	TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
+		if (psp->psp_pid == getpid())
+			continue;
+		if (ps_sendcmd(psp->psp_ctx, psp->psp_fd, PS_DAEMONISED,
+		    0, NULL, 0) == -1)
+			err = -1;
+	}
+
+	return err;
 }
 
 ssize_t
@@ -1140,6 +1146,9 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 		if (psm.psm_hdr.ps_cmd == PS_STOP) {
 			stop = true;
 			len = 0;
+		} else if (psm.psm_hdr.ps_cmd == PS_DAEMONISED) {
+			ps_daemonised(ctx);
+			return 0;
 		}
 	}
 
@@ -1202,13 +1211,14 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 		return NULL;
 	psp->psp_ctx = ctx;
 	memcpy(&psp->psp_id, psid, sizeof(psp->psp_id));
+	psp->psp_fd = -1;
 	psp->psp_work_fd = -1;
 #ifdef HAVE_CAPSICUM
 	psp->psp_pfd = -1;
 #endif
 
 	if (!(ctx->options & DHCPCD_MANAGER))
-		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_name));
+		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_ifname));
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }
