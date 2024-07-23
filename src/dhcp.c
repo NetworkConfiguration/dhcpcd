@@ -3262,12 +3262,12 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 				    ifp->name, tmp);
 				break;
 			}
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    use_v6only ? v6only_time : DHCP_MAX,
-			    dhcp_discover, ifp);
 		}
 #endif
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    use_v6only ? v6only_time : DHCP_MAX,
+		    dhcp_discover, ifp);
 		return;
 	}
 
