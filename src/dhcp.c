@@ -2989,13 +2989,13 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t type, tmp;
+	uint8_t type, tmp, ipv4llonly = 0;
 	struct in_addr addr;
 	unsigned int i;
 	char *msg;
 	bool bootp_copied;
 	uint32_t v6only_time = 0;
-	bool use_v6only = false;
+	bool use_v6only = false, has_auto_conf = false;
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
@@ -3232,7 +3232,6 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	/* DHCP Auto-Configure, RFC 2563 */
 	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
-		LOGDHCP(LOG_WARNING, "no address given");
 		if ((msg = get_option_string(ifp->ctx,
 		    bootp, bootp_len, DHO_MESSAGE)))
 		{
@@ -3241,10 +3240,11 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 #ifdef IPV4LL
 		if (state->state == DHS_DISCOVER &&
-		    get_option_uint8(ifp->ctx, &tmp, bootp, bootp_len,
+		    get_option_uint8(ifp->ctx, &ipv4llonly, bootp, bootp_len,
 		    DHO_AUTOCONFIGURE) == 0)
 		{
-			switch (tmp) {
+			has_auto_conf = true;
+			switch (ipv4llonly) {
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
 				ipv4ll_drop(ifp);
@@ -3264,6 +3264,13 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			}
 		}
 #endif
+	}
+
+	if (use_v6only) {
+		dhcp_drop(ifp, "EXPIRE");
+		dhcp_unlink(ifp->ctx, state->leasefile);
+	}
+	if (use_v6only || has_auto_conf) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    use_v6only ? v6only_time : DHCP_MAX,
@@ -3271,12 +3278,10 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		return;
 	}
 
-	if (use_v6only) {
-		dhcp_drop(ifp, "EXPIRE");
-		dhcp_unlink(ifp->ctx, state->leasefile);
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		eloop_timeout_add_sec(ifp->ctx->eloop, v6only_time,
-		    dhcp_discover, ifp);
+	/* No hints as what to do with no address?
+	 * all we can do is log it and continue. */
+	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
+		LOGDHCP(LOG_WARNING, "no address given");
 		return;
 	}
 
