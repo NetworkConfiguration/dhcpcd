@@ -50,11 +50,7 @@
 #include "sa.h"
 #include "script.h"
 
-#ifndef KERNEL_RFC5227
 static void ipv4ll_start_arp(void *arg);
-#else
-static void ipv4ll_start_arp(void *arg) { (void)arg; };
-#endif
 
 static const struct in_addr inaddr_llmask = {
 	.s_addr = HTONL(LINKLOCAL_MASK)
@@ -410,18 +406,16 @@ ipv4ll_start(void *arg)
 			ipv4ll_pickaddr(ifp);
 	}
 
-#ifdef KERNEL_RFC5227
-	ipv4ll_not_found(ifp);
-#else
 	ipv4ll_start_arp(ifp);
-#endif
 }
 
-#ifndef KERNEL_RFC5227
 static void
 ipv4ll_start_arp(void *arg)
 {
 	struct interface *ifp = arg;
+#ifdef KERNEL_RFC5227
+	ipv4ll_not_found(ifp);
+#else
 	struct ipv4ll_state *state;
 	struct arp_state *astate;
 
@@ -438,8 +432,8 @@ ipv4ll_start_arp(void *arg)
 	astate->defend_failed_cb = ipv4ll_defend_failed_arp;
 	astate->free_cb = ipv4ll_free_arp;
 	arp_probe(astate);
-}
 #endif
+}
 
 void
 ipv4ll_drop(struct interface *ifp)
