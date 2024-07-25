@@ -2989,7 +2989,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t type, tmp, ipv4llonly = 0;
+	uint8_t type, tmp;
 	struct in_addr addr;
 	unsigned int i;
 	char *msg;
@@ -3240,11 +3240,11 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 #ifdef IPV4LL
 		if (state->state == DHS_DISCOVER &&
-		    get_option_uint8(ifp->ctx, &ipv4llonly, bootp, bootp_len,
+		    get_option_uint8(ifp->ctx, &tmp, bootp, bootp_len,
 		    DHO_AUTOCONFIGURE) == 0)
 		{
 			has_auto_conf = true;
-			switch (ipv4llonly) {
+			switch (tmp) {
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
 				ipv4ll_drop(ifp);
