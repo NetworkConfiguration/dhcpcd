@@ -774,7 +774,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (ifo->options & DHCPCD_BROADCAST &&
-	    bootp->ciaddr == 0 &&
+	    bootp->ciaddr == INADDR_ANY &&
 	    type != DHCP_DECLINE &&
 	    type != DHCP_RELEASE)
 		bootp->flags = htons(BROADCAST_FLAG);
@@ -1651,7 +1651,7 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 
 	ip->ip_p = IPPROTO_UDP;
 	ip->ip_src.s_addr = source.s_addr;
-	if (dest.s_addr == 0)
+	if (dest.s_addr == INADDR_ANY)
 		ip->ip_dst.s_addr = INADDR_BROADCAST;
 	else
 		ip->ip_dst.s_addr = dest.s_addr;
@@ -2995,7 +2995,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	char *msg;
 	bool bootp_copied;
 	uint32_t v6only_time = 0;
-	bool use_v6only = false;
+	bool use_v6only = false, has_auto_conf = false;
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
@@ -3215,7 +3215,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	if (has_option_mask(ifo->requestmask, DHO_IPV6_PREFERRED_ONLY)) {
 		if (get_option_uint32(ifp->ctx, &v6only_time, bootp, bootp_len,
-		    DHO_IPV6_PREFERRED_ONLY) == 0 && (state->state == DHS_DISCOVER ||
+		    DHO_IPV6_PREFERRED_ONLY) == 0 &&
+		    (state->state == DHS_DISCOVER ||
 		    state->state == DHS_REBOOT || state->state == DHS_NONE))
 		{
 			char v6msg[128];
@@ -3231,8 +3232,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 
 	/* DHCP Auto-Configure, RFC 2563 */
-	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
-		LOGDHCP(LOG_WARNING, "no address given");
+	if (type == DHCP_OFFER && bootp->yiaddr == INADDR_ANY) {
+		LOGDHCP(LOG_WARNING, "no address offered");
 		if ((msg = get_option_string(ifp->ctx,
 		    bootp, bootp_len, DHO_MESSAGE)))
 		{
@@ -3244,6 +3245,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		    get_option_uint8(ifp->ctx, &tmp, bootp, bootp_len,
 		    DHO_AUTOCONFIGURE) == 0)
 		{
+			has_auto_conf = true;
 			switch (tmp) {
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
@@ -3262,23 +3264,26 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 				    ifp->name, tmp);
 				break;
 			}
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    use_v6only ? v6only_time : DHCP_MAX,
-			    dhcp_discover, ifp);
 		}
 #endif
-		return;
 	}
 
 	if (use_v6only) {
 		dhcp_drop(ifp, "EXPIRE");
 		dhcp_unlink(ifp->ctx, state->leasefile);
+	}
+	if (use_v6only || has_auto_conf) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		eloop_timeout_add_sec(ifp->ctx->eloop, v6only_time,
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    use_v6only ? v6only_time : DHCP_MAX,
 		    dhcp_discover, ifp);
 		return;
 	}
+
+	/* No hints as what to do with no address?
+	 * All we can do is continue. */
+	if (type == DHCP_OFFER && bootp->yiaddr == INADDR_ANY)
+		return;
 
 	/* Ensure that the address offered is valid */
 	if ((type == 0 || type == DHCP_OFFER || type == DHCP_ACK) &&
