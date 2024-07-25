@@ -774,7 +774,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (ifo->options & DHCPCD_BROADCAST &&
-	    bootp->ciaddr == 0 &&
+	    bootp->ciaddr == INADDR_ANY &&
 	    type != DHCP_DECLINE &&
 	    type != DHCP_RELEASE)
 		bootp->flags = htons(BROADCAST_FLAG);
@@ -1651,7 +1651,7 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 
 	ip->ip_p = IPPROTO_UDP;
 	ip->ip_src.s_addr = source.s_addr;
-	if (dest.s_addr == 0)
+	if (dest.s_addr == INADDR_ANY)
 		ip->ip_dst.s_addr = INADDR_BROADCAST;
 	else
 		ip->ip_dst.s_addr = dest.s_addr;
@@ -3232,7 +3232,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 
 	/* DHCP Auto-Configure, RFC 2563 */
-	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
+	if (type == DHCP_OFFER && bootp->yiaddr == INADDR_ANY) {
 		LOGDHCP(LOG_WARNING, "no address offered");
 		if ((msg = get_option_string(ifp->ctx,
 		    bootp, bootp_len, DHO_MESSAGE)))
@@ -3282,7 +3282,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	/* No hints as what to do with no address?
 	 * All we can do is continue. */
-	if (type == DHCP_OFFER && bootp->yiaddr == 0)
+	if (type == DHCP_OFFER && bootp->yiaddr == INADDR_ANY)
 		return;
 
 	/* Ensure that the address offered is valid */
