@@ -3215,7 +3215,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	if (has_option_mask(ifo->requestmask, DHO_IPV6_PREFERRED_ONLY)) {
 		if (get_option_uint32(ifp->ctx, &v6only_time, bootp, bootp_len,
-		    DHO_IPV6_PREFERRED_ONLY) == 0 && (state->state == DHS_DISCOVER ||
+		    DHO_IPV6_PREFERRED_ONLY) == 0 &&
+		    (state->state == DHS_DISCOVER ||
 		    state->state == DHS_REBOOT || state->state == DHS_NONE))
 		{
 			char v6msg[128];
@@ -3232,6 +3233,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	/* DHCP Auto-Configure, RFC 2563 */
 	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
+		LOGDHCP(LOG_WARNING, "no address offered");
 		if ((msg = get_option_string(ifp->ctx,
 		    bootp, bootp_len, DHO_MESSAGE)))
 		{
@@ -3279,11 +3281,9 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 
 	/* No hints as what to do with no address?
-	 * all we can do is log it and continue. */
-	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
-		LOGDHCP(LOG_WARNING, "no address given");
+	 * All we can do is continue. */
+	if (type == DHCP_OFFER && bootp->yiaddr == 0)
 		return;
-	}
 
 	/* Ensure that the address offered is valid */
 	if ((type == 0 || type == DHCP_OFFER || type == DHCP_ACK) &&
