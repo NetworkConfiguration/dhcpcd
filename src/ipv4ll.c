@@ -50,6 +50,8 @@
 #include "sa.h"
 #include "script.h"
 
+static void ipv4ll_start_arp(void *arg);
+
 static const struct in_addr inaddr_llmask = {
 	.s_addr = HTONL(LINKLOCAL_MASK)
 };
@@ -275,7 +277,7 @@ ipv4ll_found(struct interface *ifp)
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    state->conflicts >= MAX_CONFLICTS ?
 	    RATE_LIMIT_INTERVAL : PROBE_WAIT,
-	    ipv4ll_start, ifp);
+	    ipv4ll_start_arp, ifp);
 }
 
 static void
@@ -290,7 +292,7 @@ ipv4ll_defend_failed(struct interface *ifp)
 	rt_build(ifp->ctx, AF_INET);
 	script_runreason(ifp, "IPV4LL");
 	ipv4ll_pickaddr(ifp);
-	ipv4ll_start(ifp);
+	ipv4ll_start_arp(ifp);
 }
 
 #ifndef KERNEL_RFC5227
@@ -323,9 +325,6 @@ ipv4ll_start(void *arg)
 	struct ipv4ll_state *state;
 	struct ipv4_addr *ia;
 	bool repick;
-#ifndef KERNEL_RFC5227
-	struct arp_state *astate;
-#endif
 
 	if ((state = IPV4LL_STATE(ifp)) == NULL) {
 		ifp->if_data[IF_DATA_IPV4LL] = calloc(1, sizeof(*state));
@@ -407,9 +406,21 @@ ipv4ll_start(void *arg)
 			ipv4ll_pickaddr(ifp);
 	}
 
+	ipv4ll_start_arp(ifp);
+}
+
+static void
+ipv4ll_start_arp(void *arg)
+{
+	struct interface *ifp = arg;
 #ifdef KERNEL_RFC5227
 	ipv4ll_not_found(ifp);
 #else
+	struct ipv4ll_state *state;
+	struct arp_state *astate;
+
+	state = IPV4LL_STATE(ifp);
+
 	ipv4ll_freearp(ifp);
 	state->arp = astate = arp_new(ifp, &state->pickedaddr);
 	if (state->arp == NULL)
