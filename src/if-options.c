@@ -1218,7 +1218,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (p == NULL)
 				break;
 			ifo->mtu = (unsigned int)strtou(p, NULL, 0,
-			    MTU_MIN, MTU_MAX, &e);
+			    IPV4_MMTU, UINT_MAX, &e);
 			if (e) {
 				logerrx("invalid MTU %s", p);
 				return -1;

@@ -852,27 +852,18 @@ if_loopback(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_domtu(const struct interface *ifp, short int mtu)
+if_getmtu(const struct interface *ifp)
 {
-	int r;
-	struct ifreq ifr;
-
 #ifdef __sun
-	if (mtu == 0)
-		return if_mtu_os(ifp);
-#endif
+	return if_mtu_os(ifp);
+#else
+	struct ifreq ifr = { .ifr_mtu = 0 };
 
-	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	ifr.ifr_mtu = mtu;
-	if (mtu != 0)
-		r = if_ioctl(ifp->ctx, SIOCSIFMTU, &ifr, sizeof(ifr));
-	else
-		r = pioctl(ifp->ctx, SIOCGIFMTU, &ifr, sizeof(ifr));
-
-	if (r == -1)
+	if (pioctl(ifp->ctx, SIOCGIFMTU, &ifr, sizeof(ifr)) == -1)
 		return -1;
 	return ifr.ifr_mtu;
+#endif
 }
 
 #ifdef ALIAS_ADDR

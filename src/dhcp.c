@@ -97,6 +97,8 @@
 __CTASSERT(sizeof(struct ip)		== 20);
 __CTASSERT(sizeof(struct udphdr)	== 8);
 __CTASSERT(sizeof(struct bootp)		== 300);
+#define IP_UDP_SIZE	sizeof(struct ip) + sizeof(struct udphdr)
+#define BOOTP_MIN_MTU	IP_UDP_SIZE + sizeof(struct bootp)
 
 struct dhcp_op {
 	uint8_t value;
@@ -676,6 +678,8 @@ dhcp_get_mtu(const struct interface *ifp)
 	    get_option_uint16(ifp->ctx, &mtu,
 			      state->new, state->new_len, DHO_MTU) == -1)
 		return 0;
+	if (mtu < IPV4_MMTU)
+		return IPV4_MMTU;
 	return mtu;
 }
 
@@ -740,19 +744,24 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	uint8_t *auth, auth_len;
 #endif
 
-	if ((mtu = if_getmtu(ifp)) == -1)
+	/* We could take the DHCPv6 approach and work out the
+	 * message length up front rather than this big hammer approach. */
+	if ((mtu = if_getmtu(ifp)) == -1) {
 		logerr("%s: if_getmtu", ifp->name);
-	else if (mtu < MTU_MIN) {
-		if (if_setmtu(ifp, MTU_MIN) == -1)
-			logerr("%s: if_setmtu", ifp->name);
-		mtu = MTU_MIN;
+		return -1;
+	}
+	if ((size_t)mtu < BOOTP_MIN_MTU) {
+		logerr("%s: interface mtu is too small (%d<%zu)",
+		    ifp->name, mtu, BOOTP_MIN_MTU);
+		return -1;
 	}
 
-	if (ifo->options & DHCPCD_BOOTP)
-		bootp = calloc(1, sizeof (*bootp));
-	else
+	if (ifo->options & DHCPCD_BOOTP) {
+		bootp = calloc(1, sizeof(*bootp));
+	} else {
 		/* Make the maximal message we could send */
-		bootp = calloc(1, (size_t)(mtu - IP_UDP_SIZE));
+		bootp = calloc(1, (size_t)mtu - IP_UDP_SIZE);
+	}
 
 	if (bootp == NULL)
 		return -1;
@@ -797,7 +806,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		return sizeof(*bootp);
 
 	p = bootp->vend;
-	e = (uint8_t *)bootp + (mtu - IP_UDP_SIZE) - 1; /* -1 for DHO_END */
+	e = (uint8_t *)bootp + ((size_t)mtu - IP_UDP_SIZE - 1/* DHO_END */);
 
 	ul = htonl(MAGIC_COOKIE);
 	memcpy(p, &ul, sizeof(ul));
@@ -924,7 +933,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			AREA_CHECK(2);
 			*p++ = DHO_MAXMESSAGESIZE;
 			*p++ = 2;
-			sz = htons((uint16_t)(mtu - IP_UDP_SIZE));
+			sz = htons((uint16_t)((size_t)mtu - IP_UDP_SIZE));
 			memcpy(p, &sz, 2);
 			p += 2;
 		}
