@@ -58,6 +58,10 @@
     (((uint32_t)(A) & 0x000000ff) << 24))
 #endif /* BYTE_ORDER */
 
+#ifndef IPV4_MMTU
+#define IPV4_MMTU 68
+#endif
+
 #ifdef __sun
    /* Solaris lacks these defines.
     * While it supports DaD, to seems to only expose IFF_DUPLICATE

@@ -46,11 +46,6 @@
 #define NS_MAXLABEL MAXLABEL
 #endif
 
-/* Max MTU - defines dhcp option length */
-#define	IP_UDP_SIZE		  28
-#define	MTU_MAX			1500 - IP_UDP_SIZE
-#define	MTU_MIN			 576 + IP_UDP_SIZE
-
 #define	OT_REQUEST		(1 << 0)
 #define	OT_UINT8		(1 << 1)
 #define	OT_INT8			(1 << 2)
