@@ -230,11 +230,20 @@ ipv4ll_not_found(struct interface *ifp)
 #endif
 		loginfox("%s: using IPv4LL address %s",
 		  ifp->name, inet_ntoa(state->pickedaddr));
-	if (!(ifp->options->options & DHCPCD_CONFIGURE))
-		goto run;
 	if (ia == NULL) {
-		if (ifp->ctx->options & DHCPCD_TEST)
-			goto test;
+		if (ifp->ctx->options & DHCPCD_TEST) {
+			ia = malloc(sizeof(*ia));
+			if (ia == NULL) {
+				logerr(__func__);
+				return;
+			}
+			ia->iface = ifp;
+			ia->addr = state->pickedaddr;
+		} else if (!(ifp->options->options & DHCPCD_CONFIGURE)) {
+			logwarnx("%s: refusing to add IPv4LL address %s",
+			    ifp->name, inet_ntoa(state->pickedaddr));
+			return;
+		}
 		ia = ipv4_addaddr(ifp, &state->pickedaddr,
 		    &inaddr_llmask, &inaddr_llbcast,
 		    DHCP_INFINITE_LIFETIME, DHCP_INFINITE_LIFETIME);
@@ -247,7 +256,6 @@ ipv4ll_not_found(struct interface *ifp)
 	logdebugx("%s: DAD completed for %s", ifp->name, ia->saddr);
 #endif
 
-test:
 	state->addr = ia;
 	state->down = false;
 	if (ifp->ctx->options & DHCPCD_TEST) {
@@ -256,7 +264,7 @@ test:
 		return;
 	}
 	rt_build(ifp->ctx, AF_INET);
-run:
+
 	astate = arp_announceaddr(ifp->ctx, &ia->addr);
 	if (astate != NULL)
 		astate->announced_cb = ipv4ll_announced_arp;
