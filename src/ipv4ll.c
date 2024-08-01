@@ -400,10 +400,13 @@ ipv4ll_start(void *arg)
 #ifdef IN_IFF_DUPLICATED
 		loginfox("%s: using IPv4LL address %s", ifp->name, ia->saddr);
 #endif
-	} else {
+	} else if (ifp->options->options & DHCPCD_CONFIGURE) {
 		loginfox("%s: probing for an IPv4LL address", ifp->name);
 		if (repick || state->pickedaddr.s_addr == INADDR_ANY)
 			ipv4ll_pickaddr(ifp);
+	} else {
+		logwarnx("%s: refusing to configure IPv4LL", ifp->name);
+		return;
 	}
 
 	ipv4ll_start_arp(ifp);
