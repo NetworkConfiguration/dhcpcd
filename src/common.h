@@ -70,16 +70,10 @@
 #endif
 
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
-# ifndef __packed
-#  define __packed __attribute__((__packed__))
-# endif
 # ifndef __unused
 #  define __unused __attribute__((__unused__))
 # endif
 #else
-# ifndef __packed
-#  define __packed
-# endif
 # ifndef __unused
 #  define __unused
 # endif

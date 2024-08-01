@@ -112,8 +112,9 @@ struct dhcp6_ia_addr {
 };
 __CTASSERT(sizeof(struct dhcp6_ia_addr) == 16 + 8);
 
-/* XXX FIXME: This is the only packed structure and it does not align.
- * Maybe manually decode it? */
+/* Some compilers do not support packed structures.
+ * We manually decode this. */
+#if 0
 struct dhcp6_pd_addr {
 	uint32_t pltime;
 	uint32_t vltime;
@@ -121,6 +122,13 @@ struct dhcp6_pd_addr {
 	struct in6_addr prefix;
 } __packed;
 __CTASSERT(sizeof(struct dhcp6_pd_addr) == 8 + 1 + 16);
+#endif
+
+#define DHCP6_PD_ADDR_SIZE	(8 + 1 + 16)
+#define DHCP6_PD_ADDR_PLTIME	0
+#define DHCP6_PD_ADDR_VLTIME	4
+#define DHCP6_PD_ADDR_PLEN	8
+#define DHCP6_PD_ADDR_PREFIX	9
 
 struct dhcp6_op {
 	uint16_t type;
@@ -838,7 +846,7 @@ dhcp6_makemessage(struct interface *ifp)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				len += sizeof(o) + sizeof(struct dhcp6_pd_addr);
+				len += sizeof(o) + DHCP6_PD_ADDR_SIZE;
 				if (ap->prefix_exclude_len)
 					len += sizeof(o) + 1 +
 					    (uint8_t)((ap->prefix_exclude_len -
@@ -989,19 +997,14 @@ dhcp6_makemessage(struct interface *ifp)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				struct dhcp6_pd_addr pdp = {
-				    .prefix_len = ap->prefix_len,
-				    /*
-				     * RFC 8415 21.22 states that the
-				     * valid and preferred lifetimes sent by
-				     * the client SHOULD be zero and MUST
-				     * be ignored by the server.
-				     */
-				};
+				uint8_t pdp[DHCP6_PD_ADDR_SIZE];
 
-				/* pdp.prefix is not aligned, so copy it in. */
-				memcpy(&pdp.prefix, &ap->prefix, sizeof(pdp.prefix));
-				COPYIN(D6_OPTION_IAPREFIX, &pdp, sizeof(pdp));
+				memset(pdp, 0, DHCP6_PD_ADDR_PLEN);
+				pdp[DHCP6_PD_ADDR_PLEN] = (uint8_t)ap->prefix_len;
+				memcpy(pdp + DHCP6_PD_ADDR_PREFIX, &ap->prefix,
+				    DHCP6_PD_ADDR_SIZE - DHCP6_PD_ADDR_PREFIX);
+				COPYIN(D6_OPTION_IAPREFIX, pdp, sizeof(pdp));
+
 				ia_na_len = (uint16_t)
 				    (ia_na_len + sizeof(o) + sizeof(pdp));
 
@@ -2224,7 +2227,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	int i;
 	uint8_t nb, *pw;
 	uint16_t ol;
-	struct dhcp6_pd_addr pdp;
+	uint32_t pdp_vltime, pdp_pltime;
+	uint8_t pdp_plen;
 	struct in6_addr pdp_prefix;
 
 	i = 0;
@@ -2234,36 +2238,42 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		nd = o + ol;
 		l -= (size_t)(nd - d);
 		d = nd;
-		if (ol < sizeof(pdp)) {
+		if (ol < DHCP6_PD_ADDR_SIZE) {
 			errno = EINVAL;
 			logerrx("%s: IA Prefix option truncated", ifp->name);
 			continue;
 		}
 
-		memcpy(&pdp, o, sizeof(pdp));
-		pdp.pltime = ntohl(pdp.pltime);
-		pdp.vltime = ntohl(pdp.vltime);
+		memcpy(&pdp_pltime, o, sizeof(pdp_pltime));
+		o += sizeof(pdp_pltime);
+		memcpy(&pdp_vltime, o, sizeof(pdp_vltime));
+		o += sizeof(pdp_vltime);
+		memcpy(&pdp_plen, o, sizeof(pdp_plen));
+		o += sizeof(pdp_plen);
+
+		pdp_pltime = (uint16_t)ntohl(pdp_pltime);
+		pdp_vltime = (uint16_t)ntohl(pdp_vltime);
 		/* RFC 3315 22.6 */
-		if (pdp.pltime > pdp.vltime) {
+		if (pdp_pltime > pdp_vltime) {
 			errno = EINVAL;
 			logerrx("%s: IA Prefix pltime %"PRIu32
 			    " > vltime %"PRIu32,
-			    ifp->name, pdp.pltime, pdp.vltime);
+			    ifp->name, pdp_pltime, pdp_vltime);
 			continue;
 		}
 
-		o += sizeof(pdp);
-		ol = (uint16_t)(ol - sizeof(pdp));
+		memcpy(&pdp_prefix, o, sizeof(pdp_prefix));
+		o += sizeof(pdp_prefix);
+		ol = (uint16_t)(ol - sizeof(pdp_pltime) - sizeof(pdp_vltime) -
+		    sizeof(pdp_plen) - sizeof(pdp_prefix));
 
-		/* pdp.prefix is not aligned so copy it out. */
-		memcpy(&pdp_prefix, &pdp.prefix, sizeof(pdp_prefix));
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp_prefix))
 				break;
 		}
 
 		if (a == NULL) {
-			a = ipv6_newaddr(ifp, &pdp_prefix, pdp.prefix_len,
+			a = ipv6_newaddr(ifp, &pdp_prefix, pdp_plen,
 			    IPV6_AF_DELEGATEDPFX);
 			if (a == NULL)
 				break;
@@ -2276,13 +2286,13 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			if (!(a->flags & IPV6_AF_DELEGATEDPFX))
 				a->flags |= IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
 			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_EXTENDED);
-			if (a->prefix_vltime != pdp.vltime)
+			if (a->prefix_vltime != pdp_vltime)
 				a->flags |= IPV6_AF_NEW;
 		}
 
 		a->acquired = *acquired;
-		a->prefix_pltime = pdp.pltime;
-		a->prefix_vltime = pdp.vltime;
+		a->prefix_pltime = pdp_pltime;
+		a->prefix_vltime = pdp_vltime;
 
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 			state->lowpl = a->prefix_pltime;
