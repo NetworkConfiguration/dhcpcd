@@ -385,7 +385,7 @@ if_linksocket(struct sockaddr_nl *nl, int protocol, int flags)
 	return fd;
 }
 
-static char *
+char *
 if_getnetworknamespace(char *buf, size_t len)
 {
 	struct stat sb_self, sb_netns;
