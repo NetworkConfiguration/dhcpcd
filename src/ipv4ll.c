@@ -294,8 +294,7 @@ ipv4ll_defend_failed(struct interface *ifp)
 	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
 
 	ipv4ll_freearp(ifp);
-	if (ifp->options->options & DHCPCD_CONFIGURE)
-		ipv4_deladdr(state->addr, 1);
+	ipv4_deladdr(state->addr, 1);
 	state->addr = NULL;
 	rt_build(ifp->ctx, AF_INET);
 	script_runreason(ifp, "IPV4LL");
@@ -388,8 +387,7 @@ ipv4ll_start(void *arg)
 	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED) {
 		state->pickedaddr = ia->addr; /* So it's not picked again. */
 		repick = true;
-		if (ifp->options->options & DHCPCD_CONFIGURE)
-			ipv4_deladdr(ia, 0);
+		ipv4_deladdr(ia, 0);
 		ia = NULL;
 	}
 #endif
@@ -464,8 +462,7 @@ ipv4ll_drop(struct interface *ifp)
 	if (state) {
 		state->running = false;
 		if (state->addr != NULL) {
-			if (ifp->options->options & DHCPCD_CONFIGURE)
-				ipv4_deladdr(state->addr, 1);
+			ipv4_deladdr(state->addr, 1);
 			state->addr = NULL;
 			dropped = true;
 		}
@@ -477,8 +474,7 @@ ipv4ll_drop(struct interface *ifp)
 
 		TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
 			if (IN_LINKLOCAL(ntohl(ia->addr.s_addr))) {
-				if (ifp->options->options & DHCPCD_CONFIGURE)
-					ipv4_deladdr(ia, 0);
+				ipv4_deladdr(ia, 0);
 				dropped = true;
 			}
 		}
@@ -570,8 +566,7 @@ ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	else if (ia->addr_flags & IN_IFF_DUPLICATED) {
 		logerrx("%s: DAD detected %s", ifp->name, ia->saddr);
 		ipv4ll_freearp(ifp);
-		if (ifp->options->options & DHCPCD_CONFIGURE)
-			ipv4_deladdr(ia, 1);
+		ipv4_deladdr(ia, 1);
 		state->addr = NULL;
 		rt_build(ifp->ctx, AF_INET);
 		ipv4ll_found(ifp);

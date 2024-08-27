@@ -704,6 +704,10 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 void
 rt_build(struct dhcpcd_ctx *ctx, int af)
 {
+	if (!(ctx->options & DHCPCD_CONFIGURE)) {
+		return;
+	}
+
 	rb_tree_t routes, added, kroutes;
 	struct rt *rt, *rtn;
 	unsigned long long o;
