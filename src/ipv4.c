@@ -527,11 +527,13 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	logdebugx("%s: deleting IP address %s",
 	    addr->iface->name, addr->saddr);
 
-	r = if_address(RTM_DELADDR, addr);
-	if (r == -1 &&
-	    errno != EADDRNOTAVAIL && errno != ESRCH &&
-	    errno != ENXIO && errno != ENODEV)
-		logerr("%s: %s", addr->iface->name, __func__);
+	if (addr->iface->options->options & DHCPCD_CONFIGURE) {
+		r = if_address(RTM_DELADDR, addr);
+		if (r == -1 &&
+			errno != EADDRNOTAVAIL && errno != ESRCH &&
+			errno != ENXIO && errno != ENODEV)
+			logerr("%s: %s", addr->iface->name, __func__);
+	}
 
 #ifdef ARP
 	if (!keeparp)
@@ -721,7 +723,8 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	    ifp->name, ia->saddr,
 	    ifp->flags & IFF_POINTOPOINT ? "destination" : "broadcast",
 	    inet_ntoa(*bcast));
-	if (if_address(RTM_NEWADDR, ia) == -1) {
+	if (ifp->options->options & DHCPCD_CONFIGURE &&
+		if_address(RTM_NEWADDR, ia) == -1) {
 		if (errno != EEXIST)
 			logerr("%s: if_addaddress",
 			    __func__);

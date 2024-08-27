@@ -2374,24 +2374,6 @@ dhcp_bind(struct interface *ifp)
 
 	old_state = state->added;
 
-	if (!(ifo->options & DHCPCD_CONFIGURE)) {
-		struct ipv4_addr *ia;
-
-		script_runreason(ifp, state->reason);
-		dhcpcd_daemonise(ifp->ctx);
-
-		/* We we are not configuring the address, we need to keep
-		 * the BPF socket open if the address does not exist. */
-		ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
-		if (ia != NULL) {
-			state->addr = ia;
-			state->added = STATE_ADDED;
-			dhcp_closebpf(ifp);
-			goto openudp;
-		}
-		return;
-	}
-
 	/* Add the address */
 	if (ipv4_applyaddr(ifp) == NULL) {
 		/* There was an error adding the address.
@@ -2402,6 +2384,9 @@ dhcp_bind(struct interface *ifp)
 		}
 		return;
 	}
+
+	if (!(ifo->options & DHCPCD_CONFIGURE))
+		return;
 
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
@@ -2848,13 +2833,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->new = NULL;
 	state->new_len = 0;
 	state->reason = reason;
-	if (ifp->options->options & DHCPCD_CONFIGURE)
-		ipv4_applyaddr(ifp);
-	else {
-		state->addr = NULL;
-		state->added = 0;
-		script_runreason(ifp, state->reason);
-	}
+	ipv4_applyaddr(ifp);
 	free(state->old);
 	state->old = NULL;
 	state->old_len = 0;
