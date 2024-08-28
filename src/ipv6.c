@@ -666,13 +666,13 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	struct interface *ifp;
 	uint32_t pltime, vltime;
 	int loglevel;
+	struct ipv6_state *state;
+	struct ipv6_addr *ia2;
 #ifdef ND6_ADVERTISE
 	bool vltime_was_zero = ia->prefix_vltime == 0;
 #endif
-#ifdef __sun
-	struct ipv6_state *state;
-	struct ipv6_addr *ia2;
 
+#ifdef __sun
 	/* If we re-add then address on Solaris then the prefix
 	 * route will be scrubbed and re-added. Something might
 	 * be using it, so let's avoid it. */
@@ -794,12 +794,9 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	}
 #endif
 
-#ifdef __sun
-	/* Solaris does not announce new addresses which need DaD
-	 * so we need to take a copy and add it to our list.
-	 * Otherwise aliasing gets confused if we add another
-	 * address during DaD. */
-
+	/* Take a copy of the address and add it to our state if
+	 * it does not exist.
+	 * This is important if route overflow loses the message. */
 	state = IPV6_STATE(ifp);
 	TAILQ_FOREACH(ia2, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ia2->addr, &ia->addr))
@@ -808,17 +805,14 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	if (ia2 == NULL) {
 		if ((ia2 = malloc(sizeof(*ia2))) == NULL) {
 			logerr(__func__);
-			return 0; /* Well, we did add the address */
+			goto advertise; /* Well, we did add the address */
 		}
 		memcpy(ia2, ia, sizeof(*ia2));
 		TAILQ_INSERT_TAIL(&state->addrs, ia2, next);
 	}
-#endif
 
-#ifdef ND6_ADVERTISE
-#ifdef __sun
 advertise:
-#endif
+#ifdef ND6_ADVERTISE
 	/* Re-advertise the preferred address to be safe. */
 	if (!vltime_was_zero)
 		ipv6nd_advertise(ia);
@@ -1908,6 +1902,10 @@ ipv6_handleifa_addrs(int cmd,
 
 		ia->addr_flags = addr->addr_flags;
 
+		if (cmd == RTM_DELADDR && ia->flags & IPV6_AF_ADDED)
+			logwarnx("%s: pid %d deleted address %s",
+			    ia->iface->name, pid, ia->saddr);
+
 		/* Check DAD.
 		 * On Linux we can get IN6_IFF_DUPLICATED via RTM_DELADDR. */
 		if (((ia->addr_flags &
@@ -1924,11 +1922,7 @@ ipv6_handleifa_addrs(int cmd,
 		}
 
 		if (cmd == RTM_DELADDR) {
-			if (ia->flags & IPV6_AF_ADDED) {
-				logwarnx("%s: pid %d deleted address %s",
-				    ia->iface->name, pid, ia->saddr);
-				ia->flags &= ~IPV6_AF_ADDED;
-			}
+			ia->flags &= ~IPV6_AF_ADDED;
 			ipv6_deletedaddr(ia);
 			if (ia->flags & IPV6_AF_DELEGATED) {
 				TAILQ_REMOVE(addrs, ia, next);
