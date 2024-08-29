@@ -2251,8 +2251,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		memcpy(&pdp_plen, o, sizeof(pdp_plen));
 		o += sizeof(pdp_plen);
 
-		pdp_pltime = (uint16_t)ntohl(pdp_pltime);
-		pdp_vltime = (uint16_t)ntohl(pdp_vltime);
+		pdp_pltime = ntohl(pdp_pltime);
+		pdp_vltime = ntohl(pdp_vltime);
 		/* RFC 3315 22.6 */
 		if (pdp_pltime > pdp_vltime) {
 			errno = EINVAL;
@@ -2561,7 +2561,7 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 			continue;
 		}
 		TAILQ_REMOVE(addrs, ia, next);
-		if (ia->flags & IPV6_AF_EXTENDED)
+		if (!(ia->flags & IPV6_AF_EXTENDED))
 			ipv6_deleteaddr(ia);
 		ipv6_freeaddr(ia);
 	}
