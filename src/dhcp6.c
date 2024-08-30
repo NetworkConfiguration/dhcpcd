@@ -2373,7 +2373,9 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	i = e = 0;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (!(ap->flags & (IPV6_AF_DELEGATED | IPV6_AF_DELEGATEDPFX)))
+		/* Anything not from a lease for this interface should be
+		 * marked as stale. */
+		if (!(ap->flags & IPV6_AF_DELEGATED))
 			ap->flags |= IPV6_AF_STALE;
 	}
 
@@ -2710,7 +2712,7 @@ out:
 	return bytes;
 
 ex:
-	dhcp6_freedrop_addrs(ifp, 0, IPV6_AF_ANYDELEGATED, NULL);
+	dhcp6_freedrop_addrs(ifp, 0, IPV6_AF_DELEGATED, NULL);
 	dhcp_unlink(ifp->ctx, state->leasefile);
 	free(state->new);
 	state->new = NULL;
