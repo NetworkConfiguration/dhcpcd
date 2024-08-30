@@ -1749,7 +1749,8 @@ dhcp6_fail(struct interface *ifp, bool drop)
 	state->failed = true;
 
 	if (drop) {
-		dhcp6_freedrop_addrs(ifp, 1, IPV6_AF_ANYDELEGATED, NULL);
+		dhcp6_freedrop_addrs(ifp, 1,
+		    IPV6_AF_DELEGATED | IPV6_AF_PFXDELEGATION, NULL);
 #ifndef SMALL
 		dhcp6_delete_delegates(ifp);
 #endif
@@ -2274,7 +2275,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 
 		if (a == NULL) {
 			a = ipv6_newaddr(ifp, &pdp_prefix, pdp_plen,
-			    IPV6_AF_DELEGATEDPFX);
+			    IPV6_AF_PFXDELEGATION);
 			if (a == NULL)
 				break;
 			a->created = *acquired;
@@ -2283,8 +2284,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
-			if (!(a->flags & IPV6_AF_DELEGATEDPFX))
-				a->flags |= IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
+			if (!(a->flags & IPV6_AF_PFXDELEGATION))
+				a->flags |= IPV6_AF_NEW | IPV6_AF_PFXDELEGATION;
 			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_EXTENDED);
 			if (a->prefix_vltime != pdp_vltime)
 				a->flags |= IPV6_AF_NEW;
@@ -2552,7 +2553,7 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 #ifndef SMALL
 		/* If we delegated from this prefix, deprecate or remove
 		 * the delegations. */
-		if (ia->flags & IPV6_AF_DELEGATEDPFX)
+		if (ia->flags & IPV6_AF_PFXDELEGATION)
 			dhcp6_deprecatedele(ia);
 #endif
 
@@ -2927,7 +2928,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		k = 0;
 		carrier_warned = false;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
+			if (!(ap->flags & IPV6_AF_PFXDELEGATION))
 				continue;
 			if (!(ap->flags & IPV6_AF_DELEGATEDLOG)) {
 				int loglevel;
@@ -3028,7 +3029,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		if (state == NULL || state->state != DH6S_BOUND)
 			continue;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
+			if (!(ap->flags & IPV6_AF_PFXDELEGATION))
 				continue;
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];

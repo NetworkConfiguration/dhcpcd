@@ -960,7 +960,7 @@ ipv6_doaddr(struct ipv6_addr *ia, struct timespec *now)
 {
 
 	/* A delegated prefix is not an address. */
-	if (ia->flags & IPV6_AF_DELEGATEDPFX)
+	if (ia->flags & IPV6_AF_PFXDELEGATION)
 		return 0;
 
 	if (ia->prefix_vltime == 0) {
@@ -1014,7 +1014,7 @@ ipv6_freeaddr(struct ipv6_addr *ia)
 	struct ipv6_addr *iad;
 
 	/* Forget the reference */
-	if (ia->flags & IPV6_AF_DELEGATEDPFX) {
+	if (ia->flags & IPV6_AF_PFXDELEGATION) {
 		TAILQ_FOREACH(iad, &ia->pd_pfxs, pd_next) {
 			iad->delegating_prefix = NULL;
 		}
@@ -1673,7 +1673,7 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 #else
 		return ia;
 #endif
-	} else if (ia->flags & (IPV6_AF_REQUEST | IPV6_AF_DELEGATEDPFX)) {
+	} else if (ia->flags & (IPV6_AF_REQUEST | IPV6_AF_PFXDELEGATION)) {
 		ia->prefix = *addr;
 		cbp = inet_ntop(AF_INET6, &ia->prefix, buf, sizeof(buf));
 		goto paddr;
@@ -2244,7 +2244,7 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 
 	/* This address is the delegated prefix, so add a reject route for
 	 * it via the loopback interface. */
-	if (addr->flags & IPV6_AF_DELEGATEDPFX) {
+	if (addr->flags & IPV6_AF_PFXDELEGATION) {
 		struct interface *lo0;
 
 		TAILQ_FOREACH(lo0, ifp->ctx->ifaces, next) {
@@ -2264,7 +2264,7 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 	sa_in6_init(&rt->rt_dest, &addr->prefix);
 	ipv6_mask(&netmask, addr->prefix_len);
 	sa_in6_init(&rt->rt_netmask, &netmask);
-	if (addr->flags & IPV6_AF_DELEGATEDPFX) {
+	if (addr->flags & IPV6_AF_PFXDELEGATION) {
 		rt->rt_flags |= RTF_REJECT;
 		/* Linux does not like a gateway for a reject route. */
 #ifndef __linux__
@@ -2406,7 +2406,7 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
 		TAILQ_FOREACH(ia, &d6_state->addrs, next) {
 			if (dstate == DH6S_DELEGATED) {
 				// Reject route won't have IPV6_AF_ADDED
-				if (!(ia->flags & IPV6_AF_DELEGATEDPFX))
+				if (!(ia->flags & IPV6_AF_PFXDELEGATION))
 					continue;
 			} else if (!(ia->flags & IPV6_AF_ADDED))
 				continue;

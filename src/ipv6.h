@@ -217,8 +217,8 @@ struct ipv6_addr {
 #define	IPV6_AF_ADDED		(1U << 3)
 #define	IPV6_AF_AUTOCONF	(1U << 4)
 #define	IPV6_AF_DADCOMPLETED	(1U << 5)
-#define	IPV6_AF_DELEGATED	(1U << 6)	// Delegated from prefix
-#define	IPV6_AF_DELEGATEDPFX	(1U << 7)	// Delegated prefix
+#define	IPV6_AF_PFXDELEGATION	(1U << 6)
+#define	IPV6_AF_DELEGATED	(1U << 7)
 #define	IPV6_AF_NOREJECT	(1U << 8)
 #define	IPV6_AF_REQUEST		(1U << 9)
 #define	IPV6_AF_STATIC		(1U << 10)
@@ -230,8 +230,6 @@ struct ipv6_addr {
 #ifdef IPV6_MANAGETEMPADDR
 #define	IPV6_AF_TEMPORARY	(1U << 16)
 #endif
-
-#define IPV6_AF_ANYDELEGATED	(IPV6_AF_DELEGATED | IPV6_AF_DELEGATEDPFX)
 
 struct ll_callback {
 	TAILQ_ENTRY(ll_callback) next;
