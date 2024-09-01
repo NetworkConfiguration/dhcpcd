@@ -1136,7 +1136,8 @@ ipv6_anyglobal(struct interface *sifp)
 			continue;
 
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr))
+			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) ||
+			    IN6_IS_ADDR_LOOPBACK(&ia->addr))
 				continue;
 			/* Let's be optimistic.
 			 * Any decent OS won't forward or accept traffic
