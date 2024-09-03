@@ -1108,43 +1108,61 @@ ipv6_getstate(struct interface *ifp)
 	return state;
 }
 
+static struct ipv6_addr *
+ipv6_ifanyglobal(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ia;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return NULL;
+
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) ||
+		    IN6_IS_ADDR_LOOPBACK(&ia->addr))
+			continue;
+		/* Let's be optimistic.
+		 * Any decent OS won't forward or accept traffic
+		 * from/to tentative or detached addresses. */
+		if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
+			return ia;
+	}
+
+	return NULL;
+}
+
 struct ipv6_addr *
 ipv6_anyglobal(struct interface *sifp)
 {
-	struct interface *ifp;
-	struct ipv6_state *state;
 	struct ipv6_addr *ia;
+	struct interface *ifp;
 	bool forwarding;
+
+	ia = ipv6_ifanyglobal(sifp);
+	if (ia != NULL)
+		return ia;
 
 	/* BSD forwarding is either on or off.
 	 * Linux forwarding is technically the same as it's
 	 * configured by the "all" interface.
 	 * Per interface only affects IsRouter of NA messages. */
-#if defined(PRIVSEP) && (defined(HAVE_PLEDGE) || defined(__linux__))
+#ifdef PRIVSEP_SYSCTL
 	if (IN_PRIVSEP(sifp->ctx))
 		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) != 0;
 	else
 #endif
 		forwarding = ip6_forwarding(NULL) != 0;
 
+	if (!forwarding)
+		return NULL;
+
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
-		if (ifp != sifp && !forwarding)
+		if (ifp == sifp)
 			continue;
-
-		state = IPV6_STATE(ifp);
-		if (state == NULL)
-			continue;
-
-		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) ||
-			    IN6_IS_ADDR_LOOPBACK(&ia->addr))
-				continue;
-			/* Let's be optimistic.
-			 * Any decent OS won't forward or accept traffic
-			 * from/to tentative or detached addresses. */
-			if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
-				return ia;
-		}
+		ia = ipv6_ifanyglobal(ifp);
+		if (ia != NULL)
+			return ia;
 	}
 	return NULL;
 }

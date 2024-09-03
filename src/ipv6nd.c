@@ -566,7 +566,7 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 
 	na->nd_na_type = ND_NEIGHBOR_ADVERT;
 	na->nd_na_flags_reserved = ND_NA_FLAG_OVERRIDE;
-#if defined(PRIVSEP) && (defined(__linux__) || defined(HAVE_PLEDGE))
+#ifdef PRIVSEP_SYSCTL
 	if (IN_PRIVSEP(ctx)) {
 		if (ps_root_ip6forwarding(ctx, ifp->name) != 0)
 			na->nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;

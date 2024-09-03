@@ -1173,7 +1173,7 @@ err:
 }
 #endif
 
-#if defined(__linux__) || defined(HAVE_PLEDGE)
+#ifdef PRIVSEP_SYSCTL
 ssize_t
 ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
 {
