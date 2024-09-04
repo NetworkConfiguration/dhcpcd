@@ -1598,7 +1598,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		logwarnx("%s: %s: no longer a default router (lifetime = 0)",
 		    ifp->name, rap->sfrom);
 
-	if (new_data && !has_address && rap->lifetime && !ipv6_anyglobal(ifp))
+	if (new_data && !has_address && rap->lifetime &&
+	    ifp->options->options & DHCPCD_GATEWAY && !ipv6_anyglobal(ifp))
 		logwarnx("%s: no global addresses for default route",
 		    ifp->name);
 
