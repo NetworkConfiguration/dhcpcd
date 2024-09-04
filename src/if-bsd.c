@@ -1767,14 +1767,12 @@ inet6_sysctlbyname(const char *name, int val, int action)
 int
 ip6_forwarding(__unused const char *ifname)
 {
-	int val;
 
 #ifdef IPV6CTL_FORWARDING
-	val = get_inet6_sysctl(IPV6CTL_FORWARDING);
+	return get_inet6_sysctl(IPV6CTL_FORWARDING);
 #else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.forwarding");
+	return get_inet6_sysctlbyname("net.inet6.ip6.forwarding");
 #endif
-	return val < 0 ? 0 : val;
 }
 
 #ifdef SIOCIFAFATTACH

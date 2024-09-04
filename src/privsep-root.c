@@ -611,7 +611,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		free_rdata = true;
 		break;
 #endif
-#if defined(INET6) && (defined(__linux__) || defined(HAVE_PLEDGE))
+#if defined(INET6) && defined(PRIVSEP_SYSCTL)
 	case PS_IP6FORWARDING:
 		 err = ip6_forwarding(data);
 		 break;

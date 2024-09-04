@@ -1149,10 +1149,10 @@ ipv6_anyglobal(struct interface *sifp)
 	 * Per interface only affects IsRouter of NA messages. */
 #ifdef PRIVSEP_SYSCTL
 	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) != 0;
+		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) > 0;
 	else
 #endif
-		forwarding = ip6_forwarding(NULL) != 0;
+		forwarding = ip6_forwarding(NULL) > 0;
 
 	if (!forwarding)
 		return NULL;

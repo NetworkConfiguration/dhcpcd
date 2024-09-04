@@ -572,7 +572,7 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 			na->nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;
 	} else
 #endif
-	if (ip6_forwarding(ifp->name) != 0)
+	if (ip6_forwarding(ifp->name) > 0)
 		na->nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;
 	na->nd_na_target = ia->addr;
 

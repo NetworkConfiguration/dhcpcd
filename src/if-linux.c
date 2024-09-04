@@ -2250,10 +2250,10 @@ ip6_forwarding(const char *ifname)
 		ifname = "all";
 	snprintf(path, sizeof(path), "%s/%s/forwarding", p_conf, ifname);
 	if (readfile(path, buf, sizeof(buf)) == -1)
-		return 0;
+		return -1;
 	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
 	if (error != 0 && error != ENOTSUP)
-		return 0;
+		return -1;
 	return i;
 }
 
