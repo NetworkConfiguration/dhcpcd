@@ -3119,7 +3119,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 
 		if (state->reason == NULL)
 			state->reason = "INFORM6";
-		o = dhcp6_findmoption(state->new, state->new_len,
+		o = dhcp6_findmoption(state->recv, state->recv_len,
 				      D6_OPTION_INFO_REFRESH_TIME, &ol);
 		if (o == NULL || ol != sizeof(uint32_t))
 			state->renew = IRT_DEFAULT;
