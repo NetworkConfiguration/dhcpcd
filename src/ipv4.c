@@ -560,28 +560,6 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	return r;
 }
 
-static int
-delete_address(struct interface *ifp)
-{
-	int r;
-	struct if_options *ifo;
-	struct dhcp_state *state;
-
-	state = D_STATE(ifp);
-	ifo = ifp->options;
-	/* The lease could have been added, but the address deleted
-	 * by a 3rd party. */
-	if (state->addr == NULL ||
-	    ifo->options & DHCPCD_INFORM ||
-	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
-		return 0;
-#ifdef ARP
-	arp_freeaddr(ifp, &state->addr->addr);
-#endif
-	r = ipv4_deladdr(state->addr, 0);
-	return r;
-}
-
 struct ipv4_state *
 ipv4_getstate(struct interface *ifp)
 {
@@ -766,7 +744,7 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
-	struct ipv4_addr *ia;
+	struct ipv4_addr *ia, *old_ia;
 
 	if (state == NULL)
 		return NULL;
@@ -777,7 +755,7 @@ ipv4_applyaddr(void *arg)
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
 			if (state->added) {
-				delete_address(ifp);
+				ipv4_deladdr(state->addr, 0);
 				rt_build(ifp->ctx, AF_INET);
 #ifdef ARP
 				/* Announce the preferred address to
@@ -790,6 +768,9 @@ ipv4_applyaddr(void *arg)
 			rt_build(ifp->ctx, AF_INET);
 		return NULL;
 	}
+
+	/* ipv4_dadaddr() will overwrite this, we need it to purge later */
+	old_ia = state->addr;
 
 	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	/* If the netmask or broadcast is different, re-add the addresss.
@@ -833,10 +814,8 @@ ipv4_applyaddr(void *arg)
 #endif
 
 	/* Delete the old address if different */
-	if (state->addr &&
-	    state->addr->addr.s_addr != lease->addr.s_addr &&
-	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
-		delete_address(ifp);
+	if (old_ia && old_ia->addr.s_addr != lease->addr.s_addr)
+		ipv4_deladdr(old_ia, 0);
 
 	state->addr = ia;
 	state->added = STATE_ADDED;
