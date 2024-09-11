@@ -160,7 +160,8 @@
 
 /*
  * ND6 Advertising is only used for IP address sharing to prefer
- * the address on a specific interface.
+ * the address on a specific interface or when the hardware address
+ * of the interface changes.
  * This just fails to work on OpenBSD and causes erroneous duplicate
  * address messages on BSD's other then DragonFly and NetBSD.
  */
@@ -227,8 +228,9 @@ struct ipv6_addr {
 #define	IPV6_AF_EXTENDED	(1U << 13)
 #define	IPV6_AF_REGEN		(1U << 14)
 #define	IPV6_AF_ROUTER		(1U << 15)
+#define	IPV6_AF_ADVERTISED	(1U << 16)
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	(1U << 16)
+#define	IPV6_AF_TEMPORARY	(1U << 17)
 #endif
 
 struct ll_callback {

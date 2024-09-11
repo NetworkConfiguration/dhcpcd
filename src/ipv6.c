@@ -1832,16 +1832,19 @@ ipv6_startstatic(struct interface *ifp)
 int
 ipv6_start(struct interface *ifp)
 {
-#ifdef IPV6_POLLADDRFLAG
+#if defined(ND6_ADVERTISE) || defined(IPV6_POLLADDRFLAG)
 	struct ipv6_state *state;
 
 	/* We need to update the address flags. */
 	if ((state = IPV6_STATE(ifp)) != NULL) {
 		struct ipv6_addr *ia;
+#ifdef IPV6_POLLADDRFLAG
 		const char *alias;
 		int flags;
+#endif
 
 		TAILQ_FOREACH(ia, &state->addrs, next) {
+#ifdef IPV6_POLLADDRFLAG
 #ifdef ALIAS_ADDR
 			alias = ia->alias;
 #else
@@ -1850,6 +1853,9 @@ ipv6_start(struct interface *ifp)
 			flags = if_addrflags6(ia->iface, &ia->addr, alias);
 			if (flags != -1)
 				ia->addr_flags = flags;
+#endif
+			/* hwaddr could have changed */
+			ia->flags &= ~IPV6_AF_ADVERTISED;
 		}
 	}
 #endif
