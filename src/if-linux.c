@@ -686,6 +686,27 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_DST:
 			sa = &rt->rt_dest;
 			break;
+		case RTA_SRC:
+		{
+			union sa_ss ssa;
+			struct sockaddr *psa = (struct sockaddr *)&ssa;
+			socklen_t salen;
+
+			psa->sa_family = rtm->rtm_family;
+			salen = sa_addrlen(psa);
+			memcpy((char *)psa + sa_addroffset(psa),
+			       RTA_DATA(rta), MIN(salen, RTA_PAYLOAD(rta)));
+			/* if ip-route "from" address is not unspecified,
+                           route is source-based, eg:
+                             <dest-net> from <source-net> via ... dev ...
+                           ignore the route as may otherwise appear to overlap
+                           with routes set/removed by dhcpcd */
+			if (!sa_is_unspecified(psa)) {
+				errno = ENOTSUP;
+				return -1;
+			}
+			break;
+		}
 		case RTA_GATEWAY:
 			sa = &rt->rt_gateway;
 			break;
