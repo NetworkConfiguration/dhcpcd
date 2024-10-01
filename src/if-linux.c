@@ -60,8 +60,10 @@
 #include <linux/if_arp.h>
 #endif
 
+#ifndef IFF_DORMANT
 /* Inlcude this *after* net/if.h so we get IFF_DORMANT */
 #include <linux/if.h>
+#endif
 
 #include <dirent.h>
 #include <errno.h>
