@@ -3489,61 +3489,63 @@ is_packet_udp_bootp(void *packet, size_t plen)
 	return true;
 }
 
+/* IPv4 pseudo header used for computing TCP and UDP checksums. */
+struct ip_pseudo {
+	struct in_addr ipp_src;
+	struct in_addr ipp_dst;
+	uint8_t ipp_pad; /* must be zero */
+	uint8_t ipp_p;
+	uint16_t ipp_len;
+};
+
 /* Lengths have already been checked. */
 static bool
-checksums_valid(void *packet,
+checksums_valid(const void *packet,
     struct in_addr *from, unsigned int flags)
 {
-	struct ip *ip = packet;
-	union pip {
-		struct ip ip;
-		uint16_t w[sizeof(struct ip) / 2];
-	} pip = {
-		.ip = {
-			.ip_p = IPPROTO_UDP,
-			.ip_src = ip->ip_src,
-			.ip_dst = ip->ip_dst,
-		}
-	};
+	const struct ip *ip = packet;
 	size_t ip_hlen;
 	struct udphdr udp;
-	char *udpp, *uh_sump;
+	const char *udpp;
 	uint32_t csum;
+	struct ip_pseudo ip_pseudo;
+	/* We create a buffer to copy ip_pseudo into and send that to
+	 * in_cksum() to avoid memory issues. */
+	uint8_t ip_pseudo_buf[sizeof(struct ip_pseudo)];
 
 	if (from != NULL)
 		from->s_addr = ip->ip_src.s_addr;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
+	/* RFC 1071 states that the check of the checksum is equal to 0. */
 	if (in_cksum(ip, ip_hlen, NULL) != 0)
 		return false;
 
 	if (flags & BPF_PARTIALCSUM)
 		return true;
 
-	udpp = (char *)ip + ip_hlen;
+	udpp = (const char *)ip + ip_hlen;
 	memcpy(&udp, udpp, sizeof(udp));
+	/* RFC 768 states that zero means no checksum to verify. */
 	if (udp.uh_sum == 0)
 		return true;
 
 	/* UDP checksum is based on a pseudo IP header alongside
 	 * the UDP header and payload. */
-	pip.ip.ip_len = udp.uh_ulen;
-	csum = 0;
-
-	/* Need to zero the UDP sum in the packet for the checksum to work. */
-	uh_sump = udpp + offsetof(struct udphdr, uh_sum);
-	memset(uh_sump, 0, sizeof(udp.uh_sum));
+	ip_pseudo.ipp_src = ip->ip_src;
+	ip_pseudo.ipp_dst = ip->ip_dst;
+	ip_pseudo.ipp_pad = 0;
+	ip_pseudo.ipp_p = ip->ip_p;
+	ip_pseudo.ipp_len = udp.uh_ulen;
+	memcpy(ip_pseudo_buf, &ip_pseudo, sizeof(ip_pseudo_buf));
 
 	/* Checksum pseudo header and then UDP + payload. */
-	in_cksum(pip.w, sizeof(pip.w), &csum);
+	csum = 0;
+	in_cksum(ip_pseudo_buf, sizeof(ip_pseudo_buf), &csum);
 	csum = in_cksum(udpp, ntohs(udp.uh_ulen), &csum);
 
-#if 0	/* Not needed, just here for completeness. */
-	/* Put the checksum back. */
-	memcpy(uh_sump, &udp.uh_sum, sizeof(udp.uh_sum));
-#endif
-
-	return csum == udp.uh_sum;
+	/* RFC 1071 states that the check of the checksum is equal to 0. */
+	return csum == 0;
 }
 
 static void
