@@ -86,6 +86,7 @@ const struct option cf_options[] = {
 	{"userclass",       required_argument, NULL, 'u'},
 #ifndef SMALL
 	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
+	{"vsio",         	required_argument, NULL, O_VENDOPT6},
 #endif
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
@@ -647,6 +648,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	char *p = NULL, *bp, *fp, *np;
 	ssize_t s;
 	struct in_addr addr, addr2;
+	struct in6_addr in6addr;
 	in_addr_t *naddr;
 	struct rt *rt;
 	const struct dhcp_opt *d, *od;
@@ -654,6 +656,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl, odl;
 	struct vivco *vivco;
+	struct vsio6 *vsio6;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -895,6 +898,99 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		ifo->userclass[0] = (uint8_t)s;
+		break;
+	case O_VENDOPT6:
+		ARG_REQUIRED;
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid code: %s", arg);
+			return -1;
+		}
+
+		fp = strskipwhite(fp);
+		p = strchr(fp, ',');
+		if (!p || !p[1]) {
+			logerrx("invalid vendor format: %s", arg);
+			return -1;
+		}
+
+		/* Strip and preserve the comma */
+		*p = '\0';
+		i = (int)strtoi(fp, NULL, 0, 1, 65535, &e);
+		*p = ',';
+		if (e) {
+			logerrx("vendor6 option should be between"
+			    " 1 and 65535 inclusive");
+			return -1;
+		}
+
+		fp = p + 1;
+
+		if (fp) {
+			if (inet_pton(AF_INET6, fp, &in6addr) == 1) {
+				s = sizeof(in6addr.s6_addr);
+				dl = (size_t)s;
+				if (dl + (sizeof(uint16_t) * 2) > UINT16_MAX) {
+					logerrx("vendor6 option is too big");
+					return -1;
+				}
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				memcpy(np, &in6addr.s6_addr, dl);
+			} else {
+				s = parse_string(NULL, 0, fp);
+				if(s == -1) {
+					logerr(__func__);
+					return -1;
+				}
+				dl = (size_t)s;
+				if (dl + (sizeof(uint16_t) * 2) > UINT16_MAX) {
+					logerrx("vendor6 option is too big");
+					return -1;
+				}
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				parse_string(np, dl, fp);
+			}
+		} else {
+			dl = 0;
+			np = NULL;
+		}
+
+		vsio6 = reallocarray(ifo->vsio6, ifo->vsio6_len + 1, sizeof(*ifo->vsio6));
+		if (vsio6 == NULL) {
+			logerr(__func__);
+			free(np);
+			return -1;
+		}
+		ifo->vsio6 = vsio6;
+		vsio6 = &ifo->vsio6[ifo->vsio6_len++];
+		vsio6->en = (uint32_t)u;
+		vsio6->opt = (size_t)i;
+		vsio6->len = dl;
+		vsio6->data = (uint8_t *)np;
+		
+		bool new_en = true;
+		for (size_t j = 0; j < ifo->vsio6_ent_nums_len; j++) {
+			if (ifo->vsio6_ent_nums[j] == (uint32_t)u) {
+				new_en = false;
+				break;
+			}
+		}
+
+		if (new_en) {
+			ifo->vsio6_ent_nums[ifo->vsio6_ent_nums_len] = (uint32_t)u;
+			ifo->vsio6_ent_nums_len++;
+		}
 		break;
 #endif
 	case 'v':
@@ -2798,6 +2894,7 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 #endif
 	struct dhcp_opt *opt;
 	struct vivco *vo;
+	struct vsio6 *vso6;
 #ifdef AUTH
 	struct token *token;
 #endif
@@ -2856,6 +2953,11 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	    vo++, ifo->vivco_len--)
 		free(vo->data);
 	free(ifo->vivco);
+	for (vso6 = ifo->vsio6;
+	    ifo->vsio6_len > 0;
+	    vso6++, ifo->vsio6_len--)
+			free(vso6->data);
+	free(ifo->vsio6);
 	for (opt = ifo->vivso_override;
 	    ifo->vivso_override_len > 0;
 	    opt++, ifo->vivso_override_len--)
