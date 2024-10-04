@@ -514,7 +514,6 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 	struct interface *ifp;
 	struct ipv6_state *state;
 	struct ipv6_addr *iap, *iaf;
-	bool found_another = false;
 	struct nd_neighbor_advert *na;
 
 	if (IN6_IS_ADDR_MULTICAST(&ia->addr))
@@ -537,12 +536,10 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 			if (!IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr))
 				continue;
 
-			if (iaf != NULL)
-				found_another = true;
-
 			/* Don't advertise what we can't use. */
 			if (iap->prefix_vltime == 0 ||
 			    iap->addr_flags & IN6_IFF_NOTUSEABLE ||
+			    !ifp->active ||
 			    !if_is_link_up(ifp))
 				continue;
 
@@ -557,24 +554,19 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 		return;
 
 	/* Now cancel any other advertisements for the same address. */
-	if (found_another) {
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			state = IPV6_STATE(ifp);
-			if (state == NULL)
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		state = IPV6_STATE(ifp);
+		if (state == NULL)
+			continue;
+
+		TAILQ_FOREACH(iap, &state->addrs, next) {
+			if (!IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr))
 				continue;
 
-			TAILQ_FOREACH(iap, &state->addrs, next) {
-				if (!IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr))
-					continue;
-
-				iap->flags &= ~IPV6_AF_ADVERTISED;
-				eloop_timeout_delete(ctx->eloop,
-				    ipv6nd_sendadvertisement, iap);
-			}
+			iap->flags &= ~IPV6_AF_ADVERTISED;
+			eloop_timeout_delete(ctx->eloop,
+			    ipv6nd_sendadvertisement, iap);
 		}
-	} else {
-		eloop_timeout_delete(ctx->eloop,
-		    ipv6nd_sendadvertisement, iaf);
 	}
 
 	/* Make the packet. */

@@ -519,8 +519,12 @@ struct arp_state *
 arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 {
 	struct arp_state *astate;
+	struct ipv4_addr *ia4;
 
 	if (ifp->flags & IFF_NOARP || !(ifp->options->options & DHCPCD_ARP))
+		return NULL;
+	ia4 = ipv4_iffindaddr(ifp, ia, NULL);
+	if (ia4->flags & IPV4_AF_ADVERTISED)
 		return NULL;
 
 	astate = arp_find(ifp, ia);
@@ -530,6 +534,7 @@ arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 			return NULL;
 		astate->announced_cb = arp_free;
 	}
+	ia4->flags |= IPV4_AF_ADVERTISED;
 	arp_announce(astate);
 	return astate;
 }
@@ -538,13 +543,14 @@ struct arp_state *
 arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 {
 	struct interface *ifp, *iff = NULL;
-	struct ipv4_addr *iap;
+	struct ipv4_addr *iap, *iaf = NULL;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (!ifp->active || !if_is_link_up(ifp))
-			continue;
 		iap = ipv4_iffindaddr(ifp, ia, NULL);
 		if (iap == NULL)
+			continue;
+
+		if (!ifp->active || !if_is_link_up(ifp))
 			continue;
 #ifdef IN_IFF_NOTUSEABLE
 		if (iap->addr_flags & IN_IFF_NOTUSEABLE)
@@ -553,11 +559,19 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 		if (iff != NULL && iff->metric < ifp->metric)
 			continue;
 		iff = ifp;
+		iaf = iap;
 	}
-	if (iff == NULL)
+	if (iaf == NULL || iaf->flags & IPV4_AF_ADVERTISED)
 		return NULL;
 
-	return arp_ifannounceaddr(iff, ia);
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		iap = ipv4_iffindaddr(ifp, ia, NULL);
+		if (iap == NULL)
+			continue;
+		iap->flags &= ~IPV4_AF_ADVERTISED;
+	}
+
+	return arp_ifannounceaddr(iff, &iaf->addr);
 }
 
 struct arp_state *

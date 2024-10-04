@@ -760,7 +760,7 @@ ipv4_applyaddr(void *arg)
 #ifdef ARP
 				/* Announce the preferred address to
 				 * kick ARP caches. */
-				arp_announceaddr(ifp->ctx,&lease->addr);
+				arp_announceaddr(ifp->ctx, &lease->addr);
 #endif
 			}
 			script_runreason(ifp, state->reason);
@@ -963,6 +963,23 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 
 	if (cmd == RTM_DELADDR)
 		free(ia);
+}
+
+void
+ipv4_start(struct interface *ifp)
+{
+#ifdef ARP
+	struct ipv4_state *state;
+	struct ipv4_addr *ia;
+
+	if (ifp == NULL || (state = IPV4_STATE(ifp)) == NULL)
+		return;
+
+	/* Clear advertised */
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		ia->flags &= ~IPV4_AF_ADVERTISED;
+	}
+#endif
 }
 
 void
