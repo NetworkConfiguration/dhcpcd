@@ -218,9 +218,6 @@ ipv4ll_not_found(struct interface *ifp)
 {
 	struct ipv4ll_state *state;
 	struct ipv4_addr *ia;
-#ifndef KERNEL_RFC5227
-	struct arp_state *astate;
-#endif
 
 	state = IPV4LL_STATE(ifp);
 	ia = ipv4_iffindaddr(ifp, &state->pickedaddr, &inaddr_llmask);
@@ -264,9 +261,6 @@ ipv4ll_not_found(struct interface *ifp)
 	}
 	rt_build(ifp->ctx, AF_INET);
 
-#ifndef KERNEL_RFC5227
-	state->arp->announced_cb = ipv4ll_announced_arp;
-#endif
 	script_runreason(ifp, "IPV4LL");
 	dhcpcd_daemonise(ifp->ctx);
 }
