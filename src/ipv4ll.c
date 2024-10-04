@@ -182,9 +182,6 @@ ipv4ll_announced_arp(struct arp_state *astate)
 	struct ipv4ll_state *state = IPV4LL_STATE(astate->iface);
 
 	state->conflicts = 0;
-#ifdef KERNEL_RFC5227
-	arp_free(astate);
-#endif
 }
 
 /* This is the callback by ARP freeing */
@@ -268,9 +265,7 @@ ipv4ll_not_found(struct interface *ifp)
 	rt_build(ifp->ctx, AF_INET);
 
 #ifndef KERNEL_RFC5227
-	astate = arp_ifannounceaddr(ifp, &ia->addr);
-	if (astate != NULL)
-		astate->announced_cb = ipv4ll_announced_arp;
+	state->arp->announced_cb = ipv4ll_announced_arp;
 #endif
 	script_runreason(ifp, "IPV4LL");
 	dhcpcd_daemonise(ifp->ctx);

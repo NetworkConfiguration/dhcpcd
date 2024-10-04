@@ -717,7 +717,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 
 	if (ia->flags & IPV4_AF_NEW) {
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
-#ifdef ARP
+#if defined(ARP) && !defined(KERNEL_RFC5227)
 		arp_ifannounceaddr(ifp, &ia->addr);
 #endif
 	}
