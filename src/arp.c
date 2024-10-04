@@ -530,32 +530,6 @@ arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 	arp_announce(astate);
 	return astate;
 }
-
-struct arp_state *
-arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
-{
-	struct interface *ifp, *iff = NULL;
-	struct ipv4_addr *iap;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (!ifp->active || !if_is_link_up(ifp))
-			continue;
-		iap = ipv4_iffindaddr(ifp, ia, NULL);
-		if (iap == NULL)
-			continue;
-#ifdef IN_IFF_NOTUSEABLE
-		if (iap->addr_flags & IN_IFF_NOTUSEABLE)
-			continue;
-#endif
-		if (iff != NULL && iff->metric < ifp->metric)
-			continue;
-		iff = ifp;
-	}
-	if (iff == NULL)
-		return NULL;
-
-	return arp_ifannounceaddr(iff, ia);
-}
 #endif
 
 struct arp_state *

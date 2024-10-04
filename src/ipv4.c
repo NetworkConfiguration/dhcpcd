@@ -715,8 +715,13 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	}
 #endif
 
-	if (ia->flags & IPV4_AF_NEW)
+	if (ia->flags & IPV4_AF_NEW) {
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+#ifdef ARP
+		arp_ifannounceaddr(ifp, &ia->addr);
+#endif
+	}
+
 	return ia;
 }
 

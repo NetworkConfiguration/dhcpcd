@@ -268,7 +268,7 @@ ipv4ll_not_found(struct interface *ifp)
 	rt_build(ifp->ctx, AF_INET);
 
 #ifndef KERNEL_RFC5227
-	astate = arp_announceaddr(ifp->ctx, &ia->addr);
+	astate = arp_ifannounceaddr(ifp, &ia->addr);
 	if (astate != NULL)
 		astate->announced_cb = ipv4ll_announced_arp;
 #endif
