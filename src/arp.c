@@ -238,7 +238,6 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
     unsigned int bpf_flags)
 {
 	size_t fl = bpf_frame_header_len(ifp), falen;
-	const struct interface *ifn;
 	struct arphdr ar;
 	struct arp_msg arm;
 	const struct iarp_state *state;
@@ -282,12 +281,9 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	if ((size_t)((hw_t + ar.ar_hln + ar.ar_pln) - data) > len)
 		return;
 	/* Ignore messages from ourself */
-	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-		if (ar.ar_hln == ifn->hwlen &&
-		    memcmp(hw_s, ifn->hwaddr, ifn->hwlen) == 0)
-			break;
-	}
-	if (ifn) {
+	if (ar.ar_hln == ifp->hwlen &&
+	    memcmp(hw_s, ifp->hwaddr, ifp->hwlen) == 0)
+	{
 #ifdef ARP_DEBUG
 		logdebugx("%s: ignoring ARP from self", ifp->name);
 #endif
@@ -424,6 +420,7 @@ out:
 	return NULL;
 }
 
+#ifndef KERNEL_RFC5227
 static void
 arp_announced(void *arg)
 {
@@ -559,6 +556,7 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 
 	return arp_ifannounceaddr(iff, ia);
 }
+#endif
 
 struct arp_state *
 arp_new(struct interface *ifp, const struct in_addr *addr)

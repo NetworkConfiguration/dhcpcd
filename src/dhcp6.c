@@ -1573,10 +1573,6 @@ dhcp6_dadcallback(void *arg)
 	if (ia->addr_flags & IN6_IFF_DUPLICATED)
 		logwarnx("%s: DAD detected %s", ia->iface->name, ia->saddr);
 
-#ifdef ND6_ADVERTISE
-	else
-		ipv6nd_advertise(ia);
-#endif
 	if (completed)
 		return;
 
@@ -4194,20 +4190,11 @@ void
 dhcp6_abort(struct interface *ifp)
 {
 	struct dhcp6_state *state;
-#ifdef ND6_ADVERTISE
-	struct ipv6_addr *ia;
-#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_start1, ifp);
 	state = D6_STATE(ifp);
 	if (state == NULL)
 		return;
-
-#ifdef ND6_ADVERTISE
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		ipv6nd_advertise(ia);
-	}
-#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startdiscover, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_senddiscover, ifp);

@@ -757,11 +757,6 @@ ipv4_applyaddr(void *arg)
 			if (state->added) {
 				ipv4_deladdr(state->addr, 0);
 				rt_build(ifp->ctx, AF_INET);
-#ifdef ARP
-				/* Announce the preferred address to
-				 * kick ARP caches. */
-				arp_announceaddr(ifp->ctx,&lease->addr);
-#endif
 			}
 			script_runreason(ifp, state->reason);
 		} else
@@ -821,10 +816,6 @@ ipv4_applyaddr(void *arg)
 	state->added = STATE_ADDED;
 
 	rt_build(ifp->ctx, AF_INET);
-
-#ifdef ARP
-	arp_announceaddr(ifp->ctx, &state->addr->addr);
-#endif
 
 	if (state->state == DHS_BOUND) {
 		script_runreason(ifp, state->reason);

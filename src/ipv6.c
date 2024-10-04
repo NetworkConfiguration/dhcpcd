@@ -653,11 +653,6 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 			break;
 		}
 	}
-
-#ifdef ND6_ADVERTISE
-	/* Advertise the address if it exists on another interface. */
-	ipv6nd_advertise(ia);
-#endif
 }
 
 static int
@@ -668,9 +663,6 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	int loglevel;
 	struct ipv6_state *state;
 	struct ipv6_addr *ia2;
-#ifdef ND6_ADVERTISE
-	bool vltime_was_zero = ia->prefix_vltime == 0;
-#endif
 
 #ifdef __sun
 	/* If we re-add then address on Solaris then the prefix
@@ -679,11 +671,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	if (ia->flags & IPV6_AF_DADCOMPLETED) {
 		logdebugx("%s: IP address %s already exists",
 		    ia->iface->name, ia->saddr);
-#ifdef ND6_ADVERTISE
-		goto advertise;
-#else
 		return 0;
-#endif
 	}
 #endif
 
@@ -805,18 +793,11 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	if (ia2 == NULL) {
 		if ((ia2 = malloc(sizeof(*ia2))) == NULL) {
 			logerr(__func__);
-			goto advertise; /* Well, we did add the address */
+			return 0; /* Well, we did add the address */
 		}
 		memcpy(ia2, ia, sizeof(*ia2));
 		TAILQ_INSERT_TAIL(&state->addrs, ia2, next);
 	}
-
-advertise:
-#ifdef ND6_ADVERTISE
-	/* Re-advertise the preferred address to be safe. */
-	if (!vltime_was_zero)
-		ipv6nd_advertise(ia);
-#endif
 
 	return 0;
 }
@@ -1224,11 +1205,6 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	case RTM_DELADDR:
 		if (ia != NULL) {
 			TAILQ_REMOVE(&state->addrs, ia, next);
-#ifdef ND6_ADVERTISE
-			/* Advertise the address if it exists on
-			 * another interface. */
-			ipv6nd_advertise(ia);
-#endif
 			/* We'll free it at the end of the function. */
 		}
 		break;
@@ -1832,19 +1808,16 @@ ipv6_startstatic(struct interface *ifp)
 int
 ipv6_start(struct interface *ifp)
 {
-#if defined(ND6_ADVERTISE) || defined(IPV6_POLLADDRFLAG)
+#ifdef IPV6_POLLADDRFLAG
 	struct ipv6_state *state;
 
 	/* We need to update the address flags. */
 	if ((state = IPV6_STATE(ifp)) != NULL) {
 		struct ipv6_addr *ia;
-#ifdef IPV6_POLLADDRFLAG
 		const char *alias;
 		int flags;
-#endif
 
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-#ifdef IPV6_POLLADDRFLAG
 #ifdef ALIAS_ADDR
 			alias = ia->alias;
 #else
@@ -1853,9 +1826,6 @@ ipv6_start(struct interface *ifp)
 			flags = if_addrflags6(ia->iface, &ia->addr, alias);
 			if (flags != -1)
 				ia->addr_flags = flags;
-#endif
-			/* hwaddr could have changed */
-			ia->flags &= ~IPV6_AF_ADVERTISED;
 		}
 	}
 #endif
