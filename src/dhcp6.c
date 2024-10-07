@@ -3585,8 +3585,6 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 	if (r->type == DHCP6_ADVERTISE) {
 		struct ipv6_addr *ia;
 
-		if (state->state == DH6S_REQUEST) /* rapid commit */
-			goto bind;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
 			if (!(ia->flags & (IPV6_AF_STALE | IPV6_AF_REQUEST)))
 				break;
@@ -3599,11 +3597,14 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		else
 			loginfox("%s: ADV %s from %s",
 			    ifp->name, ia->saddr, sfrom);
+		if (state->RTC > 1) {
+                        // IRT already elapsed, initiate request
+			dhcp6_startrequest(ifp);
+		}
 		// We will request when the IRT elapses
 		return;
 	}
 
-bind:
 	dhcp6_bind(ifp, op, sfrom);
 }
 
