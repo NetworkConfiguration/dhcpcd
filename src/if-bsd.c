@@ -741,19 +741,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 		    !sa_is_loopback(&rt->rt_gateway))
 		{
 			rtm->rtm_index = (unsigned short)rt->rt_ifp->index;
-/*
- * OpenBSD rejects the message for on-link routes.
- * FreeBSD-12 kernel apparently panics.
- * I can't replicate the panic, but better safe than sorry!
- * https://roy.marples.name/archives/dhcpcd-discuss/0002286.html
- *
- * Neither OS currently allows IPv6 address sharing anyway, so let's
- * try to encourage someone to fix that by logging a waring during compile.
- */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#warning kernel does not allow IPv6 address sharing
-			if (!gateway_unspec || rt->rt_dest.sa_family!=AF_INET6)
-#endif
 			rtm->rtm_addrs |= RTA_IFP;
 			if (!sa_is_unspecified(&rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
