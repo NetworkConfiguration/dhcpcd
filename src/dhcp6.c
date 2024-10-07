@@ -1790,7 +1790,12 @@ dhcp6_failconfirm(void *arg)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendconfirm, ifp);
 
 	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure. */
-	dhcp6_fail(ifp, false);
+	/* but IPv6 Ready Logo DHCPv6 tests require it to be used, so provide
+	 * a way to do so */
+	if (ifp->options->options & DHCPCD_LASTLEASE)
+		dhcp6_bind(ifp, "REPLY6", NULL);
+	else
+		dhcp6_fail(ifp, false);
 }
 
 static void
