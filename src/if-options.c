@@ -148,6 +148,7 @@ const struct option cf_options[] = {
 	{"encap",           required_argument, NULL, O_ENCAP},
 	{"vendopt",         required_argument, NULL, O_VENDOPT},
 	{"vsio",         	required_argument, NULL, O_VENDOPT6},
+	{"vivso",         	required_argument, NULL, O_VIVSO},
 	{"vendclass",       required_argument, NULL, O_VENDCLASS},
 	{"authprotocol",    required_argument, NULL, O_AUTHPROTOCOL},
 	{"authtoken",       required_argument, NULL, O_AUTHTOKEN},
@@ -657,6 +658,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	size_t *dop_len, dl, odl;
 	struct vivco *vivco;
 	struct vsio6 *vsio6;
+	struct vivso4 *vivso4;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -2114,6 +2116,100 @@ err_sla:
 
 		break;
 
+	case O_VIVSO:
+		ARG_REQUIRED;
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid code: %s", arg);
+			return -1;
+		}
+
+		fp = strskipwhite(fp);
+		p = strchr(fp, ',');
+		if (!p || !p[1]) {
+			logerrx("invalid vendor format: %s", arg);
+			return -1;
+		}
+
+		/* Strip and preserve the comma */
+		*p = '\0';
+		i = (int)strtoi(fp, NULL, 0, 1, 254, &e);
+		*p = ',';
+		if (e) {
+			logerrx("vivso option should be between"
+			    " 1 and 254 inclusive");
+			return -1;
+		}
+
+		fp = p + 1;
+
+		if (fp) {
+			if (inet_pton(AF_INET, fp, &addr) == 1) {
+				s = sizeof(addr.s_addr);
+				dl = (size_t)s;
+				if (dl + (sizeof(uint8_t) * 2) > UINT8_MAX) {
+					logerrx("vivso option is too big");
+					return -1;
+				}
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				memcpy(np, &addr.s_addr, dl);
+			} else {
+				s = parse_string(NULL, 0, fp);
+				if(s == -1) {
+					logerr(__func__);
+					return -1;
+				}
+				dl = (size_t)s;
+				if (dl + (sizeof(uint8_t) * 2) > UINT8_MAX) {
+					logerrx("vivso option is too big");
+					return -1;
+				}
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				parse_string(np, dl, fp);
+			}
+		} else {
+			dl = 0;
+			np = NULL;
+		}
+
+		vivso4 = reallocarray(ifo->vivso4, ifo->vivso4_len + 1, sizeof(*ifo->vivso4));
+		if (vivso4 == NULL) {
+			logerr(__func__);
+			free(np);
+			return -1;
+		}
+		ifo->vivso4 = vivso4;
+		vivso4 = &ifo->vivso4[ifo->vivso4_len++];
+		vivso4->en = (uint32_t)u;
+		vivso4->opt = (uint8_t)i;
+		vivso4->len = dl;
+		vivso4->data = (uint8_t *)np;
+		
+		bool new_v4_en = true;
+		for (size_t j = 0; j < ifo->vivso4_ent_nums_len; j++) {
+			if (ifo->vivso4_ent_nums[j] == (uint32_t)u) {
+				new_v4_en = false;
+				break;
+			}
+		}
+
+		if (new_v4_en) {
+			ifo->vivso4_ent_nums[ifo->vivso4_ent_nums_len] = (uint32_t)u;
+			ifo->vivso4_ent_nums_len++;
+		}
+		break;
+
 	case O_AUTHPROTOCOL:
 		ARG_REQUIRED;
 #ifdef AUTH
@@ -2898,6 +2994,7 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	struct dhcp_opt *opt;
 	struct vivco *vo;
 	struct vsio6 *vso6;
+	struct vivso4 *vivso4;
 #ifdef AUTH
 	struct token *token;
 #endif
@@ -2961,6 +3058,10 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	    vso6++, ifo->vsio6_len--)
 			free(vso6->data);
 	free(ifo->vsio6);
+	for (vivso4 = ifo->vivso4; ifo->vivso4_len > 0;
+		vivso4++, ifo->vivso4_len--)
+			free(vivso4->data);
+	free(ifo->vivso4);
 	for (opt = ifo->vivso_override;
 	    ifo->vivso_override_len > 0;
 	    opt++, ifo->vivso_override_len--)

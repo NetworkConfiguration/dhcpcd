@@ -723,6 +723,66 @@ dhcp_message_add_addr(struct bootp *bootp,
 	return 0;
 }
 
+// RFC 3925 DHCP Option 125 (Vendor-Identifying Vendor-Specific Information Option (VIVSO))
+static size_t
+dhcp_makevendoropts(void *data, const struct interface *ifp, uint32_t en)
+{
+	const struct if_options *ifo;
+	const struct vivso4 *vivso4;
+	size_t i, len, datalen;
+	uint8_t *p;
+
+	ifo = ifp->options;
+
+	len = sizeof(en) + sizeof(uint8_t); // Enterprise ID + data-len (complete data length of sub-options)
+	datalen = 0;
+
+	for (i = 0, vivso4 = ifo->vivso4; i < ifo->vivso4_len; 
+		i++, vivso4++) {
+			if (vivso4->en != en)
+				continue;
+			datalen += 2 * sizeof(uint8_t) + vivso4->len; /* this would be subopt-code (1 byte) + 
+				+ subopt-len (1 byte) + the actual len (whatever is calculated :)) */
+		}
+
+	len += datalen;
+
+	if (len > UINT8_MAX) {
+		logerrx("%s: Vendor-Identifying Vendor-Specific Information Option too big", ifp->name);
+		return 0;
+	}
+
+	if (data != NULL) {
+		uint32_t pen;
+		uint8_t allsuboptlen;
+		uint8_t subopt;
+		uint8_t suboptlen;
+
+		p = data;
+		pen = htonl(en);
+		memcpy(p, &pen, sizeof(pen));
+		p += sizeof(pen);
+		allsuboptlen = (uint8_t)datalen;
+		memcpy(p, &allsuboptlen, sizeof(allsuboptlen));
+		p += sizeof(allsuboptlen);
+
+		for (i = 0, vivso4 = ifo->vivso4; i < ifo->vivso4_len;
+			i++, vivso4++) {
+				if (vivso4->en != en)
+					continue;
+				subopt = vivso4->opt;
+				memcpy(p, &subopt, sizeof(subopt));
+				p += sizeof(subopt);
+				suboptlen = (uint8_t)vivso4->len;
+				memcpy(p, &suboptlen, sizeof(suboptlen));
+				p += sizeof(suboptlen);
+				memcpy(p, vivso4->data, vivso4->len);
+				p += vivso4->len;
+			}
+	}
+	return len;
+}
+
 static ssize_t
 make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 {
@@ -1092,6 +1152,22 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 				*lp = (uint8_t)(*lp + vivco->len + 1);
+			}
+		}
+
+		if (ifo->vivso4_len &&
+		    !has_option_mask(ifo->nomask, DHO_VIVSO)) {
+			len = 0;
+			for (i = 0; i < ifo->vivso4_ent_nums_len; i++)
+				len += dhcp_makevendoropts(NULL, ifp, ifo->vivso4_ent_nums[i]);
+
+			if(len + 2 * sizeof(uint8_t) > UINT8_MAX) { // len + option-code + option-len (length of all options!)
+				logerr("All provided VIVSO options exceed 255 bytes");
+			} else {
+				*p++ = DHO_VIVSO;
+				*p++ = (uint8_t)len;
+				for (i = 0; i < ifo->vivso4_ent_nums_len; i++)
+					p += dhcp_makevendoropts(p, ifp, ifo->vivso4_ent_nums[i]);
 			}
 		}
 
