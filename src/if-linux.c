@@ -2173,6 +2173,11 @@ if_setup_inet6(const struct interface *ifp)
 	int ra;
 	char path[256];
 
+	/* If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it. */
+	if (!(ifp->options->options & DHCPCD_IPV6RS))
+		return;
+
 	/* Modern linux kernels can make a stable private address.
 	 * However, a lot of distros ship newer kernel headers than
 	 * the kernel itself so we sweep that error under the table
@@ -2180,11 +2185,6 @@ if_setup_inet6(const struct interface *ifp)
 	if (if_disable_autolinklocal(ctx, ifp->index) == -1 &&
 	    errno != ENODEV && errno != ENOTSUP && errno != EINVAL)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
-
-	/* If not doing autoconf, don't disable the kernel from doing it.
-	 * If we need to, we should have another option actively disable it. */
-	if (!(ifp->options->options & DHCPCD_IPV6RS))
-		return;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
 	ra = check_proc_int(ctx, path);
