@@ -3302,7 +3302,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 	size_t i;
 	const char *op;
 	struct dhcp6_state *state;
-	uint8_t *o;
+	uint8_t *o, preference = 0;
 	uint16_t ol;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
@@ -3464,16 +3464,24 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			valid_op = false;
 			break;
 		}
+
+		o = dhcp6_findmoption(r, len, D6_OPTION_PREFERENCE, &ol);
+		if (o && ol == sizeof(uint8_t))
+			preference = *o;
+
+		/* If we already have an advertisement check that this one
+		 * has a higher preference value. */
 		if (state->recv_len && state->recv->type == DHCP6_ADVERTISE) {
-			/* We already have an advertismemnt.
-			 * RFC 8415 says we have to wait for the IRT to elapse.
-			 * To keep the same behaviour we won't do anything with
-			 * this. In the future we should make a lists of
-			 * ADVERTS and pick the "best" one. */
-			logdebugx("%s: discarding ADVERTISEMENT from %s",
-			    ifp->name, sfrom);
-			return;
+			o = dhcp6_findmoption(state->recv, state->recv_len,
+			    D6_OPTION_PREFERENCE, &ol);
+			if (o && ol == sizeof(uint8_t) && *o >= preference) {
+				logdebugx(
+				    "%s: discarding ADVERTISEMENT from %s (%u)",
+				    ifp->name, sfrom, preference);
+				return;
+			}
 		}
+
 		/* RFC7083 */
 		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
 		if (o && ol == sizeof(uint32_t)) {
@@ -3592,16 +3600,19 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		if (ia == NULL)
 			ia = TAILQ_FIRST(&state->addrs);
 		if (ia == NULL)
-			loginfox("%s: ADV (no address) from %s",
-			    ifp->name, sfrom);
+			loginfox("%s: ADV (no address) from %s (%u)",
+			    ifp->name, sfrom, preference);
 		else
-			loginfox("%s: ADV %s from %s",
-			    ifp->name, ia->saddr, sfrom);
-		if (state->RTC > 1) {
-                        // IRT already elapsed, initiate request
+			loginfox("%s: ADV %s from %s (%u)",
+			    ifp->name, ia->saddr, sfrom, preference);
+
+		/*
+		 * RFC 8415 18.2.1 says we must collect until ADVERTISEMENTs
+		 * until we get one with a preference of 255 or
+		 * the initial RT has elpased.
+		 */
+		if (preference == 255 || state->RTC > 1)
 			dhcp6_startrequest(ifp);
-		}
-		// We will request when the IRT elapses
 		return;
 	}
 
