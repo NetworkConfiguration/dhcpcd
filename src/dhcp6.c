@@ -1760,6 +1760,8 @@ dhcp6_fail(struct interface *ifp, bool drop)
 		dhcp_unlink(ifp->ctx, state->leasefile);
 		dhcp6_addrequestedaddrs(ifp);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	} else if (state->recv && ifp->options->options & DHCPCD_LASTLEASE) {
+		dhcp6_bind(ifp, NULL, NULL);
 	} else if (state->new) {
 		script_runreason(ifp, "TIMEOUT6");
 		// We need to keep the expire timeout alive
@@ -1790,12 +1792,7 @@ dhcp6_failconfirm(void *arg)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendconfirm, ifp);
 
 	/* RFC8415 18.2.3 says that prior addresses SHOULD be used on failure. */
-	/* but IPv6 Ready Logo DHCPv6 tests require it to be used, so provide
-	 * a way to do so */
-	if (ifp->options->options & DHCPCD_LASTLEASE)
-		dhcp6_bind(ifp, NULL, NULL);
-	else
-		dhcp6_fail(ifp, false);
+	dhcp6_fail(ifp, false);
 }
 
 static void
