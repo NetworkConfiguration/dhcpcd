@@ -1793,7 +1793,7 @@ dhcp6_failconfirm(void *arg)
 	/* but IPv6 Ready Logo DHCPv6 tests require it to be used, so provide
 	 * a way to do so */
 	if (ifp->options->options & DHCPCD_LASTLEASE)
-		dhcp6_bind(ifp, "REPLY6", NULL);
+		dhcp6_bind(ifp, NULL, NULL);
 	else
 		dhcp6_fail(ifp, false);
 }
