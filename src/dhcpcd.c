@@ -2719,6 +2719,7 @@ exit1:
 	eloop_free(ctx.eloop);
 	logclose();
 	free(ctx.logfile);
+	fflush(stdout);
 	free(ctx.ctl_buf);
 #ifdef SETPROCTITLE_H
 	setproctitle_fini();
