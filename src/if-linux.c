@@ -60,11 +60,6 @@
 #include <linux/if_arp.h>
 #endif
 
-#ifndef IFF_DORMANT
-/* Inlcude this *after* net/if.h so we get IFF_DORMANT */
-#include <linux/if.h>
-#endif
-
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -107,6 +102,27 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 /* Buggy CentOS and RedHat */
 #ifndef SOL_NETLINK
 #define	SOL_NETLINK	270
+#endif
+
+/*
+ * We cannot include linux/if.h due to the need to support old kernels.
+ * IFLA_LINKINFO is a define which was added after IFF_LOWER_UP and
+ * IFF_DORMANT.
+ * So we miss a few versions, but it's the best we can do.
+ */
+#ifdef IFLA_LINKINFO
+#ifndef IFF_LOWER_UP
+#define IFF_LOWER_UP	0x10000
+#endif
+#ifndef IFF_DORMANT
+#define IFF_DORMANT	0x20000
+#endif
+#endif
+
+/* Linux defines IFA_FLAGS as an enum.
+ * For older kernels we know it exists if IFA_F_MANAGETEMPADDR does. */
+#ifdef IFA_F_MANAGETEMPADDR
+#define IFA_FLAGS IFA_FLAGS
 #endif
 
 /*
@@ -1208,6 +1224,7 @@ add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 	return 0;
 }
 
+#if defined(HAVE_ROUTE_PREF) || defined(HAVE_IN6_ADDR_GEN_MODE_NONE)
 static int
 add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
     uint8_t data)
@@ -1215,6 +1232,7 @@ add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 
 	return add_attr_l(n, maxlen, type, &data, sizeof(data));
 }
+#endif
 
 static int
 add_attr_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
@@ -1997,7 +2015,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 			nlm.ifa.ifa_flags |= IFA_F_TEMPORARY;
 #endif
 		}
-#elif IFA_F_MANAGETEMPADDR
+#elif defined(IFA_F_MANAGETEMPADDR)
 		if (ia->flags & IPV6_AF_AUTOCONF && IA6_CANAUTOCONF(ia))
 			flags |= IFA_F_MANAGETEMPADDR;
 #endif
@@ -2037,11 +2055,14 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
 	struct in6_addr *local = NULL, *address = NULL;
-	uint32_t *flags = NULL;
+	uint32_t flags;
 
 	ifa = NLMSG_DATA(nlm);
 	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET6)
 		return 0;
+
+	/* Old kernels set flags here, newer ones as attributed data. */
+	flags = ifa->ifa_flags;
 
 	rta = IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
@@ -2053,9 +2074,11 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 		case IFA_LOCAL:
 			local = (struct in6_addr *)RTA_DATA(rta);
 			break;
+#ifdef IFA_F_MANAGETEMPADDR /* IFA_FLAGS is an enum, can't test that */
 		case IFA_FLAGS:
-			flags = (uint32_t *)RTA_DATA(rta);
+			memcpy(&flags, RTA_DATA(rta), sizeof(flags));
 			break;
+#endif
 		}
 	}
 
@@ -2066,8 +2089,8 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, address))
 			ia->ifa_found = true;
 	}
-	if (flags && ia->ifa_found)
-		memcpy(&ia->ifa_flags, flags, sizeof(ia->ifa_flags));
+	if (ia->ifa_found)
+		ia->ifa_flags = flags;
 	return 0;
 }
 
