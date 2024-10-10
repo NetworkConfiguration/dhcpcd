@@ -89,7 +89,6 @@
 
 #ifdef IPV6_POLLADDRFLAG
 #  warning kernel does not report IPv6 address flag changes
-#  warning polling tentative address flags periodically
 #endif
 
 /* Hackery at it's finest. */
@@ -653,11 +652,6 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 			break;
 		}
 	}
-
-#ifdef ND6_ADVERTISE
-	/* Advertise the address if it exists on another interface. */
-	ipv6nd_advertise(ia);
-#endif
 }
 
 static int
@@ -666,11 +660,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	struct interface *ifp;
 	uint32_t pltime, vltime;
 	int loglevel;
-	struct ipv6_state *state;
-	struct ipv6_addr *ia2;
-#ifdef ND6_ADVERTISE
-	bool vltime_was_zero = ia->prefix_vltime == 0;
-#endif
+	struct ipv6_addr *iaf;
 
 #ifdef __sun
 	/* If we re-add then address on Solaris then the prefix
@@ -679,19 +669,16 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	if (ia->flags & IPV6_AF_DADCOMPLETED) {
 		logdebugx("%s: IP address %s already exists",
 		    ia->iface->name, ia->saddr);
-#ifdef ND6_ADVERTISE
-		goto advertise;
-#else
 		return 0;
-#endif
 	}
 #endif
 
 	/* Remember the interface of the address. */
 	ifp = ia->iface;
 
-	if (!(ia->flags & IPV6_AF_DADCOMPLETED) &&
-	    ipv6_iffindaddr(ifp, &ia->addr, IN6_IFF_NOTUSEABLE))
+	/* Find any existing address. */
+	iaf = ipv6_iffindaddr(ifp, &ia->addr, 0);
+	if (iaf != NULL && !(iaf->addr_flags & IN6_IFF_NOTUSEABLE))
 		ia->flags |= IPV6_AF_DADCOMPLETED;
 
 	/* Adjust plftime and vltime based on acquired time */
@@ -797,26 +784,16 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	/* Take a copy of the address and add it to our state if
 	 * it does not exist.
 	 * This is important if route overflow loses the message. */
-	state = IPV6_STATE(ifp);
-	TAILQ_FOREACH(ia2, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&ia2->addr, &ia->addr))
-			break;
-	}
-	if (ia2 == NULL) {
-		if ((ia2 = malloc(sizeof(*ia2))) == NULL) {
-			logerr(__func__);
-			goto advertise; /* Well, we did add the address */
-		}
-		memcpy(ia2, ia, sizeof(*ia2));
-		TAILQ_INSERT_TAIL(&state->addrs, ia2, next);
-	}
+	if (iaf == NULL) {
+		struct ipv6_state *state = IPV6_STATE(ifp);
 
-advertise:
-#ifdef ND6_ADVERTISE
-	/* Re-advertise the preferred address to be safe. */
-	if (!vltime_was_zero)
-		ipv6nd_advertise(ia);
-#endif
+		if ((iaf = malloc(sizeof(*iaf))) == NULL) {
+			logerr(__func__);
+			return 0; /* Well, we did add the address */
+		}
+		memcpy(iaf, ia, sizeof(*iaf));
+		TAILQ_INSERT_TAIL(&state->addrs, iaf, next);
+	}
 
 	return 0;
 }
@@ -1224,11 +1201,6 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	case RTM_DELADDR:
 		if (ia != NULL) {
 			TAILQ_REMOVE(&state->addrs, ia, next);
-#ifdef ND6_ADVERTISE
-			/* Advertise the address if it exists on
-			 * another interface. */
-			ipv6nd_advertise(ia);
-#endif
 			/* We'll free it at the end of the function. */
 		}
 		break;
@@ -1354,17 +1326,19 @@ ipv6_iffindaddr(struct interface *ifp, const struct in6_addr *addr,
 	struct ipv6_addr *ap;
 
 	state = IPV6_STATE(ifp);
-	if (state) {
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (addr == NULL) {
-				if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
-				    (!revflags || !(ap->addr_flags & revflags)))
-					return ap;
-			} else {
-				if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
-				    (!revflags || !(ap->addr_flags & revflags)))
-					return ap;
-			}
+	if (state == NULL)
+		return NULL;
+
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (addr == NULL) {
+			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
+			    (!revflags || !(ap->addr_flags & revflags)))
+				return ap;
+		} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr)) {
+			/* This is our address so we will return now */
+			if (!revflags || !(ap->addr_flags & revflags))
+				return ap;
+			return NULL;
 		}
 	}
 	return NULL;
@@ -1630,38 +1604,13 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 	struct ipv6_addr *ia, *iaf;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
-	bool tempaddr;
-	int addr_flags;
-
-#ifdef IPV6_AF_TEMPORARY
-	tempaddr = flags & IPV6_AF_TEMPORARY;
-#else
-	tempaddr = false;
-#endif
-
-	/* If adding a new DHCP / RA derived address, check current flags
-	 * from an existing address. */
-	if (tempaddr)
-		iaf = NULL;
-	else if (flags & IPV6_AF_AUTOCONF)
-		iaf = ipv6nd_iffindprefix(ifp, addr, prefix_len);
-	else
-		iaf = ipv6_iffindaddr(ifp, addr, 0);
-	if (iaf != NULL) {
-		addr_flags = iaf->addr_flags;
-		flags |= IPV6_AF_ADDED;
-	} else
-		addr_flags = IN6_IFF_TENTATIVE;
 
 	ia = calloc(1, sizeof(*ia));
 	if (ia == NULL)
 		goto err;
 
 	ia->iface = ifp;
-	ia->addr_flags = addr_flags;
 	ia->flags = IPV6_AF_NEW | flags;
-	if (!(ia->addr_flags & IN6_IFF_NOTUSEABLE))
-		ia->flags |= IPV6_AF_DADCOMPLETED;
 	ia->prefix_len = prefix_len;
 	ia->dhcp6_fd = -1;
 
@@ -1673,6 +1622,7 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 		goto makepfx;
 	else if (ia->flags & IPV6_AF_AUTOCONF) {
 		ia->prefix = *addr;
+		iaf = ipv6nd_iffindprefix(ifp, addr, prefix_len);
 		if (iaf != NULL)
 			memcpy(&ia->addr, &iaf->addr, sizeof(ia->addr));
 		else {
@@ -1690,7 +1640,7 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 		cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
 		goto paddr;
 #else
-		return ia;
+		goto flags;
 #endif
 	} else if (ia->flags & (IPV6_AF_REQUEST | IPV6_AF_PFXDELEGATION)) {
 		ia->prefix = *addr;
@@ -1709,6 +1659,21 @@ paddr:
 	if (cbp == NULL)
 		goto err;
 	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", cbp, ia->prefix_len);
+
+#ifndef __sun
+flags:
+#endif
+	/* If adding a new DHCP / RA derived address, check current flags
+	 * from an existing address. */
+	iaf = ipv6_iffindaddr(ifp, &ia->addr, 0);
+	if (iaf != NULL) {
+		ia->addr_flags = iaf->addr_flags;
+		ia->flags |= IPV6_AF_ADDED;
+	} else
+		ia->addr_flags |= IN6_IFF_TENTATIVE;
+
+	if (!(ia->addr_flags & IN6_IFF_NOTUSEABLE))
+		ia->flags |= IPV6_AF_DADCOMPLETED;
 
 	return ia;
 
@@ -1832,19 +1797,16 @@ ipv6_startstatic(struct interface *ifp)
 int
 ipv6_start(struct interface *ifp)
 {
-#if defined(ND6_ADVERTISE) || defined(IPV6_POLLADDRFLAG)
+#ifdef IPV6_POLLADDRFLAG
 	struct ipv6_state *state;
 
 	/* We need to update the address flags. */
 	if ((state = IPV6_STATE(ifp)) != NULL) {
 		struct ipv6_addr *ia;
-#ifdef IPV6_POLLADDRFLAG
 		const char *alias;
 		int flags;
-#endif
 
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-#ifdef IPV6_POLLADDRFLAG
 #ifdef ALIAS_ADDR
 			alias = ia->alias;
 #else
@@ -1853,9 +1815,6 @@ ipv6_start(struct interface *ifp)
 			flags = if_addrflags6(ia->iface, &ia->addr, alias);
 			if (flags != -1)
 				ia->addr_flags = flags;
-#endif
-			/* hwaddr could have changed */
-			ia->flags &= ~IPV6_AF_ADVERTISED;
 		}
 	}
 #endif
@@ -2372,6 +2331,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			sa_in6_init(&rt->rt_dest, &rinfo->prefix);
 			sa_in6_init(&rt->rt_netmask, &netmask);
 			sa_in6_init(&rt->rt_gateway, &rap->from);
+			rt->rt_dflags |= RTDF_RA;
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif

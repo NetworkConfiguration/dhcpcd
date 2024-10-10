@@ -136,6 +136,7 @@ dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 	if (opt->type & OT_NOREQ)
 		printf(" norequest");
 	putchar('\n');
+	fflush(stdout);
 }
 
 struct dhcp_opt *

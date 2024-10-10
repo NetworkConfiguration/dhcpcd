@@ -715,8 +715,13 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	}
 #endif
 
-	if (ia->flags & IPV4_AF_NEW)
+	if (ia->flags & IPV4_AF_NEW) {
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+#if defined(ARP) && !defined(KERNEL_RFC5227)
+		arp_ifannounceaddr(ifp, &ia->addr);
+#endif
+	}
+
 	return ia;
 }
 
@@ -757,11 +762,6 @@ ipv4_applyaddr(void *arg)
 			if (state->added) {
 				ipv4_deladdr(state->addr, 0);
 				rt_build(ifp->ctx, AF_INET);
-#ifdef ARP
-				/* Announce the preferred address to
-				 * kick ARP caches. */
-				arp_announceaddr(ifp->ctx,&lease->addr);
-#endif
 			}
 			script_runreason(ifp, state->reason);
 		} else
@@ -821,10 +821,6 @@ ipv4_applyaddr(void *arg)
 	state->added = STATE_ADDED;
 
 	rt_build(ifp->ctx, AF_INET);
-
-#ifdef ARP
-	arp_announceaddr(ifp->ctx, &state->addr->addr);
-#endif
 
 	if (state->state == DHS_BOUND) {
 		script_runreason(ifp, state->reason);

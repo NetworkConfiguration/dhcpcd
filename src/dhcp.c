@@ -2670,43 +2670,11 @@ dhcp_reboot_newopts(struct interface *ifp, unsigned long long oldopts)
 	}
 }
 
-#ifdef ARP
-static int
-dhcp_activeaddr(const struct interface *ifp, const struct in_addr *addr)
-{
-	const struct interface *ifp1;
-	const struct dhcp_state *state;
-
-	TAILQ_FOREACH(ifp1, ifp->ctx->ifaces, next) {
-		if (ifp1 == ifp)
-			continue;
-		if ((state = D_CSTATE(ifp1)) == NULL)
-			continue;
-		switch(state->state) {
-		case DHS_REBOOT:
-		case DHS_RENEW:
-		case DHS_REBIND:
-		case DHS_BOUND:
-		case DHS_INFORM:
-			break;
-		default:
-			continue;
-		}
-		if (state->lease.addr.s_addr == addr->s_addr)
-			return 1;
-	}
-	return 0;
-}
-#endif
-
 static void
 dhcp_reboot(struct interface *ifp)
 {
 	struct if_options *ifo;
 	struct dhcp_state *state = D_STATE(ifp);
-#ifdef ARP
-	struct ipv4_addr *ia;
-#endif
 
 	if (state == NULL || state->state == DHS_NONE)
 		return;
@@ -2738,23 +2706,9 @@ dhcp_reboot(struct interface *ifp)
 	loginfox("%s: rebinding lease of %s",
 	    ifp->name, inet_ntoa(state->lease.addr));
 
-#ifdef ARP
-#ifndef KERNEL_RFC5227
+#if defined(ARP) && !defined(KERNEL_RFC5227)
 	/* Create the DHCP ARP state so we can defend it. */
 	(void)dhcp_arp_new(ifp, &state->lease.addr);
-#endif
-
-	/* If the address exists on the interface and no other interface
-	 * is currently using it then announce it to ensure this
-	 * interface gets the reply. */
-	ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
-	if (ia != NULL &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
-#ifdef IN_IFF_NOTUSEABLE
-	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
-#endif
-	    dhcp_activeaddr(ifp, &state->lease.addr) == 0)
-		arp_ifannounceaddr(ifp, &state->lease.addr);
 #endif
 
 	dhcp_new_xid(ifp);
@@ -4233,13 +4187,8 @@ dhcp_abort(struct interface *ifp)
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp_start1, ifp);
 
-	if (state != NULL && state->added) {
+	if (state != NULL && state->added)
 		rt_build(ifp->ctx, AF_INET);
-#ifdef ARP
-		if (ifp->options->options & DHCPCD_ARP)
-			arp_announceaddr(ifp->ctx, &state->addr->addr);
-#endif
-	}
 }
 
 struct ipv4_addr *

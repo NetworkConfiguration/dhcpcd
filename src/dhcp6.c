@@ -1645,10 +1645,6 @@ dhcp6_dadcallback(void *arg)
 	if (ia->addr_flags & IN6_IFF_DUPLICATED)
 		logwarnx("%s: DAD detected %s", ia->iface->name, ia->saddr);
 
-#ifdef ND6_ADVERTISE
-	else
-		ipv6nd_advertise(ia);
-#endif
 	if (completed)
 		return;
 
@@ -3378,7 +3374,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 	size_t i;
 	const char *op;
 	struct dhcp6_state *state;
-	uint8_t *o;
+	uint8_t *o, preference = 0;
 	uint16_t ol;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
@@ -3540,16 +3536,24 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			valid_op = false;
 			break;
 		}
+
+		o = dhcp6_findmoption(r, len, D6_OPTION_PREFERENCE, &ol);
+		if (o && ol == sizeof(uint8_t))
+			preference = *o;
+
+		/* If we already have an advertisement check that this one
+		 * has a higher preference value. */
 		if (state->recv_len && state->recv->type == DHCP6_ADVERTISE) {
-			/* We already have an advertismemnt.
-			 * RFC 8415 says we have to wait for the IRT to elapse.
-			 * To keep the same behaviour we won't do anything with
-			 * this. In the future we should make a lists of
-			 * ADVERTS and pick the "best" one. */
-			logdebugx("%s: discarding ADVERTISEMENT from %s",
-			    ifp->name, sfrom);
-			return;
+			o = dhcp6_findmoption(state->recv, state->recv_len,
+			    D6_OPTION_PREFERENCE, &ol);
+			if (o && ol == sizeof(uint8_t) && *o >= preference) {
+				logdebugx(
+				    "%s: discarding ADVERTISEMENT from %s (%u)",
+				    ifp->name, sfrom, preference);
+				return;
+			}
 		}
+
 		/* RFC7083 */
 		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
 		if (o && ol == sizeof(uint32_t)) {
@@ -3661,8 +3665,6 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 	if (r->type == DHCP6_ADVERTISE) {
 		struct ipv6_addr *ia;
 
-		if (state->state == DH6S_REQUEST) /* rapid commit */
-			goto bind;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
 			if (!(ia->flags & (IPV6_AF_STALE | IPV6_AF_REQUEST)))
 				break;
@@ -3670,16 +3672,22 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		if (ia == NULL)
 			ia = TAILQ_FIRST(&state->addrs);
 		if (ia == NULL)
-			loginfox("%s: ADV (no address) from %s",
-			    ifp->name, sfrom);
+			loginfox("%s: ADV (no address) from %s (%u)",
+			    ifp->name, sfrom, preference);
 		else
-			loginfox("%s: ADV %s from %s",
-			    ifp->name, ia->saddr, sfrom);
-		// We will request when the IRT elapses
+			loginfox("%s: ADV %s from %s (%u)",
+			    ifp->name, ia->saddr, sfrom, preference);
+
+		/*
+		 * RFC 8415 18.2.1 says we must collect until ADVERTISEMENTs
+		 * until we get one with a preference of 255 or
+		 * the initial RT has elpased.
+		 */
+		if (preference == 255 || state->RTC > 1)
+			dhcp6_startrequest(ifp);
 		return;
 	}
 
-bind:
 	dhcp6_bind(ifp, op, sfrom);
 }
 
@@ -4266,20 +4274,11 @@ void
 dhcp6_abort(struct interface *ifp)
 {
 	struct dhcp6_state *state;
-#ifdef ND6_ADVERTISE
-	struct ipv6_addr *ia;
-#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_start1, ifp);
 	state = D6_STATE(ifp);
 	if (state == NULL)
 		return;
-
-#ifdef ND6_ADVERTISE
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		ipv6nd_advertise(ia);
-	}
-#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startdiscover, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_senddiscover, ifp);

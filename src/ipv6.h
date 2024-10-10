@@ -158,20 +158,6 @@
 #  define IN6_IFF_DETACHED	0
 #endif
 
-/*
- * ND6 Advertising is only used for IP address sharing to prefer
- * the address on a specific interface or when the hardware address
- * of the interface changes.
- * This just fails to work on OpenBSD and causes erroneous duplicate
- * address messages on BSD's other then DragonFly and NetBSD.
- */
-#if !defined(SMALL) && \
-    ((defined(__DragonFly_version) && __DragonFly_version >= 500703) || \
-    (defined(__NetBSD_Version__) && __NetBSD_Version__ >= 899002800) || \
-    defined(__linux__) || defined(__sun))
-#  define ND6_ADVERTISE
-#endif
-
 #ifdef INET6
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 struct ipv6_addr {
