@@ -61,6 +61,7 @@
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
 #define	MUDURL_MAX_LEN		255
+#define ENTERPRISE_NUMS_MAX_LEN	255
 
 #define DHCPCD_ARP			(1ULL << 0)
 #define DHCPCD_RELEASE			(1ULL << 1)
@@ -191,6 +192,8 @@
 #define O_REQUEST_TIME		O_BASE + 54
 #define O_FALLBACK_TIME		O_BASE + 55
 #define O_IPV4LL_TIME		O_BASE + 56
+#define O_VENDOPT6		O_BASE + 57
+#define O_VIVSO			O_BASE + 58
 
 extern const struct option cf_options[];
 
@@ -218,6 +221,20 @@ struct if_ia {
 };
 
 struct vivco {
+	size_t len;
+	uint8_t *data;
+};
+
+struct vsio6 {
+	uint32_t en;
+	size_t opt;
+	size_t len;
+	uint8_t *data;
+};
+
+struct vivso4 {
+	uint32_t en;
+	uint8_t opt;
 	size_t len;
 	uint8_t *data;
 };
@@ -292,6 +309,16 @@ struct if_options {
 	size_t vivco_len;
 	struct dhcp_opt *vivso_override;
 	size_t vivso_override_len;
+	struct vsio6 *vsio6;
+	size_t vsio6_len;
+	uint32_t vsio6_ent_nums[ENTERPRISE_NUMS_MAX_LEN]; // Unique enterprise ID's will be saved here
+	size_t vsio6_ent_nums_len;
+	
+	struct vivso4 *vivso4;
+	size_t vivso4_len;
+	uint32_t vivso4_ent_nums[ENTERPRISE_NUMS_MAX_LEN];
+	size_t vivso4_ent_nums_len;
+
 
 	struct auth auth;
 };
