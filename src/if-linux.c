@@ -702,6 +702,22 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_DST:
 			sa = &rt->rt_dest;
 			break;
+		case RTA_SRC:
+		{
+			struct sockaddr ssa;
+			socklen_t salen;
+
+			ssa.sa_family = rtm->rtm_family;
+			salen = sa_addrlen(&ssa);
+			memcpy((char *)&ssa + sa_addroffset(&ssa),
+			       RTA_DATA(rta), MIN(salen, RTA_PAYLOAD(rta)));
+			/* if source-route, ignore it */
+			if (!sa_is_unspecified(&ssa)) {
+				errno = ENOTSUP;
+				return -1;
+			}
+			break;
+		}
 		case RTA_GATEWAY:
 			sa = &rt->rt_gateway;
 			break;
