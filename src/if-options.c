@@ -86,8 +86,8 @@ const struct option cf_options[] = {
 	{"userclass",       required_argument, NULL, 'u'},
 #ifndef SMALL
 	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
-	{"vsio",         	required_argument, NULL, O_VENDOPT6},
 #endif
+	{"vsio",            required_argument, NULL, O_VENDOPT6},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
@@ -899,8 +899,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		ifo->userclass[0] = (uint8_t)s;
 		break;
+#endif
 	case O_VENDOPT6:
 		ARG_REQUIRED;
+#ifdef SMALL
+		logwarnx("%s: vendor options not compiled in", ifname);
+		return -1;
+#else
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
@@ -2959,7 +2964,7 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	for (vso6 = ifo->vsio6;
 	    ifo->vsio6_len > 0;
 	    vso6++, ifo->vsio6_len--)
-			free(vso6->data);
+		free(vso6->data);
 	free(ifo->vsio6);
 #endif
 	for (opt = ifo->vivso_override;
