@@ -2331,6 +2331,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			sa_in6_init(&rt->rt_dest, &rinfo->prefix);
 			sa_in6_init(&rt->rt_netmask, &netmask);
 			sa_in6_init(&rt->rt_gateway, &rap->from);
+			rt->rt_dflags |= RTDF_RA;
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif

@@ -185,6 +185,12 @@ the SSID the
 is connected to.
 .It Ev $interface_order
 A list of interfaces, in order of preference.
+.It Ev $if_configured
+.Dv true
+if dhcpcd has configured the
+.Ev interface
+otherwise
+.Dv false .
 .It Ev $if_up
 .Dv true
 if the

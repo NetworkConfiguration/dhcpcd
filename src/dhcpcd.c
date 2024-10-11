@@ -114,7 +114,7 @@ printf("usage: "PACKAGE"\t[-146ABbDdEGgHJKLMNPpqTV]\n"
 	"\t\t[-O, --nooption option] [-o, --option option]\n"
 	"\t\t[-Q, --require option] [-r, --request address]\n"
 	"\t\t[-S, --static value]\n"
-	"\t\t[-s, --inform address[/cidr[/broadcast_address]]]\n [--inform6]"
+	"\t\t[-s, --inform address[/cidr[/broadcast_address]]] [--inform6]\n"
 	"\t\t[-t, --timeout seconds] [-u, --userclass class]\n"
 	"\t\t[-v, --vendor code, value] [-W, --whitelist address[/cidr]] [-w]\n"
 	"\t\t[--waitip [4 | 6]] [-y, --reboot seconds]\n"
@@ -2719,6 +2719,7 @@ exit1:
 	eloop_free(ctx.eloop);
 	logclose();
 	free(ctx.logfile);
+	fflush(stdout);
 	free(ctx.ctl_buf);
 #ifdef SETPROCTITLE_H
 	setproctitle_fini();
