@@ -1114,29 +1114,10 @@ ipv6_anyglobal(struct interface *sifp)
 {
 	struct ipv6_addr *ia;
 	struct interface *ifp;
-	bool forwarding;
 
-	ia = ipv6_ifanyglobal(sifp);
-	if (ia != NULL)
-		return ia;
-
-	/* BSD forwarding is either on or off.
-	 * Linux forwarding is technically the same as it's
-	 * configured by the "all" interface.
-	 * Per interface only affects IsRouter of NA messages. */
-#ifdef PRIVSEP_SYSCTL
-	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) > 0;
-	else
-#endif
-		forwarding = ip6_forwarding(NULL) > 0;
-
-	if (!forwarding)
-		return NULL;
-
+	/* IP6 source address selection does not care if we are a router
+	 * or not, so just find a global address on any interface. */
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
-		if (ifp == sifp)
-			continue;
 		ia = ipv6_ifanyglobal(ifp);
 		if (ia != NULL)
 			return ia;
@@ -2356,6 +2337,11 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		/* add default route */
 		if (rap->lifetime == 0)
 			continue;
+		/* We only want to install a default route if we have
+		 * an address that we can use other it.
+		 * If we don't have any global addresses any request
+		 * over the interface just times out.
+		 * This avoids a badly setup IPv6 enabled router. */
 		if (ipv6_anyglobal(rap->iface) == NULL)
 			continue;
 		rt = inet6_makerouter(rap);

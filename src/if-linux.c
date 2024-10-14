@@ -2265,21 +2265,4 @@ if_applyra(const struct ra *rap)
 	return error;
 }
 
-int
-ip6_forwarding(const char *ifname)
-{
-	char path[256], buf[64];
-	int error, i;
-
-	if (ifname == NULL)
-		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/forwarding", p_conf, ifname);
-	if (readfile(path, buf, sizeof(buf)) == -1)
-		return -1;
-	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
-	if (error != 0 && error != ENOTSUP)
-		return -1;
-	return i;
-}
-
 #endif /* INET6 */
