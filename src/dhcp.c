@@ -2362,6 +2362,46 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 
 #endif /* ARP */
 
+static void
+dhcp_bound(struct interface *ifp, uint8_t old_state)
+{
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct dhcp_state *state = D_STATE(ifp);
+
+	/* Close the BPF filter as we can now receive DHCP messages
+	 * on a UDP socket. */
+	dhcp_closebpf(ifp);
+
+	/* If not in manager mode, open an address specific socket. */
+	if (ctx->options & DHCPCD_MANAGER ||
+	    ifp->options->options & DHCPCD_STATIC ||
+	    (state->old != NULL &&
+		state->old->yiaddr == state->new->yiaddr) ||
+	    (old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
+		return;
+
+	dhcp_closeinet(ifp);
+#ifdef PRIVSEP
+	if (IN_PRIVSEP_SE(ctx)) {
+		if (ps_inet_openbootp(state->addr) == -1)
+		    logerr(__func__);
+		return;
+	}
+#endif
+
+	state->udp_rfd = dhcp_openudp(&state->addr->addr);
+	if (state->udp_rfd == -1) {
+		logerr(__func__);
+		/* We still need to work, so re-open BPF. */
+		dhcp_openbpf(ifp);
+		return;
+	}
+
+	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
+	    dhcp_handleifudp, ifp) == -1)
+		logerr("%s: eloop_event_add", __func__);
+}
+
 void
 dhcp_bind(struct interface *ifp)
 {
@@ -2488,7 +2528,18 @@ dhcp_bind(struct interface *ifp)
 
 	old_state = state->added;
 
-	if (!(ifo->options & DHCPCD_CONFIGURE)) {
+	if (ifo->options & DHCPCD_CONFIGURE) {
+		/* Add the address */
+		if (ipv4_applyaddr(ifp) == NULL) {
+			/* There was an error adding the address.
+			 * If we are in oneshot, exit with a failure. */
+			if (ctx->options & DHCPCD_ONESHOT) {
+				loginfox("exiting due to oneshot");
+				eloop_exit(ctx->eloop, EXIT_FAILURE);
+			}
+			return;
+		}
+	} else {
 		struct ipv4_addr *ia;
 
 		script_runreason(ifp, state->reason);
@@ -2497,61 +2548,13 @@ dhcp_bind(struct interface *ifp)
 		/* We we are not configuring the address, we need to keep
 		 * the BPF socket open if the address does not exist. */
 		ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
-		if (ia != NULL) {
-			state->addr = ia;
-			state->added = STATE_ADDED;
-			dhcp_closebpf(ifp);
-			goto openudp;
-		}
-		return;
+		if (ia == NULL)
+			return;
+		state->addr = ia;
+		state->added = STATE_ADDED;
 	}
 
-	/* Add the address */
-	if (ipv4_applyaddr(ifp) == NULL) {
-		/* There was an error adding the address.
-		 * If we are in oneshot, exit with a failure. */
-		if (ctx->options & DHCPCD_ONESHOT) {
-			loginfox("exiting due to oneshot");
-			eloop_exit(ctx->eloop, EXIT_FAILURE);
-		}
-		return;
-	}
-
-	/* Close the BPF filter as we can now receive DHCP messages
-	 * on a UDP socket. */
-	dhcp_closebpf(ifp);
-
-openudp:
-	/* If not in manager mode, open an address specific socket. */
-	if (ctx->options & DHCPCD_MANAGER ||
-	    ifo->options & DHCPCD_STATIC ||
-	    (state->old != NULL &&
-	     state->old->yiaddr == state->new->yiaddr &&
-	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
-		return;
-
-	dhcp_closeinet(ifp);
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ctx)) {
-		if (ps_inet_openbootp(state->addr) == -1)
-		    logerr(__func__);
-		return;
-	}
-#endif
-
-	state->udp_rfd = dhcp_openudp(&state->addr->addr);
-	if (state->udp_rfd == -1) {
-		logerr(__func__);
-		/* Address sharing without manager mode is not supported.
-		 * It's also possible another DHCP client could be running,
-		 * which is even worse.
-		 * We still need to work, so re-open BPF. */
-		dhcp_openbpf(ifp);
-		return;
-	}
-	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
-	    dhcp_handleifudp, ifp) == -1)
-		logerr("%s: eloop_event_add", __func__);
+	dhcp_bound(ifp, old_state);
 }
 
 static size_t
@@ -4342,18 +4345,15 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 	ifo = ifp->options;
 
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ifp->ctx) &&
-	    !(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
+	if (!(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
 	    IN_ARE_ADDR_EQUAL(&state->lease.addr, &ia->addr))
 	{
+		uint8_t old_state = state->added;
+
 		state->addr = ia;
 		state->added = STATE_ADDED;
-		dhcp_closebpf(ifp);
-		if (ps_inet_openbootp(ia) == -1)
-		    logerr(__func__);
+		dhcp_bound(ifp, old_state);
 	}
-#endif
 
 	/* If we have requested a specific address, return now.
 	 * The below code is only for when inform or static has been
