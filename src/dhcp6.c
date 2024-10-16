@@ -639,6 +639,64 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 
 	return sla->prefix_len;
 }
+
+// DHCPv6 Option 17 (Vendor-Specific Information Option)
+static size_t
+dhcp6_makevendoropts(void *data, const struct interface *ifp, uint32_t en)
+{
+	const struct if_options *ifo;
+	size_t len, vlen;
+	uint8_t *p;
+	struct dhcp6_option o;
+
+	ifo = ifp->options;
+	const struct vsio6 *vsio6_endp = ifo->vsio6 + ifo->vsio6_len; 
+	len = sizeof(uint32_t); /* IANA PEN */
+	vlen = 0;
+
+	for (struct vsio6 *vsio6 = ifo->vsio6; vsio6 != vsio6_endp; ++vsio6) {
+		if (vsio6->en != en)
+			continue;
+		vlen += 2 * sizeof(uint16_t) + vsio6->len;
+		}
+
+	len += vlen;
+	
+	if (len > UINT16_MAX) {
+		logerrx("%s: DHCPv6 Vendor-Specific Information Option too big", ifp->name);
+		return 0;
+	}
+
+	if (data != NULL) {
+		uint32_t pen;
+		uint16_t opt;
+		uint16_t hvlen;
+
+		p = data;
+		o.code = htons(D6_OPTION_VENDOR_OPTS);
+		o.len = htons((uint16_t)len);
+		memcpy(p, &o, sizeof(o));
+		p += sizeof(o);
+		pen = htonl(en);
+		memcpy(p, &pen, sizeof(pen));
+		p += sizeof(pen);
+
+		for (struct vsio6 *vsio6 = ifo->vsio6; vsio6 != vsio6_endp; ++vsio6) {
+			if (vsio6->en != en)
+				continue;
+			opt = htons((uint16_t)vsio6->opt);
+			memcpy(p, &opt, sizeof(opt));
+			p += sizeof(opt);
+			hvlen = htons((uint16_t)vsio6->len);
+			memcpy(p, &hvlen, sizeof(hvlen));
+			p += sizeof(hvlen);
+			memcpy(p, vsio6->data, vsio6->len);
+			p += vsio6->len;
+			}
+		}
+
+	return sizeof(o) + len;
+}
 #endif
 
 static int
@@ -803,6 +861,13 @@ dhcp6_makemessage(struct interface *ifp)
 		len += dhcp6_makeuser(NULL, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		len += dhcp6_makevendor(NULL, ifp);
+
+#ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS)) {
+		for (size_t j = 0; j < ifo->vsio6_ent_nums_len; j++)
+			len += dhcp6_makevendoropts(NULL, ifp, ifo->vsio6_ent_nums[j]);
+	}
+#endif
 
 	/* IA */
 	m = NULL;
@@ -1123,6 +1188,13 @@ dhcp6_makemessage(struct interface *ifp)
 		p += dhcp6_makeuser(p, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		p += dhcp6_makevendor(p, ifp);
+
+#ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS)) {
+		for (size_t j = 0; j < ifo->vsio6_ent_nums_len; j++)
+			p += dhcp6_makevendoropts(p, ifp, ifo->vsio6_ent_nums[j]);
+	}
+#endif
 
 	if (state->send->type != DHCP6_RELEASE &&
 	    state->send->type != DHCP6_DECLINE)
