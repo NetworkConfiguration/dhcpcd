@@ -738,6 +738,7 @@ script_dump(const char *env, size_t len)
 			env += 4;
 		printf("%s\n", env);
 	}
+	fflush(stdout);
 	return 0;
 }
 

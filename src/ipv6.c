@@ -1114,29 +1114,19 @@ ipv6_anyglobal(struct interface *sifp)
 {
 	struct ipv6_addr *ia;
 	struct interface *ifp;
-	bool forwarding;
 
-	ia = ipv6_ifanyglobal(sifp);
-	if (ia != NULL)
-		return ia;
-
-	/* BSD forwarding is either on or off.
-	 * Linux forwarding is technically the same as it's
-	 * configured by the "all" interface.
-	 * Per interface only affects IsRouter of NA messages. */
-#ifdef PRIVSEP_SYSCTL
-	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) > 0;
-	else
-#endif
-		forwarding = ip6_forwarding(NULL) > 0;
-
-	if (!forwarding)
-		return NULL;
-
+	/*
+	 * IPv6 source address selection will prefer the outgoing interface,
+	 * but will also use any other interface if it things the address is
+	 * a better fit for the destination.
+	 * This logic is pretty much baked into all kernels and you
+	 * don't need to be a router either.
+	 * We only have this logic to work around badly configured IPv6
+	 * setups where there is a default router, but you're not handed
+	 * a reachable address. This results in network timeouts which we
+	 * want to actively avoid.
+	 */
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
-		if (ifp == sifp)
-			continue;
 		ia = ipv6_ifanyglobal(ifp);
 		if (ia != NULL)
 			return ia;
@@ -2332,6 +2322,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			sa_in6_init(&rt->rt_dest, &rinfo->prefix);
 			sa_in6_init(&rt->rt_netmask, &netmask);
 			sa_in6_init(&rt->rt_gateway, &rap->from);
+			rt->rt_dflags |= RTDF_RA;
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
@@ -2356,6 +2347,21 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		/* add default route */
 		if (rap->lifetime == 0)
 			continue;
+		/*
+		 * We only want to install a default route if we have
+		 * an address that we can use over it.
+		 * If we don't have any global addresses then the link-local
+		 * address would be used instead and we wouldn't reach
+		 * our destination and even if we could, they wouldn't
+		 * be able to reply back to us.
+		 * This avoids timeouts on badly configured IPv6 setups
+		 * where there is a default router but it or a DHCPv6 server
+		 * doesn't hand out an address.
+		 * If an address appears from anywhere, dhcpcd will spot this
+		 * and then add the default like.
+		 * Likewise, if all global addresses are removed then dhcpcd
+		 * will remove the default route.
+		 */
 		if (ipv6_anyglobal(rap->iface) == NULL)
 			continue;
 		rt = inet6_makerouter(rap);
