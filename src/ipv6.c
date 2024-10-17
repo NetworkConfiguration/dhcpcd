@@ -1115,8 +1115,17 @@ ipv6_anyglobal(struct interface *sifp)
 	struct ipv6_addr *ia;
 	struct interface *ifp;
 
-	/* IP6 source address selection does not care if we are a router
-	 * or not, so just find a global address on any interface. */
+	/*
+	 * IPv6 source address selection will prefer the outgoing interface,
+	 * but will also use any other interface if it things the address is
+	 * a better fit for the destination.
+	 * This logic is pretty much baked into all kernels and you
+	 * don't need to be a router either.
+	 * We only have this logic to work around badly configured IPv6
+	 * setups where there is a default router, but you're not handed
+	 * a reachable address. This results in network timeouts which we
+	 * want to actively avoid.
+	 */
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
 		ia = ipv6_ifanyglobal(ifp);
 		if (ia != NULL)
@@ -2337,11 +2346,21 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		/* add default route */
 		if (rap->lifetime == 0)
 			continue;
-		/* We only want to install a default route if we have
-		 * an address that we can use other it.
-		 * If we don't have any global addresses any request
-		 * over the interface just times out.
-		 * This avoids a badly setup IPv6 enabled router. */
+		/*
+		 * We only want to install a default route if we have
+		 * an address that we can use over it.
+		 * If we don't have any global addresses then the link-local
+		 * address would be used instead and we wouldn't reach
+		 * our destination and even if we could, they wouldn't
+		 * be able to reply back to us.
+		 * This avoids timeouts on badly configured IPv6 setups
+		 * where there is a default router but it or a DHCPv6 server
+		 * doesn't hand out an address.
+		 * If an address appears from anywhere, dhcpcd will spot this
+		 * and then add the default like.
+		 * Likewise, if all global addresses are removed then dhcpcd
+		 * will remove the default route.
+		 */
 		if (ipv6_anyglobal(rap->iface) == NULL)
 			continue;
 		rt = inet6_makerouter(rap);
