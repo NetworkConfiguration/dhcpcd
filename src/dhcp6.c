@@ -1760,8 +1760,9 @@ dhcp6_fail(struct interface *ifp, bool drop)
 		dhcp_unlink(ifp->ctx, state->leasefile);
 		dhcp6_addrequestedaddrs(ifp);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	} else if (state->recv && ifp->options->options & DHCPCD_LASTLEASE) {
+	} else if (state->state == DH6S_CONFIRM && ifp->options->options & DHCPCD_LASTLEASE) {
 		dhcp6_bind(ifp, NULL, NULL);
+		return;
 	} else if (state->new) {
 		script_runreason(ifp, "TIMEOUT6");
 		// We need to keep the expire timeout alive
