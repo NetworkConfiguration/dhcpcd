@@ -144,6 +144,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	}
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
+	struct rlimit rlease = { .rlim_cur = 5000, .rlim_max = 5000 };
 
 	/* Prohibit new files, sockets, etc */
 	/*
@@ -174,8 +175,17 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
 	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
 	{
-		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
-			logerr("setrlimit RLIMIT_FSIZE");
+		/* Allow dumplease to write to file (all other priveleges are still reduced) */
+		if (ctx->options & DHCPCD_DUMPLEASE) {
+			logdebugx("%s DHCPCD_DUMPLEASE setrlimit to %d for RLIMIT_FSIZE", __func__, rlease.rlim_cur);
+			if (setrlimit(RLIMIT_FSIZE, &rlease) == -1)
+				logerr("setrlimit RLIMIT_FSIZE rlim_cur: %d max: %d", rlease.rlim_cur, rlease.rlim_max);
+		}
+		else {
+			logdebugx("%s DHC_NOCHKIO setrlimit to %d for RLIMIT_FSIZE", __func__, rzero.rlim_cur);
+			if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
+				logerr("setrlimit RLIMIT_FSIZE rlim_cur: %d max: %d", rzero.rlim_cur, rzero.rlim_max);
+		}
 	}
 
 #ifdef RLIMIT_NPROC
