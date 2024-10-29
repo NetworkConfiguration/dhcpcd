@@ -1746,11 +1746,4 @@ if_setup_inet6(__unused const struct interface *ifp)
 {
 
 }
-
-int
-ip6_forwarding(__unused const char *ifname)
-{
-
-	return 1;
-}
 #endif

@@ -1658,8 +1658,7 @@ if_machinearch(char *str, size_t len)
 }
 
 #ifdef INET6
-#if (defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)) || \
-    defined(IPV6CTL_FORWARDING)
+#if (defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV))
 #define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
 static int
@@ -1728,37 +1727,6 @@ if_applyra(const struct ra *rap)
 #warning OS does not allow setting of RA bits hoplimit, retrans or reachable
 	UNUSED(rap);
 	return 0;
-#endif
-}
-
-#ifndef IPV6CTL_FORWARDING
-#define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
-#define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
-static int
-inet6_sysctlbyname(const char *name, int val, int action)
-{
-	size_t size;
-
-	size = sizeof(val);
-	if (action) {
-		if (sysctlbyname(name, NULL, 0, &val, size) == -1)
-			return -1;
-		return 0;
-	}
-	if (sysctlbyname(name, &val, &size, NULL, 0) == -1)
-		return -1;
-	return val;
-}
-#endif
-
-int
-ip6_forwarding(__unused const char *ifname)
-{
-
-#ifdef IPV6CTL_FORWARDING
-	return get_inet6_sysctl(IPV6CTL_FORWARDING);
-#else
-	return get_inet6_sysctlbyname("net.inet6.ip6.forwarding");
 #endif
 }
 

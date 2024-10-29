@@ -611,11 +611,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		free_rdata = true;
 		break;
 #endif
-#if defined(INET6) && defined(PRIVSEP_SYSCTL)
-	case PS_IP6FORWARDING:
-		 err = ip6_forwarding(data);
-		 break;
-#endif
 #ifdef PLUGIN_DEV
 	case PS_DEV_INITTED:
 		err = dev_initialised(ctx, data);
@@ -1170,18 +1165,6 @@ err:
 	*ifahead = NULL;
 	errno = EINVAL;
 	return -1;
-}
-#endif
-
-#ifdef PRIVSEP_SYSCTL
-ssize_t
-ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
-{
-
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IP6FORWARDING, 0,
-	    ifname, ifname != NULL ? strlen(ifname) + 1 : 0) == -1)
-		return -1;
-	return ps_root_readerror(ctx, NULL, 0);
 }
 #endif
 

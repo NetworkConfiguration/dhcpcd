@@ -187,6 +187,7 @@ static const char * const dhcp6_statuses[] = {
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
+static void dhcp6_startrebind(void *arg);
 static void dhcp6_recvaddr(void *, unsigned short);
 static void dhcp6_startdecline(struct interface *);
 static void dhcp6_startrequest(struct interface *);
@@ -1832,6 +1833,12 @@ dhcp6_fail(struct interface *ifp, bool drop)
 		dhcp_unlink(ifp->ctx, state->leasefile);
 		dhcp6_addrequestedaddrs(ifp);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	} else if ((state->state == DH6S_CONFIRM || state->state == DH6S_REBIND) &&
+	           ifp->options->options & DHCPCD_LASTLEASE) {
+		dhcp6_bind(ifp, NULL, NULL);
+		state->state = DH6S_REBIND;
+		dhcp6_startrebind(ifp);
+		return;
 	} else if (state->new) {
 		script_runreason(ifp, "TIMEOUT6");
 		// We need to keep the expire timeout alive
