@@ -125,6 +125,8 @@ static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
+	int fd_out = ctx->options & DHCPCD_DUMPLEASE ?
+	   STDOUT_FILENO : STDERR_FILENO;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
@@ -172,7 +174,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
-	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
+	    (ctx->logfile == NULL && isatty(fd_out) == 1))
 	{
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
