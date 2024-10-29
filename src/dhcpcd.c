@@ -1739,13 +1739,6 @@ dhcpcd_readdump2(void *arg, unsigned short events)
 	if (ctx->ctl_buf[ctx->ctl_buflen - 1] != '\0') /* unlikely */
 		ctx->ctl_buf[ctx->ctl_buflen - 1] = '\0';
 	script_dump(ctx->ctl_buf, ctx->ctl_buflen);
-#ifdef PRIVSEP
-	// Check for redirect, if so, if privsep we need to open up priveleges
-	if (IN_PRIVSEP(ctx) && !isatty(fileno(stdout)))
-	{
-		logdebugx("dumplease stdout has been redirected");
-	}
-#endif
 	fflush(stdout);
 	if (--ctx->ctl_extra != 0) {
 		putchar('\n');

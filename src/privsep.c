@@ -125,6 +125,8 @@ static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
+	int fd_out = ctx->options & DHCPCD_DUMPLEASE ?
+	   STDOUT_FILENO : STDERR_FILENO;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
@@ -144,7 +146,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	}
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
-	struct rlimit rlease = { .rlim_cur = 5000, .rlim_max = 5000 };
 
 	/* Prohibit new files, sockets, etc */
 	/*
@@ -173,19 +174,10 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
-	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
+	    (ctx->logfile == NULL && isatty(fd_out) == 1))
 	{
-		/* Allow dumplease to write to file (all other priveleges are still reduced) */
-		if (ctx->options & DHCPCD_DUMPLEASE) {
-			logdebugx("%s DHCPCD_DUMPLEASE setrlimit to %d for RLIMIT_FSIZE", __func__, rlease.rlim_cur);
-			if (setrlimit(RLIMIT_FSIZE, &rlease) == -1)
-				logerr("setrlimit RLIMIT_FSIZE rlim_cur: %d max: %d", rlease.rlim_cur, rlease.rlim_max);
-		}
-		else {
-			logdebugx("%s DHC_NOCHKIO setrlimit to %d for RLIMIT_FSIZE", __func__, rzero.rlim_cur);
-			if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
-				logerr("setrlimit RLIMIT_FSIZE rlim_cur: %d max: %d", rzero.rlim_cur, rzero.rlim_max);
-		}
+		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
+			logerr("setrlimit RLIMIT_FSIZE");
 	}
 
 #ifdef RLIMIT_NPROC
