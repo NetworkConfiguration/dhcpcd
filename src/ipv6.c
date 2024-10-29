@@ -654,6 +654,25 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	}
 }
 
+static struct ipv6_state *
+ipv6_getstate(struct interface *ifp)
+{
+	struct ipv6_state *state;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL) {
+	        ifp->if_data[IF_DATA_IPV6] = calloc(1, sizeof(*state));
+		state = IPV6_STATE(ifp);
+		if (state == NULL) {
+			logerr(__func__);
+			return NULL;
+		}
+		TAILQ_INIT(&state->addrs);
+		TAILQ_INIT(&state->ll_callbacks);
+	}
+	return state;
+}
+
 static int
 ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 {
@@ -785,7 +804,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	 * it does not exist.
 	 * This is important if route overflow loses the message. */
 	if (iaf == NULL) {
-		struct ipv6_state *state = IPV6_STATE(ifp);
+		struct ipv6_state *state = ipv6_getstate(ifp);
 
 		if ((iaf = malloc(sizeof(*iaf))) == NULL) {
 			logerr(__func__);
@@ -1064,25 +1083,6 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		if (drop != 2)
 			ipv6_freeaddr(ap);
 	}
-}
-
-static struct ipv6_state *
-ipv6_getstate(struct interface *ifp)
-{
-	struct ipv6_state *state;
-
-	state = IPV6_STATE(ifp);
-	if (state == NULL) {
-	        ifp->if_data[IF_DATA_IPV6] = calloc(1, sizeof(*state));
-		state = IPV6_STATE(ifp);
-		if (state == NULL) {
-			logerr(__func__);
-			return NULL;
-		}
-		TAILQ_INIT(&state->addrs);
-		TAILQ_INIT(&state->ll_callbacks);
-	}
-	return state;
 }
 
 static struct ipv6_addr *
