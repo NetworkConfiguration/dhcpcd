@@ -782,6 +782,22 @@ Set the vendor option 03 with an IP address as a string.
 .D1 vendor 03,\e"192.168.0.2\e"
 Set un-encapsulated vendor option to hello world.
 .D1 vendor ,"hello world"
+.It Ic vsio Ar en Ar code, Ns Ar value
+Add an encapsulated vendor-specific information option (DHCPv6 Option 17) with
+IANA assigned Enterprise Number
+.Ar en
+proceeding with the
+.Ar code
+which should be between 1 and 65535 inclusive, and the
+.Ar value
+after the comma. Examples:
+.Pp
+Set the vsio for enterprise number 155 option 01 with an IPv6 address.
+.D1 vsio 155 01,2001:0db8:85a3:0000:0000:8a2e:0370:7334
+Set the vsio for enterprise number 155 option 02 with a string.
+.D1 vsio 155 02,"hello world"
+Set the vsio for enterprise number 255 option 01 with a hex code.
+.D1 vsio 255 01,01:02:03:04:05
 .It Ic vendorclassid Ar string
 Set the DHCP Vendor Class.
 DHCPv6 has its own option as shown below.
