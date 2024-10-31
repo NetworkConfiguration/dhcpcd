@@ -447,7 +447,7 @@ int
 logopen(const char *path)
 {
 	struct logctx *ctx = &_logctx;
-	int opts = 0;
+	int opts = LOG_NDELAY; /* Ensure openlog gets a fd */
 
 	/* Cache timezone */
 	tzset();
