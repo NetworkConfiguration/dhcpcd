@@ -225,11 +225,15 @@ struct vivco {
 };
 
 #ifndef SMALL
-struct vsio6 {
+struct vsio_so {
+	uint16_t opt;
+	uint16_t len;
+	void *data;
+};
+struct vsio {
 	uint32_t en;
-	size_t opt;
-	size_t len;
-	uint8_t *data;
+	size_t so_len;
+	struct vsio_so *so;
 };
 #endif
 
@@ -305,10 +309,8 @@ struct if_options {
 	size_t vivso_override_len;
 
 #ifndef SMALL
-	struct vsio6 *vsio6;
 	size_t vsio6_len;
-	uint32_t vsio6_ent_nums[ENTERPRISE_NUMS_MAX_LEN]; // Unique enterprise ID's will be saved here
-	size_t vsio6_ent_nums_len;
+	struct vsio *vsio6;
 #endif
 
 	struct auth auth;
