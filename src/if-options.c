@@ -87,7 +87,7 @@ const struct option cf_options[] = {
 #ifndef SMALL
 	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
 #endif
-	{"vsio",            required_argument, NULL, O_VENDOPT6},
+	{"vsio6",           required_argument, NULL, O_VENDOPT6},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
