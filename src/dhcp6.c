@@ -649,8 +649,8 @@ dhcp6_makevendoropts(void *data, const struct interface *ifp, uint32_t en)
 	size_t len, vlen;
 	uint8_t *p;
 	struct dhcp6_option o;
-
 	ifo = ifp->options;
+	
 	const struct vsio6 *vsio6_endp = ifo->vsio6 + ifo->vsio6_len; 
 	len = sizeof(uint32_t); /* IANA PEN */
 	vlen = 0;
@@ -659,7 +659,7 @@ dhcp6_makevendoropts(void *data, const struct interface *ifp, uint32_t en)
 		if (vsio6->en != en)
 			continue;
 		vlen += 2 * sizeof(uint16_t) + vsio6->len;
-		}
+	}
 
 	len += vlen;
 	
@@ -693,8 +693,8 @@ dhcp6_makevendoropts(void *data, const struct interface *ifp, uint32_t en)
 			p += sizeof(hvlen);
 			memcpy(p, vsio6->data, vsio6->len);
 			p += vsio6->len;
-			}
 		}
+	}
 
 	return sizeof(o) + len;
 }
