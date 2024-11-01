@@ -1095,6 +1095,49 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			}
 		}
 
+#ifndef SMALL
+		if (ifo->vsio_len &&
+		    !has_option_mask(ifo->nomask, DHO_VIVSO))
+		{
+			struct vsio *vso = ifo->vsio;
+			size_t vlen = ifo->vsio_len;
+			struct vsio_so *so;
+			size_t slen;
+			uint8_t *dlp;
+
+			for (; vlen > 0; vso++, vlen--) {
+				so = vso->so;
+				slen = vso->so_len;
+
+				AREA_CHECK(sizeof(ul) + 1);
+				*p++ = DHO_VIVSO;
+				lp = p++;
+				ul = htonl(vso->en);
+				memcpy(p, &ul, sizeof(ul));
+				p += sizeof(ul);
+				dlp = p++;
+				*lp = sizeof(ul) + 1;
+				*dlp = 0;
+
+				for (; slen > 0; so++, slen--) {
+					AREA_CHECK(so->len);
+					if (so->len + 2 + *lp > UINT8_MAX) {
+						logerrx("%s: VIVSO"
+						    " too big", ifp->name);
+						free(bootp);
+						return -1;
+					}
+					*p++ = (uint8_t)so->opt;
+					*p++ = (uint8_t)so->len;
+					memcpy(p, so->data, so->len);
+					p += so->len;
+					*lp = (uint8_t)(*lp + 2 + so->len);
+					*dlp = (uint8_t)(*dlp + 2 + so->len);
+				}
+			}
+		}
+#endif
+
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE &&

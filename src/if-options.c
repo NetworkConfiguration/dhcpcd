@@ -87,7 +87,8 @@ const struct option cf_options[] = {
 #ifndef SMALL
 	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
 #endif
-	{"vsio6",           required_argument, NULL, O_VENDOPT6},
+	{"vsio",            required_argument, NULL, O_VSIO},
+	{"vsio6",           required_argument, NULL, O_VSIO6},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
@@ -669,7 +670,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	uint8_t iaid[4];
 #ifndef SMALL
 	struct if_sla *sla, *slap;
-	struct vsio *vsio;
+	struct vsio **vsiop = NULL, *vsio;
+	size_t *vsio_lenp = NULL, opt_max;
 	struct vsio_so *vsio_so;
 #endif
 #endif
@@ -901,7 +903,18 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->userclass[0] = (uint8_t)s;
 		break;
 #endif
-	case O_VENDOPT6:
+
+	case O_VSIO:
+		vsiop = &ifo->vsio;
+		vsio_lenp = &ifo->vsio_len;
+		opt_max = UINT8_MAX;
+		/* FALLTHROUGH */
+	case O_VSIO6:
+		if (vsiop == NULL) {
+			vsiop = &ifo->vsio6;
+			vsio_lenp = &ifo->vsio6_len;
+			opt_max = UINT16_MAX;
+		}
 		ARG_REQUIRED;
 #ifdef SMALL
 		logwarnx("%s: vendor options not compiled in", ifname);
@@ -925,22 +938,35 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 		/* Strip and preserve the comma */
 		*p = '\0';
-		i = (int)strtoi(fp, NULL, 0, 1, UINT16_MAX, &e);
+		i = (int)strtoi(fp, NULL, 0, 1, (intmax_t)opt_max, &e);
 		*p = ',';
 		if (e) {
-			logerrx("vendor6 option should be between"
-			    " 1 and 65535 inclusive");
+			logerrx("vendor option should be between"
+			    " 1 and %zu inclusive", opt_max);
 			return -1;
 		}
 
 		fp = p + 1;
 
 		if (fp) {
-			if (inet_pton(AF_INET6, fp, &in6addr) == 1) {
+			if (inet_pton(AF_INET, fp, &addr) == 1) {
+				s = sizeof(addr.s_addr);
+				dl = (size_t)s;
+				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
+					logerrx("vendor option is too big");
+					return -1;
+				}
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				memcpy(np, &addr.s_addr, dl);
+			} else if (inet_pton(AF_INET6, fp, &in6addr) == 1) {
 				s = sizeof(in6addr.s6_addr);
 				dl = (size_t)s;
-				if (dl + (sizeof(uint16_t) * 2) > UINT16_MAX) {
-					logerrx("vendor6 option is too big");
+				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
+					logerrx("vendor option is too big");
 					return -1;
 				}
 				np = malloc(dl);
@@ -956,7 +982,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					return -1;
 				}
 				dl = (size_t)s;
-				if (dl + (sizeof(uint16_t) * 2) > UINT16_MAX) {
+				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
 					logerrx("vendor6 option is too big");
 					return -1;
 				}
@@ -972,22 +998,20 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			np = NULL;
 		}
 
-		for (sl = 0, vsio = ifo->vsio6;
-		     sl < ifo->vsio6_len;
-		     sl++, vsio++) {
+		for (sl = 0, vsio = *vsiop; sl < *vsio_lenp; sl++, vsio++) {
 			if (vsio->en == (uint32_t)u)
 				break;
 		}
-		if (sl == ifo->vsio6_len) {
-			vsio = reallocarray(ifo->vsio6, ifo->vsio6_len + 1,
-			    sizeof(*vsio));
+		if (sl == *vsio_lenp) {
+			vsio = reallocarray(*vsiop, *vsio_lenp + 1,
+			    sizeof(**vsiop));
 			if (vsio == NULL) {
 				logerr("%s: reallocarray vsio", __func__);
 				free(np);
 				return -1;
 			}
-			ifo->vsio6 = vsio;
-			vsio = &ifo->vsio6[ifo->vsio6_len++];
+			*vsiop = vsio;
+			vsio = &(*vsiop)[(*vsio_lenp)++];
 			vsio->en = (uint32_t)u;
 			vsio->so = NULL;
 			vsio->so_len = 0;
