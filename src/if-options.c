@@ -2996,6 +2996,17 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 		free(vo->data);
 	free(ifo->vivco);
 #ifndef SMALL
+	for (vsio = ifo->vsio;
+	    ifo->vsio_len > 0;
+	    vsio++, ifo->vsio_len--)
+	{
+		for (vsio_so = vsio->so;
+		    vsio->so_len > 0;
+		    vsio_so++, vsio->so_len--)
+			free(vsio_so->data);
+		free(vsio->so);
+	}
+	free(ifo->vsio);
 	for (vsio = ifo->vsio6;
 	    ifo->vsio6_len > 0;
 	    vsio++, ifo->vsio6_len--)
