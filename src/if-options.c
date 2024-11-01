@@ -649,7 +649,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	char *p = NULL, *bp, *fp, *np;
 	ssize_t s;
 	struct in_addr addr, addr2;
-	struct in6_addr in6addr;
 	in_addr_t *naddr;
 	struct rt *rt;
 	const struct dhcp_opt *d, *od;
@@ -669,6 +668,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct if_ia *ia;
 	uint8_t iaid[4];
 #ifndef SMALL
+	struct in6_addr in6addr;
 	struct if_sla *sla, *slap;
 	struct vsio **vsiop = NULL, *vsio;
 	size_t *vsio_lenp = NULL, opt_max;
@@ -905,16 +905,20 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #endif
 
 	case O_VSIO:
+#ifndef SMALL
 		vsiop = &ifo->vsio;
 		vsio_lenp = &ifo->vsio_len;
 		opt_max = UINT8_MAX;
+#endif
 		/* FALLTHROUGH */
 	case O_VSIO6:
+#ifndef SMALL
 		if (vsiop == NULL) {
 			vsiop = &ifo->vsio6;
 			vsio_lenp = &ifo->vsio6_len;
 			opt_max = UINT16_MAX;
 		}
+#endif
 		ARG_REQUIRED;
 #ifdef SMALL
 		logwarnx("%s: vendor options not compiled in", ifname);
