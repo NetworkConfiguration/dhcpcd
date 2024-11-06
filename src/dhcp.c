@@ -735,10 +735,11 @@ struct rfc3396_ctx {
 static ssize_t
 rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 {
+	uint8_t *datap = data;
 	size_t wlen, left, r = 0;
 
 	while (len != 0) {
-		if (ctx->len == NULL || *ctx->len + len > UINT8_MAX) {
+		if (ctx->len == NULL || *ctx->len == UINT8_MAX) {
 			if (ctx->buflen < 2) {
 				errno = ENOMEM;
 				return -1;
@@ -758,7 +759,8 @@ rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 			return -1;
 		}
 
-		memcpy(*ctx->buf, data, wlen);
+		memcpy(*ctx->buf, datap, wlen);
+		datap += wlen;
 		*ctx->buf += wlen;
 		ctx->buflen -= wlen;
 		*ctx->len = (uint8_t)(*ctx->len + wlen);
@@ -1173,9 +1175,17 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			};
 
 			for (; vlen > 0; vso++, vlen--) {
+				if (vso->so_len == 0)
+					continue;
+
 				so = vso->so;
 				slen = vso->so_len;
 
+				/* NOTE: Wireshark does not decode this correctly
+				 * when the option overflows the 255 byte boundary
+				 * and another option is created to hold the rest
+				 * of the data.
+				 * Tested against Wireshark-4.4.1 */
 				ul = htonl(vso->en);
 				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
 					goto toobig;

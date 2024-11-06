@@ -975,10 +975,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				memcpy(np, &in6addr.s6_addr, dl);
 			} else {
 				s = parse_string(NULL, 0, fp);
-				if(s == -1) {
+				if (s == -1) {
 					logerr(__func__);
 					return -1;
 				}
+				dl = (size_t)s;
 				np = malloc(dl);
 				if (np == NULL) {
 					logerr(__func__);
