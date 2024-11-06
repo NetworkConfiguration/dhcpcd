@@ -671,7 +671,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct in6_addr in6addr;
 	struct if_sla *sla, *slap;
 	struct vsio **vsiop = NULL, *vsio;
-	size_t *vsio_lenp = NULL, opt_max;
+	size_t *vsio_lenp = NULL, opt_max, opt_header;
 	struct vsio_so *vsio_so;
 #endif
 #endif
@@ -909,6 +909,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		vsiop = &ifo->vsio;
 		vsio_lenp = &ifo->vsio_len;
 		opt_max = UINT8_MAX;
+		opt_header = sizeof(uint8_t) + sizeof(uint8_t);
 #endif
 		/* FALLTHROUGH */
 	case O_VSIO6:
@@ -917,6 +918,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			vsiop = &ifo->vsio6;
 			vsio_lenp = &ifo->vsio6_len;
 			opt_max = UINT16_MAX;
+			opt_header = sizeof(uint16_t) + sizeof(uint16_t);
 		}
 #endif
 		ARG_REQUIRED;
@@ -956,10 +958,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (inet_pton(AF_INET, fp, &addr) == 1) {
 				s = sizeof(addr.s_addr);
 				dl = (size_t)s;
-				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
-					logerrx("vendor option is too big");
-					return -1;
-				}
 				np = malloc(dl);
 				if (np == NULL) {
 					logerr(__func__);
@@ -969,10 +967,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			} else if (inet_pton(AF_INET6, fp, &in6addr) == 1) {
 				s = sizeof(in6addr.s6_addr);
 				dl = (size_t)s;
-				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
-					logerrx("vendor option is too big");
-					return -1;
-				}
 				np = malloc(dl);
 				if (np == NULL) {
 					logerr(__func__);
@@ -983,11 +977,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				s = parse_string(NULL, 0, fp);
 				if(s == -1) {
 					logerr(__func__);
-					return -1;
-				}
-				dl = (size_t)s;
-				if (dl + (sizeof(uint16_t) * 2) > opt_max) {
-					logerrx("vendor6 option is too big");
 					return -1;
 				}
 				np = malloc(dl);
@@ -1019,6 +1008,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			vsio->en = (uint32_t)u;
 			vsio->so = NULL;
 			vsio->so_len = 0;
+		}
+
+		for (sl = 0, vsio_so = vsio->so;
+		    sl < vsio->so_len;
+		    sl++, vsio_so++)
+			opt_max -= opt_header + vsio_so->len;
+		if (opt_header + dl > opt_max) {
+			logerrx("vsio is too big: %s", fp);
+			free(np);
+			return -1;
 		}
 
 		vsio_so = reallocarray(vsio->so, vsio->so_len + 1,
