@@ -732,6 +732,11 @@ struct rfc3396_ctx {
 };
 
 /* Encode data as a DHCP Long Option, RFC 3396. */
+/* NOTE: Wireshark does not decode this correctly
+ * when the option overflows the boundary and another option
+ * is created to hold the resta of the data.
+ * Tested against Wireshark-4.4.1 */
+#define RFC3396_BOUNDARY UINT8_MAX
 static ssize_t
 rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 {
@@ -739,7 +744,7 @@ rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 	size_t wlen, left, r = 0;
 
 	while (len != 0) {
-		if (ctx->len == NULL || *ctx->len == UINT8_MAX) {
+		if (ctx->len == NULL || *ctx->len == RFC3396_BOUNDARY) {
 			if (ctx->buflen < 2) {
 				errno = ENOMEM;
 				return -1;
@@ -750,8 +755,8 @@ rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 			r += 2;
 		}
 
-		wlen = len < UINT8_MAX ? len : UINT8_MAX;
-		left = UINT8_MAX - *ctx->len;
+		wlen = len < RFC3396_BOUNDARY ? len : RFC3396_BOUNDARY;
+		left = RFC3396_BOUNDARY - *ctx->len;
 		if (left < wlen)
 			wlen = left;
 		if (ctx->buflen < wlen) {
@@ -1181,11 +1186,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 				so = vso->so;
 				slen = vso->so_len;
 
-				/* NOTE: Wireshark does not decode this correctly
-				 * when the option overflows the 255 byte boundary
-				 * and another option is created to hold the rest
-				 * of the data.
-				 * Tested against Wireshark-4.4.1 */
 				ul = htonl(vso->en);
 				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
 					goto toobig;
