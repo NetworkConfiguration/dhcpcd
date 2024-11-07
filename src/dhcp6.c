@@ -204,6 +204,11 @@ static int dhcp6_hasprefixdelegation(struct interface *);
 	!((ia)->flags & IPV6_AF_STALE) && \
 	(ia)->prefix_vltime != 0)
 
+
+/* Gets a pointer to the length part of the option to fill it
+ * in later. */
+#define NEXTLEN(p) ((p) + offsetof(struct dhcp6_option, len))
+
 void
 dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -336,6 +341,74 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 
 	return sizeof(o) + len;
 }
+
+#ifndef SMALL
+/* DHCPv6 Option 17 (Vendor-Specific Information Option) */
+static size_t
+dhcp6_makevendoropts(void *data, const struct interface *ifp)
+{
+	uint8_t *p = data, *olenp;
+	const struct if_options *ifo = ifp->options;
+	size_t len = 0, olen;
+	const struct vsio *vsio, *vsio_endp = ifo->vsio6 + ifo->vsio6_len;
+	const struct vsio_so *so, *so_endp;
+	struct dhcp6_option o;
+	uint32_t en;
+	uint16_t opt, slen;
+
+	for (vsio = ifo->vsio6; vsio != vsio_endp; ++vsio) {
+		if (vsio->so_len == 0)
+			continue;
+
+		if (p != NULL) {
+			olenp = NEXTLEN(p);
+			o.code = htons(D6_OPTION_VENDOR_OPTS);
+			o.len = 0;
+			memcpy(p, &o, sizeof(o));
+			p += sizeof(o);
+
+			en = htonl(vsio->en);
+			memcpy(p, &en, sizeof(en));
+			p += sizeof(en);
+		} else
+			olenp = NULL;
+
+		olen = sizeof(en);
+
+		so_endp = vsio->so + vsio->so_len;
+		for (so = vsio->so; so != so_endp; so++) {
+			if (olen + sizeof(opt) + sizeof(slen)
+			    + so->len > UINT16_MAX)
+			{
+				logerrx("%s: option too big", __func__);
+				break;
+			}
+
+			if (p != NULL) {
+				opt = htons(so->opt);
+				memcpy(p, &opt, sizeof(opt));
+				p += sizeof(opt);
+				slen = htons(so->len);
+				memcpy(p, &slen, sizeof(slen));
+				p += sizeof(slen);
+				memcpy(p, so->data, so->len);
+				p += so->len;
+			}
+
+			olen += sizeof(opt) + sizeof(slen) + so->len;
+		}
+
+		if (olenp != NULL) {
+			slen = htons((uint16_t)olen);
+			memcpy(olenp, &slen, sizeof(slen));
+		}
+
+		len += sizeof(o) + olen;
+	}
+
+	return len;
+}
+#endif
 
 static void *
 dhcp6_findoption(void *data, size_t data_len, uint16_t code, uint16_t *len)
@@ -805,6 +878,11 @@ dhcp6_makemessage(struct interface *ifp)
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		len += dhcp6_makevendor(NULL, ifp);
 
+#ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
+		len += dhcp6_makevendoropts(NULL, ifp);
+#endif
+
 	/* IA */
 	m = NULL;
 	ml = 0;
@@ -950,7 +1028,6 @@ dhcp6_makemessage(struct interface *ifp)
 		p += (_len);			\
 	}					\
 } while (0 /* CONSTCOND */)
-#define NEXTLEN (p + offsetof(struct dhcp6_option, len))
 
 	/* Options are listed in numerical order as per RFC 7844 Section 4.1
 	 * XXX: They should be randomised. */
@@ -968,7 +1045,7 @@ dhcp6_makemessage(struct interface *ifp)
 
 	for (l = 0; IA && l < ifo->ia_len; l++) {
 		ifia = &ifo->ia[l];
-		o_lenp = NEXTLEN;
+		o_lenp = NEXTLEN(p);
 		/* TA structure is the same as the others,
 		 * it just lacks the T1 and T2 timers.
 		 * These happen to be at the end of the struct,
@@ -1064,7 +1141,7 @@ dhcp6_makemessage(struct interface *ifp)
 	    state->send->type != DHCP6_DECLINE &&
 	    n_options)
 	{
-		o_lenp = NEXTLEN;
+		o_lenp = NEXTLEN(p);
 		o.len = 0;
 		COPYIN1(D6_OPTION_ORO, 0);
 		for (l = 0, opt = ifp->ctx->dhcp6_opts;
@@ -1125,11 +1202,16 @@ dhcp6_makemessage(struct interface *ifp)
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		p += dhcp6_makevendor(p, ifp);
 
+#ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
+		p += dhcp6_makevendoropts(p, ifp);
+#endif
+
 	if (state->send->type != DHCP6_RELEASE &&
 	    state->send->type != DHCP6_DECLINE)
 	{
 		if (fqdn != FQDN_DISABLE) {
-			o_lenp = NEXTLEN;
+			o_lenp = NEXTLEN(p);
 			COPYIN1(D6_OPTION_FQDN, 0);
 			if (hl == 0)
 				*p = D6_FQDN_NONE;

@@ -61,6 +61,7 @@
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
 #define	MUDURL_MAX_LEN		255
+#define ENTERPRISE_NUMS_MAX_LEN	255
 
 #define DHCPCD_ARP			(1ULL << 0)
 #define DHCPCD_RELEASE			(1ULL << 1)
@@ -191,6 +192,8 @@
 #define O_REQUEST_TIME		O_BASE + 54
 #define O_FALLBACK_TIME		O_BASE + 55
 #define O_IPV4LL_TIME		O_BASE + 56
+#define O_VSIO			O_BASE + 57
+#define O_VSIO6			O_BASE + 58
 
 extern const struct option cf_options[];
 
@@ -221,6 +224,19 @@ struct vivco {
 	size_t len;
 	uint8_t *data;
 };
+
+#ifndef SMALL
+struct vsio_so {
+	uint16_t opt;
+	uint16_t len;
+	void *data;
+};
+struct vsio {
+	uint32_t en;
+	size_t so_len;
+	struct vsio_so *so;
+};
+#endif
 
 struct if_options {
 	time_t mtime;
@@ -292,6 +308,13 @@ struct if_options {
 	size_t vivco_len;
 	struct dhcp_opt *vivso_override;
 	size_t vivso_override_len;
+
+#ifndef SMALL
+	size_t vsio_len;
+	struct vsio *vsio;
+	size_t vsio6_len;
+	struct vsio *vsio6;
+#endif
 
 	struct auth auth;
 };

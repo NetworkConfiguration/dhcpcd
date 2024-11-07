@@ -87,6 +87,8 @@ const struct option cf_options[] = {
 #ifndef SMALL
 	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
 #endif
+	{"vsio",            required_argument, NULL, O_VSIO},
+	{"vsio6",           required_argument, NULL, O_VSIO6},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
@@ -666,7 +668,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct if_ia *ia;
 	uint8_t iaid[4];
 #ifndef SMALL
+	struct in6_addr in6addr;
 	struct if_sla *sla, *slap;
+	struct vsio **vsiop = NULL, *vsio;
+	size_t *vsio_lenp = NULL, opt_max, opt_header;
+	struct vsio_so *vsio_so;
 #endif
 #endif
 
@@ -895,6 +901,139 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		ifo->userclass[0] = (uint8_t)s;
+		break;
+#endif
+
+	case O_VSIO:
+#ifndef SMALL
+		vsiop = &ifo->vsio;
+		vsio_lenp = &ifo->vsio_len;
+		opt_max = UINT8_MAX;
+		opt_header = sizeof(uint8_t) + sizeof(uint8_t);
+#endif
+		/* FALLTHROUGH */
+	case O_VSIO6:
+#ifndef SMALL
+		if (vsiop == NULL) {
+			vsiop = &ifo->vsio6;
+			vsio_lenp = &ifo->vsio6_len;
+			opt_max = UINT16_MAX;
+			opt_header = sizeof(uint16_t) + sizeof(uint16_t);
+		}
+#endif
+		ARG_REQUIRED;
+#ifdef SMALL
+		logwarnx("%s: vendor options not compiled in", ifname);
+		return -1;
+#else
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			logerrx("invalid code: %s", arg);
+			return -1;
+		}
+
+		fp = strskipwhite(fp);
+		p = strchr(fp, ',');
+		if (!p || !p[1]) {
+			logerrx("invalid vendor format: %s", arg);
+			return -1;
+		}
+
+		/* Strip and preserve the comma */
+		*p = '\0';
+		i = (int)strtoi(fp, NULL, 0, 1, (intmax_t)opt_max, &e);
+		*p = ',';
+		if (e) {
+			logerrx("vendor option should be between"
+			    " 1 and %zu inclusive", opt_max);
+			return -1;
+		}
+
+		fp = p + 1;
+
+		if (fp) {
+			if (inet_pton(AF_INET, fp, &addr) == 1) {
+				s = sizeof(addr.s_addr);
+				dl = (size_t)s;
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				memcpy(np, &addr.s_addr, dl);
+			} else if (inet_pton(AF_INET6, fp, &in6addr) == 1) {
+				s = sizeof(in6addr.s6_addr);
+				dl = (size_t)s;
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				memcpy(np, &in6addr.s6_addr, dl);
+			} else {
+				s = parse_string(NULL, 0, fp);
+				if (s == -1) {
+					logerr(__func__);
+					return -1;
+				}
+				dl = (size_t)s;
+				np = malloc(dl);
+				if (np == NULL) {
+					logerr(__func__);
+					return -1;
+				}
+				parse_string(np, dl, fp);
+			}
+		} else {
+			dl = 0;
+			np = NULL;
+		}
+
+		for (sl = 0, vsio = *vsiop; sl < *vsio_lenp; sl++, vsio++) {
+			if (vsio->en == (uint32_t)u)
+				break;
+		}
+		if (sl == *vsio_lenp) {
+			vsio = reallocarray(*vsiop, *vsio_lenp + 1,
+			    sizeof(**vsiop));
+			if (vsio == NULL) {
+				logerr("%s: reallocarray vsio", __func__);
+				free(np);
+				return -1;
+			}
+			*vsiop = vsio;
+			vsio = &(*vsiop)[(*vsio_lenp)++];
+			vsio->en = (uint32_t)u;
+			vsio->so = NULL;
+			vsio->so_len = 0;
+		}
+
+		for (sl = 0, vsio_so = vsio->so;
+		    sl < vsio->so_len;
+		    sl++, vsio_so++)
+			opt_max -= opt_header + vsio_so->len;
+		if (opt_header + dl > opt_max) {
+			logerrx("vsio is too big: %s", fp);
+			free(np);
+			return -1;
+		}
+
+		vsio_so = reallocarray(vsio->so, vsio->so_len + 1,
+		    sizeof(*vsio_so));
+		if (vsio_so == NULL) {
+			logerr("%s: reallocarray vsio_so", __func__);
+			free(np);
+			return -1;
+		}
+
+		vsio->so = vsio_so;
+		vsio_so = &vsio->so[vsio->so_len++];
+		vsio_so->opt = (uint16_t)i;
+		vsio_so->len = (uint16_t)dl;
+		vsio_so->data = np;
 		break;
 #endif
 	case 'v':
@@ -2801,6 +2940,10 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 #ifdef AUTH
 	struct token *token;
 #endif
+#ifndef SMALL
+	struct vsio *vsio;
+	struct vsio_so *vsio_so;
+#endif
 
 	if (ifo == NULL)
 		return;
@@ -2856,6 +2999,30 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	    vo++, ifo->vivco_len--)
 		free(vo->data);
 	free(ifo->vivco);
+#ifndef SMALL
+	for (vsio = ifo->vsio;
+	    ifo->vsio_len > 0;
+	    vsio++, ifo->vsio_len--)
+	{
+		for (vsio_so = vsio->so;
+		    vsio->so_len > 0;
+		    vsio_so++, vsio->so_len--)
+			free(vsio_so->data);
+		free(vsio->so);
+	}
+	free(ifo->vsio);
+	for (vsio = ifo->vsio6;
+	    ifo->vsio6_len > 0;
+	    vsio++, ifo->vsio6_len--)
+	{
+		for (vsio_so = vsio->so;
+		    vsio->so_len > 0;
+		    vsio_so++, vsio->so_len--)
+			free(vsio_so->data);
+		free(vsio->so);
+	}
+	free(ifo->vsio6);
+#endif
 	for (opt = ifo->vivso_override;
 	    ifo->vivso_override_len > 0;
 	    opt++, ifo->vivso_override_len--)

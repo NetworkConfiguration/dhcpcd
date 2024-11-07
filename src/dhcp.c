@@ -723,6 +723,76 @@ dhcp_message_add_addr(struct bootp *bootp,
 	return 0;
 }
 
+#ifndef SMALL
+struct rfc3396_ctx {
+	uint8_t code;
+	uint8_t *len;
+	uint8_t **buf;
+	size_t buflen;
+};
+
+/* Encode data as a DHCP Long Option, RFC 3396. */
+/* NOTE: Wireshark does not decode this correctly
+ * when the option overflows the boundary and another option
+ * is created to hold the resta of the data.
+ * Tested against Wireshark-4.4.1 */
+#define RFC3396_BOUNDARY UINT8_MAX
+static ssize_t
+rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
+{
+	uint8_t *datap = data;
+	size_t wlen, left, r = 0;
+
+	while (len != 0) {
+		if (ctx->len == NULL || *ctx->len == RFC3396_BOUNDARY) {
+			if (ctx->buflen < 2) {
+				errno = ENOMEM;
+				return -1;
+			}
+			*(*ctx->buf)++ = ctx->code;
+			ctx->len = (*ctx->buf)++;
+			*ctx->len = 0;
+			r += 2;
+		}
+
+		wlen = len < RFC3396_BOUNDARY ? len : RFC3396_BOUNDARY;
+		left = RFC3396_BOUNDARY - *ctx->len;
+		if (left < wlen)
+			wlen = left;
+		if (ctx->buflen < wlen) {
+			errno = ENOMEM;
+			return -1;
+		}
+
+		memcpy(*ctx->buf, datap, wlen);
+		datap += wlen;
+		*ctx->buf += wlen;
+		ctx->buflen -= wlen;
+		*ctx->len = (uint8_t)(*ctx->len + wlen);
+		len -= wlen;
+		r += wlen;
+	}
+
+	return (ssize_t)r;
+}
+
+static ssize_t
+rfc3396_write_byte(struct rfc3396_ctx *ctx, uint8_t byte)
+{
+
+	return rfc3396_write(ctx, &byte, sizeof(byte));
+}
+
+static uint8_t *
+rfc3396_zero(struct rfc3396_ctx *ctx) {
+	uint8_t *zerop = *ctx->buf, zero = 0;
+
+	if (rfc3396_write(ctx, &zero, sizeof(zero)) == -1)
+		return NULL;
+	return zerop;
+}
+#endif
+
 static ssize_t
 make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 {
@@ -1094,6 +1164,50 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
 		}
+
+#ifndef SMALL
+		if (ifo->vsio_len &&
+		    !has_option_mask(ifo->nomask, DHO_VIVSO))
+		{
+			struct vsio *vso = ifo->vsio;
+			size_t vlen = ifo->vsio_len;
+			struct vsio_so *so;
+			size_t slen;
+			struct rfc3396_ctx rctx = {
+				.code = DHO_VIVSO,
+				.buf = &p,
+				.buflen = AREA_LEFT,
+			};
+
+			for (; vlen > 0; vso++, vlen--) {
+				if (vso->so_len == 0)
+					continue;
+
+				so = vso->so;
+				slen = vso->so_len;
+
+				ul = htonl(vso->en);
+				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
+					goto toobig;
+				lp = rfc3396_zero(&rctx);
+				if (lp == NULL)
+					goto toobig;
+
+				for (; slen > 0; so++, slen--) {
+					if (rfc3396_write_byte(&rctx,
+					    (uint8_t)so->opt) == -1)
+						goto toobig;
+					if (rfc3396_write_byte(&rctx,
+					    (uint8_t)so->len) == -1)
+						goto toobig;
+					if (rfc3396_write(&rctx,
+					    so->data, so->len) == -1)
+						goto toobig;
+					*lp = (uint8_t)(*lp + so->len + 2);
+				}
+			}
+		}
+#endif
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
