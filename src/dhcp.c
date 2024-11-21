@@ -1159,7 +1159,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 				p += sizeof(ul);
 				datalen = (uint8_t)(sizeof(uint8_t) + vivco->len);
 				memcpy(p, &datalen, sizeof(datalen));
-				p += sizeof(datalen); // OK do tu
+				p += sizeof(datalen);
 				datalenopt = (uint8_t)(vivco->len);
 				memcpy(p, &datalenopt, sizeof(datalenopt));
 				p += sizeof(datalenopt);
