@@ -656,6 +656,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl, odl;
 	struct vivco *vivco;
+	const struct vivco *vivco_endp = ifo->vivco + ifo->vivco_len;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -2119,6 +2120,12 @@ err_sla:
 			logerrx("invalid code: %s", arg);
 			return -1;
 		}
+		for (vivco = ifo->vivco; vivco != vivco_endp; vivco++) {
+			if (vivco->en == (uint32_t)u) {
+				logerrx("only one vendor class option per enterprise number");
+				return -1;
+			}
+		}
 		fp = strskipwhite(fp);
 		if (fp) {
 			s = parse_string(NULL, 0, fp);
@@ -2149,8 +2156,8 @@ err_sla:
 			return -1;
 		}
 		ifo->vivco = vivco;
-		ifo->vivco_en = (uint32_t)u;
 		vivco = &ifo->vivco[ifo->vivco_len++];
+		vivco->en = (uint32_t)u;
 		vivco->len = dl;
 		vivco->data = (uint8_t *)np;
 		break;

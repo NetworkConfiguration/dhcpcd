@@ -61,7 +61,6 @@
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
 #define	MUDURL_MAX_LEN		255
-#define ENTERPRISE_NUMS_MAX_LEN	255
 
 #define DHCPCD_ARP			(1ULL << 0)
 #define DHCPCD_RELEASE			(1ULL << 1)
@@ -221,6 +220,7 @@ struct if_ia {
 };
 
 struct vivco {
+	uint32_t en;
 	size_t len;
 	uint8_t *data;
 };
@@ -303,7 +303,6 @@ struct if_options {
 	size_t nd_override_len;
 	struct dhcp_opt *dhcp6_override;
 	size_t dhcp6_override_len;
-	uint32_t vivco_en;
 	struct vivco *vivco;
 	size_t vivco_len;
 	struct dhcp_opt *vivso_override;

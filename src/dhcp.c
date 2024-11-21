@@ -808,7 +808,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	const struct dhcp_lease *lease = &state->lease;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
-	const struct vivco *vivco;
+	const struct vivco *vivco, *vivco_endp = ifo->vivco + ifo->vivco_len;;
 	int mtu;
 #ifdef AUTH
 	uint8_t *auth, auth_len;
@@ -1142,26 +1142,29 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		{
 			AREA_CHECK(sizeof(ul));
 			*p++ = DHO_VIVCO;
-			lp = p++;
-			*lp = sizeof(ul);
-			ul = htonl(ifo->vivco_en);
-			memcpy(p, &ul, sizeof(ul));
-			p += sizeof(ul);
-			for (i = 0, vivco = ifo->vivco;
-			    i < ifo->vivco_len;
-			    i++, vivco++)
-			{
-				AREA_FIT(vivco->len);
-				if (vivco->len + 2 + *lp > 255) {
-					logerrx("%s: VIVCO option too big",
-					    ifp->name);
-					free(bootp);
-					return -1;
-				}
-				*p++ = (uint8_t)vivco->len;
+			size_t totallen = 0;
+			uint8_t datalen, datalenopt;
+			for (vivco = ifo->vivco; vivco != vivco_endp; vivco++)
+				totallen += sizeof(uint32_t) + 2 * sizeof(uint8_t) + vivco->len;
+			if (totallen > UINT8_MAX) {
+				logerrx("%s: VIVCO option too big",
+					ifp->name);
+				free(bootp);
+				return -1;
+			}
+			*p++ = (uint8_t)totallen;
+			for (vivco = ifo->vivco; vivco != vivco_endp; vivco++) {
+				ul = htonl(vivco->en);
+				memcpy(p, &ul, sizeof(ul));
+				p += sizeof(ul);
+				datalen = (uint8_t)(sizeof(uint8_t) + vivco->len);
+				memcpy(p, &datalen, sizeof(datalen));
+				p += sizeof(datalen); // OK do tu
+				datalenopt = (uint8_t)(vivco->len);
+				memcpy(p, &datalenopt, sizeof(datalenopt));
+				p += sizeof(datalenopt);
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
-				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
 		}
 

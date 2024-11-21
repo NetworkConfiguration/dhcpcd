@@ -280,25 +280,22 @@ static size_t
 dhcp6_makevendor(void *data, const struct interface *ifp)
 {
 	const struct if_options *ifo;
-	size_t len, vlen, i;
+	size_t len = 0, optlen, vlen, i;
 	uint8_t *p;
 	const struct vivco *vivco;
 	struct dhcp6_option o;
 
 	ifo = ifp->options;
-	len = sizeof(uint32_t); /* IANA PEN */
-	if (ifo->vivco_en) {
-		vlen = 0;
+	if (ifo->vivco_len > 0) {
 		for (i = 0, vivco = ifo->vivco;
 		    i < ifo->vivco_len;
 		    i++, vivco++)
-			vlen += sizeof(uint16_t) + vivco->len;
-		len += vlen;
+			len += sizeof(o) + sizeof(uint32_t) + sizeof(uint16_t) + vivco->len;
 	} else if (ifo->vendorclassid[0] != '\0') {
 		/* dhcpcd owns DHCPCD_IANA_PEN.
 		 * If you need your own string, get your own IANA PEN. */
 		vlen = strlen(ifp->ctx->vendor);
-		len += sizeof(uint16_t) + vlen;
+		len += sizeof(o) + sizeof(uint32_t) + sizeof(uint16_t) + vlen;
 	} else
 		return 0;
 
@@ -312,19 +309,19 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 		uint16_t hvlen;
 
 		p = data;
-		o.code = htons(D6_OPTION_VENDOR_CLASS);
-		o.len = htons((uint16_t)len);
-		memcpy(p, &o, sizeof(o));
-		p += sizeof(o);
-		pen = htonl(ifo->vivco_en ? ifo->vivco_en : DHCPCD_IANA_PEN);
-		memcpy(p, &pen, sizeof(pen));
-		p += sizeof(pen);
 
-		if (ifo->vivco_en) {
+		if (ifo->vivco_len > 0) {
 			for (i = 0, vivco = ifo->vivco;
 			    i < ifo->vivco_len;
-			    i++, vivco++)
-			{
+			    i++, vivco++) {
+				optlen = sizeof(uint32_t) + sizeof(uint16_t) + vivco->len;
+				o.code = htons(D6_OPTION_VENDOR_CLASS);
+				o.len = htons((uint16_t)optlen);
+				memcpy(p, &o, sizeof(o));
+				p += sizeof(o);
+				pen = htonl(vivco->en);
+				memcpy(p, &pen, sizeof(pen));
+				p += sizeof(pen);
 				hvlen = htons((uint16_t)vivco->len);
 				memcpy(p, &hvlen, sizeof(hvlen));
 				p += sizeof(hvlen);
@@ -332,14 +329,20 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 				p += vivco->len;
 			}
 		} else if (ifo->vendorclassid[0] != '\0') {
+			o.code = htons(D6_OPTION_VENDOR_CLASS);
+			o.len = htons((uint16_t)len);
+			memcpy(p, &o, sizeof(o));
+			p += sizeof(o);
+			pen = htonl(DHCPCD_IANA_PEN);
+			memcpy(p, &pen, sizeof(pen));
+			p += sizeof(pen);
 			hvlen = htons((uint16_t)vlen);
 			memcpy(p, &hvlen, sizeof(hvlen));
 			p += sizeof(hvlen);
 			memcpy(p, ifp->ctx->vendor, vlen);
 		}
 	}
-
-	return sizeof(o) + len;
+	return len;
 }
 
 #ifndef SMALL
