@@ -2112,6 +2112,10 @@ err_sla:
 		break;
 	case O_VENDCLASS:
 		ARG_REQUIRED;
+#ifdef SMALL
+			logwarnx("%s: vendor options not compiled in", ifname);
+			return -1;
+#else
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
@@ -2122,7 +2126,7 @@ err_sla:
 		}
 		for (vivco = ifo->vivco; vivco != vivco_endp; vivco++) {
 			if (vivco->en == (uint32_t)u) {
-				logerrx("only one vendor class option per enterprise number");
+				logerrx("vendor class option for enterprise number %u already defined", vivco->en);
 				return -1;
 			}
 		}
@@ -2161,6 +2165,7 @@ err_sla:
 		vivco->len = dl;
 		vivco->data = (uint8_t *)np;
 		break;
+#endif
 	case O_AUTHPROTOCOL:
 		ARG_REQUIRED;
 #ifdef AUTH
@@ -3001,12 +3006,12 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	    opt++, ifo->dhcp6_override_len--)
 		free_dhcp_opt_embenc(opt);
 	free(ifo->dhcp6_override);
+#ifndef SMALL
 	for (vo = ifo->vivco;
 	    ifo->vivco_len > 0;
 	    vo++, ifo->vivco_len--)
 		free(vo->data);
 	free(ifo->vivco);
-#ifndef SMALL
 	for (vsio = ifo->vsio;
 	    ifo->vsio_len > 0;
 	    vsio++, ifo->vsio_len--)

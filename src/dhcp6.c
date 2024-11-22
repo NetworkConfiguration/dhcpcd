@@ -276,6 +276,8 @@ dhcp6_makeuser(void *data, const struct interface *ifp)
 	return sizeof(o) + olen;
 }
 
+#ifndef SMALL
+/* DHCPv6 Option 16 (Vendor Class Option) */
 static size_t
 dhcp6_makevendor(void *data, const struct interface *ifp)
 {
@@ -345,7 +347,6 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 	return len;
 }
 
-#ifndef SMALL
 /* DHCPv6 Option 17 (Vendor-Specific Information Option) */
 static size_t
 dhcp6_makevendoropts(void *data, const struct interface *ifp)
@@ -878,10 +879,10 @@ dhcp6_makemessage(struct interface *ifp)
 
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
 		len += dhcp6_makeuser(NULL, ifp);
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		len += dhcp6_makevendor(NULL, ifp);
 
 #ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		len += dhcp6_makevendor(NULL, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
 		len += dhcp6_makevendoropts(NULL, ifp);
 #endif
@@ -1202,10 +1203,10 @@ dhcp6_makemessage(struct interface *ifp)
 
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
 		p += dhcp6_makeuser(p, ifp);
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		p += dhcp6_makevendor(p, ifp);
 
 #ifndef SMALL
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		p += dhcp6_makevendor(p, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
 		p += dhcp6_makevendoropts(p, ifp);
 #endif

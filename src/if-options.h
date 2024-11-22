@@ -219,13 +219,12 @@ struct if_ia {
 #endif
 };
 
+#ifndef SMALL
 struct vivco {
 	uint32_t en;
 	size_t len;
 	uint8_t *data;
 };
-
-#ifndef SMALL
 struct vsio_so {
 	uint16_t opt;
 	uint16_t len;
@@ -303,12 +302,12 @@ struct if_options {
 	size_t nd_override_len;
 	struct dhcp_opt *dhcp6_override;
 	size_t dhcp6_override_len;
-	struct vivco *vivco;
-	size_t vivco_len;
 	struct dhcp_opt *vivso_override;
 	size_t vivso_override_len;
 
 #ifndef SMALL
+	size_t vivco_len;
+	struct vivco *vivco;
 	size_t vsio_len;
 	struct vsio *vsio;
 	size_t vsio6_len;
