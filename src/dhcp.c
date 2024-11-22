@@ -1155,11 +1155,11 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 				lp = rfc3396_zero(&rctx);
 				if (lp == NULL)
 					goto toobig;
-				if (rfc3396_write_byte(&rctx,
-					(uint8_t)vivco->len) == -1)
+				if (rfc3396_write_byte(&rctx, 
+				    (uint8_t)vivco->len) == -1)
 					goto toobig;
-				if (rfc3396_write(&rctx,
-					vivco->data, vivco->len) == -1)
+				if (rfc3396_write(&rctx, 
+				    vivco->data, vivco->len) == -1)
 					goto toobig;
 				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
