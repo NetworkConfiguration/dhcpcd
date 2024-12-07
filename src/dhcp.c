@@ -752,6 +752,7 @@ rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 			*(*ctx->buf)++ = ctx->code;
 			ctx->len = (*ctx->buf)++;
 			*ctx->len = 0;
+			ctx->buflen -= 2;
 			r += 2;
 		}
 
