@@ -409,6 +409,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_recvmsg
 	SECCOMP_ALLOW(__NR_recvmsg),
 #endif
+#ifdef __NR_rt_sigprocmask
+	SECCOMP_ALLOW(__NR_rt_sigprocmask),
+#endif
 #ifdef __NR_rt_sigreturn
 	SECCOMP_ALLOW(__NR_rt_sigreturn),
 #endif
