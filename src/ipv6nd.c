@@ -974,6 +974,12 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	bool new_ia;
 #endif
 
+#define FREE_RAP(rap)					\
+	if (new_rap)					\
+		ipv6nd_removefreedrop_ra(rap, 0, 0);	\
+	else						\
+		ipv6nd_free_ra(rap);			\
+
 	if (ifp == NULL || RS_STATE(ifp) == NULL) {
 #ifdef DEBUG_RS
 		logdebugx("RA for unexpected interface from %s", sfrom);
@@ -1130,8 +1136,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		memcpy(&ndo, p, sizeof(ndo));
 		olen = (size_t)ndo.nd_opt_len * 8;
 		if (olen == 0) {
+			/* RFC4681 4.6 says we MUST discard this ND packet. */
 			logerrx("%s: zero length option", ifp->name);
-			break;
+			FREE_RAP(rap);
+			return;
 		}
 		if (olen > len) {
 			logerrx("%s: option length exceeds message",
@@ -1155,10 +1163,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			else
 				logwarnx("%s: reject RA (option %d) from %s",
 				    ifp->name, ndo.nd_opt_type, rap->sfrom);
-			if (new_rap)
-				ipv6nd_removefreedrop_ra(rap, 0, 0);
-			else
-				ipv6nd_free_ra(rap);
+			FREE_RAP(rap);
 			return;
 		}
 
@@ -1409,10 +1414,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		{
 			logwarnx("%s: reject RA (no option %s) from %s",
 			    ifp->name, dho->var, rap->sfrom);
-			if (new_rap)
-				ipv6nd_removefreedrop_ra(rap, 0, 0);
-			else
-				ipv6nd_free_ra(rap);
+			FREE_RAP(rap);
 			return;
 		}
 	}
@@ -1494,6 +1496,7 @@ nodhcp6:
 
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
+#undef FREE_RAP
 }
 
 bool
