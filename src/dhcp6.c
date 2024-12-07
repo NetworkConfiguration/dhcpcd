@@ -186,7 +186,6 @@ static const char * const dhcp6_statuses[] = {
 };
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
-static void dhcp6_failinform(void *);
 static void dhcp6_startrebind(void *arg);
 static void dhcp6_recvaddr(void *, unsigned short);
 static void dhcp6_startdecline(struct interface *);
@@ -1061,6 +1060,15 @@ dhcp6_makemessage(struct interface *ifp)
 		ia_na.t2 = 0;
 		COPYIN(ifia->ia_type, &ia_na, ia_na_len);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			/* A bit of a corner case, but tested by IPv6 Ready Logo:
+			 * Don't attempt to renew expired leases. This can
+			 * really only happen if the server is poorly configured and
+			 * doesn't allow enough time for lease renewal per the
+			 * T1 and valid lifetime parameters it sent.
+			 */
+			if ((state->state == DH6S_RENEW) &&
+			    (ap->prefix_vltime <= state->renew))
+				continue;
 			if (ap->flags & IPV6_AF_STALE)
 				continue;
 			if (!(ap->flags & IPV6_AF_REQUEST) &&
@@ -1494,7 +1502,7 @@ sent:
 		state->RT = RT * 2;
 		if (state->RT < RT) /* Check overflow */
 			state->RT = RT;
-		if (state->MRC == 0 || state->RTC < state->MRC)
+		if (state->MRC == 0 || state->RTC <= state->MRC)
 			eloop_timeout_add_msec(ctx->eloop,
 			    RT, callback, ifp);
 		else if (state->MRC != 0 && state->MRCcallback)
@@ -1759,7 +1767,6 @@ dhcp6_startdiscover(void *arg)
 	state->IRT = SOL_TIMEOUT;
 	state->MRT = state->sol_max_rt;
 	state->MRC = SOL_MAX_RC;
-
 	/* If we fail to renew or confirm, our requested addreses will
 	 * be marked as stale.
 	 To re-request them, just mark them as not stale. */
@@ -1796,14 +1803,8 @@ dhcp6_startinform(void *arg)
 		logerr("%s: %s", __func__, ifp->name);
 		return;
 	}
-	dhcp6_sendinform(ifp);
-	/* RFC3315 18.1.2 says that if CONFIRM failed then the prior addresses
-	 * SHOULD be used. The wording here is poor, because the addresses are
-	 * merely one facet of the lease as a whole.
-	 * This poor wording might explain the lack of similar text for INFORM
-	 * in 18.1.5 because there are no addresses in the INFORM message. */
-	eloop_timeout_add_sec(ifp->ctx->eloop,
-	    INF_MAX_RD, dhcp6_failinform, ifp);
+	else
+		dhcp6_sendinform(ifp);
 }
 
 static bool
@@ -1889,17 +1890,6 @@ dhcp6_failrequest(void *arg)
 	int llevel = dhcp6_failloglevel(ifp);
 
 	logmessage(llevel, "%s: failed to request DHCPv6 address", ifp->name);
-	dhcp6_fail(ifp, true);
-}
-
-static void
-dhcp6_failinform(void *arg)
-{
-	struct interface *ifp = arg;
-	int llevel = dhcp6_failloglevel(ifp);
-
-	logmessage(llevel, "%s: failed to request DHCPv6 information",
-	    ifp->name);
 	dhcp6_fail(ifp, true);
 }
 
@@ -2186,6 +2176,17 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	free(sbuf);
 	state->lerror = code;
 	errno = 0;
+	if (code == D6_STATUS_USEMULTICAST) {
+		/* RFC 8415 18.2.10
+		 * If the client receives a Reply message with a status code of
+		 * UseMulticast, the client records the receipt of the message and sends
+		 * subsequent messages to the server through the interface on which the
+		 * message was received using multicast.  The client resends the
+		 * original message using multicast.
+		 */
+		logdebugx("%s: server sent UseMulticast", ifp->name);
+		state->unicast = in6addr_any;
+	}
 
 	/* code cannot be D6_STATUS_OK, so there is a failure */
 	if (ifp->ctx->options & DHCPCD_TEST)
@@ -3384,6 +3385,51 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 }
 
 static void
+dhcp6_adjust_max_rt(struct interface *ifp, const char *sfrom,
+    struct dhcp6_message *r, size_t len)
+{
+	struct dhcp6_state *state;
+	uint8_t *o;
+	uint16_t ol;
+
+	state = D6_STATE(ifp);
+	/* RFC8415 */
+	o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
+	if (o && ol == sizeof(uint32_t)) {
+		uint32_t max_rt;
+
+		memcpy(&max_rt, o, sizeof(max_rt));
+		max_rt = ntohl(max_rt);
+		if (max_rt >= 60 && max_rt <= 86400) {
+			logdebugx("%s: SOL_MAX_RT %llu -> %u",
+			    ifp->name,
+			    (unsigned long long)state->sol_max_rt,
+			    max_rt);
+			state->sol_max_rt = max_rt;
+			state->MRT = max_rt;
+		} else
+			logerr("%s: invalid SOL_MAX_RT %u",
+			    ifp->name, max_rt);
+	}
+	o = dhcp6_findmoption(r, len, D6_OPTION_INF_MAX_RT, &ol);
+	if (o && ol == sizeof(uint32_t)) {
+		uint32_t max_rt;
+
+		memcpy(&max_rt, o, sizeof(max_rt));
+		max_rt = ntohl(max_rt);
+		if (max_rt >= 60 && max_rt <= 86400) {
+			logdebugx("%s: INF_MAX_RT %llu -> %u",
+			    ifp->name,
+			    (unsigned long long)state->inf_max_rt,
+			    max_rt);
+			state->inf_max_rt = max_rt;
+		} else
+			logerrx("%s: invalid INF_MAX_RT %u",
+			    ifp->name, max_rt);
+	}
+}
+
+static void
 dhcp6_recvif(struct interface *ifp, const char *sfrom,
     struct dhcp6_message *r, size_t len)
 {
@@ -3501,6 +3547,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			/* Validate lease before setting state to REQUEST. */
 			/* FALLTHROUGH */
 		case DH6S_REQUEST: /* FALLTHROUGH */
+			dhcp6_adjust_max_rt(ifp, sfrom, r, len);
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
 			if (dhcp6_validatelease(ifp, r, len, sfrom, NULL) == -1)
@@ -3509,7 +3556,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				 * If we can't use the lease, fallback to
 				 * DISCOVER and try and get a new one.
 				 *
-				 * This is needed become some servers
+				 * This is needed because some servers
 				 * renumber the prefix or address
 				 * and deny the current one before it expires
 				 * rather than sending it back with a zero
@@ -3521,16 +3568,20 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				 * The currently held lease is still valid
 				 * until a new one is found.
 				 */
-				if (state->state != DH6S_DISCOVER)
-					dhcp6_startdiscoinform(ifp);
-				return;
-			}
-			/* RFC8415 18.2.10.1 */
-			if ((state->state == DH6S_RENEW ||
-			    state->state == DH6S_REBIND) &&
-			    state->has_no_binding)
-			{
-				dhcp6_startrequest(ifp);
+				/* RFC 8415 18.2.10 calls out various behaviors
+				 * for some of the status codes a client might receive:
+				 * UnspecFail, and NotOnLink. Handle those here.
+				 */
+				if ((state->state == DH6S_RENEW ||
+				     state->state == DH6S_REBIND) &&
+				     state->has_no_binding) {
+					dhcp6_startrequest(ifp);
+				}
+				else if (state->state == DH6S_REQUEST &&
+				         state->lerror == D6_STATUS_NOTONLINK) {
+					eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+					dhcp6_startdiscover(ifp);
+				}
 				return;
 			}
 			if (state->state == DH6S_DISCOVER)
@@ -3570,40 +3621,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				return;
 			}
 		}
-
-		/* RFC7083 */
-		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
-		if (o && ol == sizeof(uint32_t)) {
-			uint32_t max_rt;
-
-			memcpy(&max_rt, o, sizeof(max_rt));
-			max_rt = ntohl(max_rt);
-			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebugx("%s: SOL_MAX_RT %llu -> %u",
-				    ifp->name,
-				    (unsigned long long)state->sol_max_rt,
-				    max_rt);
-				state->sol_max_rt = max_rt;
-			} else
-				logerr("%s: invalid SOL_MAX_RT %u",
-				    ifp->name, max_rt);
-		}
-		o = dhcp6_findmoption(r, len, D6_OPTION_INF_MAX_RT, &ol);
-		if (o && ol == sizeof(uint32_t)) {
-			uint32_t max_rt;
-
-			memcpy(&max_rt, o, sizeof(max_rt));
-			max_rt = ntohl(max_rt);
-			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebugx("%s: INF_MAX_RT %llu -> %u",
-				    ifp->name,
-				    (unsigned long long)state->inf_max_rt,
-				    max_rt);
-				state->inf_max_rt = max_rt;
-			} else
-				logerrx("%s: invalid INF_MAX_RT %u",
-				    ifp->name, max_rt);
-		}
+		dhcp6_adjust_max_rt(ifp, sfrom, r, len);
 		if (dhcp6_validatelease(ifp, r, len, sfrom, NULL) == -1)
 			return;
 		break;
@@ -3696,7 +3714,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			    ifp->name, ia->saddr, sfrom, preference);
 
 		/*
-		 * RFC 8415 18.2.1 says we must collect until ADVERTISEMENTs
+		 * RFC 8415 18.2.1 says we must collect ADVERTISEMENTs
 		 * until we get one with a preference of 255 or
 		 * the initial RT has elpased.
 		 */
