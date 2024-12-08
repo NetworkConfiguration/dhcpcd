@@ -656,6 +656,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl, odl;
 	struct vivco *vivco;
+	const struct vivco *vivco_endp = ifo->vivco + ifo->vivco_len;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -2111,6 +2112,10 @@ err_sla:
 		break;
 	case O_VENDCLASS:
 		ARG_REQUIRED;
+#ifdef SMALL
+			logwarnx("%s: vendor options not compiled in", ifname);
+			return -1;
+#else
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
@@ -2118,6 +2123,12 @@ err_sla:
 		if (e) {
 			logerrx("invalid code: %s", arg);
 			return -1;
+		}
+		for (vivco = ifo->vivco; vivco != vivco_endp; vivco++) {
+			if (vivco->en == (uint32_t)u) {
+				logerrx("vendor class option for enterprise number %u already defined", vivco->en);
+				return -1;
+			}
 		}
 		fp = strskipwhite(fp);
 		if (fp) {
@@ -2149,11 +2160,12 @@ err_sla:
 			return -1;
 		}
 		ifo->vivco = vivco;
-		ifo->vivco_en = (uint32_t)u;
 		vivco = &ifo->vivco[ifo->vivco_len++];
+		vivco->en = (uint32_t)u;
 		vivco->len = dl;
 		vivco->data = (uint8_t *)np;
 		break;
+#endif
 	case O_AUTHPROTOCOL:
 		ARG_REQUIRED;
 #ifdef AUTH
@@ -2994,12 +3006,12 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	    opt++, ifo->dhcp6_override_len--)
 		free_dhcp_opt_embenc(opt);
 	free(ifo->dhcp6_override);
+#ifndef SMALL
 	for (vo = ifo->vivco;
 	    ifo->vivco_len > 0;
 	    vo++, ifo->vivco_len--)
 		free(vo->data);
 	free(ifo->vivco);
-#ifndef SMALL
 	for (vsio = ifo->vsio;
 	    ifo->vsio_len > 0;
 	    vsio++, ifo->vsio_len--)

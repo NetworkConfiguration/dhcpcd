@@ -809,7 +809,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	const struct dhcp_lease *lease = &state->lease;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
-	const struct vivco *vivco;
 	int mtu;
 #ifdef AUTH
 	uint8_t *auth, auth_len;
@@ -1138,35 +1137,35 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		       p += ifo->mudurl[0] + 1;
 		}
 
+#ifndef SMALL
 		if (ifo->vivco_len &&
 		    !has_option_mask(ifo->nomask, DHO_VIVCO))
 		{
-			AREA_CHECK(sizeof(ul));
-			*p++ = DHO_VIVCO;
-			lp = p++;
-			*lp = sizeof(ul);
-			ul = htonl(ifo->vivco_en);
-			memcpy(p, &ul, sizeof(ul));
-			p += sizeof(ul);
-			for (i = 0, vivco = ifo->vivco;
-			    i < ifo->vivco_len;
-			    i++, vivco++)
-			{
-				AREA_FIT(vivco->len);
-				if (vivco->len + 2 + *lp > 255) {
-					logerrx("%s: VIVCO option too big",
-					    ifp->name);
-					free(bootp);
-					return -1;
-				}
-				*p++ = (uint8_t)vivco->len;
-				memcpy(p, vivco->data, vivco->len);
-				p += vivco->len;
+			struct vivco *vivco = ifo->vivco;
+			size_t vlen = ifo->vivco_len;
+			struct rfc3396_ctx rctx = {
+				.code = DHO_VIVCO,
+				.buf = &p,
+				.buflen = AREA_LEFT,
+			};
+
+			for (; vlen > 0; vivco++, vlen--) {
+				ul = htonl(vivco->en);
+				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
+					goto toobig;
+				lp = rfc3396_zero(&rctx);
+				if (lp == NULL)
+					goto toobig;
+				if (rfc3396_write_byte(&rctx,
+				    (uint8_t)vivco->len) == -1)
+					goto toobig;
+				if (rfc3396_write(&rctx,
+				    vivco->data, vivco->len) == -1)
+					goto toobig;
 				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
 		}
-
-#ifndef SMALL
+		
 		if (ifo->vsio_len &&
 		    !has_option_mask(ifo->nomask, DHO_VIVSO))
 		{
