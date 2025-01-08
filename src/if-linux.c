@@ -1736,8 +1736,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
 	/* add route lifetime */
-    logdebugx("Sending RTA_EXPIRES %d", rt->rt_expires);
-    add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_expires);
+	logdebugx("Sending RTA_EXPIRES %d", rt->rt_expires);
+	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_expires);
 
 	if (rt->rt_metric != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
