@@ -753,8 +753,13 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			break;
 		}
 		case RTA_EXPIRES:
-			rt->rt_expires = *(uint32_t *)RTA_DATA(rta);
+		{
+			if (rt->rt_expires != 0)
+			{
+				rt->rt_expires = *(uint32_t *)RTA_DATA(rta);
+			}
 			break;
+		}
 		}
 
 		if (sa != NULL) {
