@@ -754,10 +754,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		}
 		case RTA_EXPIRES:
 		{
-			if (rt->rt_expires != 0)
-			{
-				rt->rt_expires = *(uint32_t *)RTA_DATA(rta);
-			}
+			rt->rt_expires = *(uint32_t *)RTA_DATA(rta);
 			break;
 		}
 		}
@@ -1744,7 +1741,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
 	/* add route lifetime */
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_expires);
+	if (rt->rt_expires != 0)
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_expires);
 
 	if (rt->rt_metric != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
