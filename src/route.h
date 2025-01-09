@@ -120,7 +120,7 @@ struct rt {
 #define	RTDF_GATELINK		0x40		/* Gateway is on link */
 	size_t			rt_order;
 	rb_node_t		rt_tree;
-	int			rt_expires;	/* current lifetime of route */
+	uint32_t		rt_expires;	/* current lifetime of route */
 };
 
 extern const rb_tree_ops_t rt_compare_list_ops;
