@@ -2301,13 +2301,14 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	const struct routeinfo *rinfo;
 	const struct ipv6_addr *addr;
 	struct in6_addr netmask;
+
+	if (ctx->ra_routers == NULL)
+		return 0;
+
 	struct timespec now;
 	uint32_t elapsed;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
-
-	if (ctx->ra_routers == NULL)
-		return 0;
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired)
@@ -2329,7 +2330,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
-			elapsed = (uint32_t)eloop_timespec_diff(&now, &rap->acquired, NULL);
+			elapsed = (uint32_t)eloop_timespec_diff(&now, &rinfo->acquired, NULL);
 			rt->rt_expires = rap->lifetime - elapsed;
 
 			rt_proto_add(routes, rt);
@@ -2345,7 +2346,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_PREF
 				rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
-				elapsed = (uint32_t)eloop_timespec_diff(&now, &rap->acquired, NULL);
+				elapsed = (uint32_t)eloop_timespec_diff(&now, &addr->acquired, NULL);
 				rt->rt_expires = rap->lifetime - elapsed;
 
 				rt_proto_add(routes, rt);
