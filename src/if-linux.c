@@ -752,6 +752,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			}
 			break;
 		}
+		case RTA_EXPIRES:
+			rt->rt_expires = *(unsigned int *)RTA_DATA(rta);
+			break;
 		}
 
 		if (sa != NULL) {
