@@ -38,6 +38,7 @@
 
 #include "common.h"
 #include "dhcpcd.h"
+#include "eloop.h"
 #include "if-options.h"
 
 const char *
@@ -216,9 +217,9 @@ is_root_local(void)
 }
 
 uint32_t
-lifetime_left(uint32_t lifetime, const struct timespec *aquired, const struct timespec *now)
+lifetime_left(uint32_t lifetime, const struct timespec *acquired, const struct timespec *now)
 {
-    uint32_t elpased;
+    uint32_t elapsed;
 
     if (lifetime == INFINITE_LIFETIME)
         return lifetime;
