@@ -730,7 +730,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 			else
 				ia->prefix_pltime -= elapsed;
 		}
-		if (ia->prefix_vltime != ND6_INFINITE_) {
+		if (ia->prefix_vltime != ND6_INFINITE_LIFETIME) {
 			if (elapsed > ia->prefix_vltime)
 				ia->prefix_vltime = 0;
 			else
