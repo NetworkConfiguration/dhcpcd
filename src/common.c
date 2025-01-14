@@ -224,7 +224,7 @@ lifetime_left(uint32_t lifetime, const struct timespec *acquired, const struct t
 	if (lifetime == INFINITE_LIFETIME)
 		return lifetime;
 
-	elapsed = (uint32_t)eloop_timespec_diff(now, &acquired, NULL);
+	elapsed = (uint32_t)eloop_timespec_diff(now, acquired, NULL);
 	if (elapsed > lifetime)
 		return 0;
 
