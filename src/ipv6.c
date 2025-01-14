@@ -2301,11 +2301,11 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	const struct routeinfo *rinfo;
 	const struct ipv6_addr *addr;
 	struct in6_addr netmask;
+	struct timespec now;
 
 	if (ctx->ra_routers == NULL)
 		return 0;
 
-	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
