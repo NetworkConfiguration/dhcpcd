@@ -141,6 +141,8 @@
 # endif
 #endif
 
+#define INFINITE_LIFETIME (~0U)
+
 const char *hwaddr_ntoa(const void *, size_t, char *, size_t);
 size_t hwaddr_aton(uint8_t *, const char *);
 ssize_t readfile(const char *, void *, size_t);
@@ -148,4 +150,5 @@ ssize_t writefile(const char *, mode_t, const void *, size_t);
 int filemtime(const char *, time_t *);
 char *get_line(char ** __restrict, ssize_t * __restrict);
 int is_root_local(void);
+uint32_t lifetime_left(uint32_t, const struct timespec *, const struct timespec *);
 #endif
