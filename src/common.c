@@ -217,12 +217,20 @@ is_root_local(void)
 }
 
 uint32_t
-lifetime_left(uint32_t lifetime, const struct timespec *acquired, const struct timespec *now)
+lifetime_left(uint32_t lifetime, const struct timespec *acquired, struct timespec *now)
 {
 	uint32_t elapsed;
+	struct timespec n;
 
 	if (lifetime == INFINITE_LIFETIME)
 		return lifetime;
+
+	if (now == NULL) {
+		timespecclear(&n);
+		now = &n;
+	}
+	if (!timespecisset(now))
+		clock_gettime(CLOCK_MONOTONIC, now);
 
 	elapsed = (uint32_t)eloop_timespec_diff(now, acquired, NULL);
 	if (elapsed > lifetime)
