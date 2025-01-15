@@ -743,14 +743,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 			rtm->rtm_index = (unsigned short)rt->rt_ifp->index;
 /*
  * OpenBSD rejects this for on-link routes when there is no default route
- * FreeBSD-12 kernel apparently panics.
- * I can't replicate the panic, but better safe than sorry!
- *
- * Neither OS currently allows the same IPv6 address on different
+ * OpenBSD does not allow the same IPv6 address on different
  * interfaces on the same network, so let's try to encourage someone to
  * fix that by logging a waring during compile.
  */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#ifdef __OpenBSD__
 #warning kernel does not allow IPv6 address sharing
 			if (!gateway_unspec || rt->rt_dest.sa_family!=AF_INET6)
 #endif
