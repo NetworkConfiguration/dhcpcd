@@ -295,6 +295,8 @@ rt_desc(const char *cmd, const struct rt *rt)
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix, gateway);
+	logdebugx("route flags %d lifetime %d mtu %d",
+		rt->rt_flags, rt->rt_expires, rt->rt_mtu);
 }
 
 void
@@ -540,9 +542,12 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
-			if (ort->rt_mtu == nrt->rt_mtu)
+			/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
+			if (ort->rt_mtu != nrt->rt_mtu) ||
+				(ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
+				change = true;
+			if (!change)
 				return true;
-			change = true;
 			kroute = true;
 		}
 	} else if (ort->rt_dflags & RTDF_FAKE &&
@@ -555,9 +560,11 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    rt_cmp_netmask(ort, nrt) == 0 &&
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
-		/* If it has not been renewed by RA, and MTU is unchanged, skip */
-		if (ort->rt_updated.tv_sec == nrt->rt_updated.tv_sec &&
-			ort->rt_mtu == nrt->rt_mtu)
+		/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
+		if (ort->rt_mtu != nrt->rt_mtu) ||
+			(ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
+			change = true;
+		if (!change)
 			return true;
 		change = true;
 	}
