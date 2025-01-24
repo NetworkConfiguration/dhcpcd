@@ -543,8 +543,8 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
 			/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
-			if (ort->rt_mtu != nrt->rt_mtu) ||
-				(ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
+			if (ort->rt_mtu != nrt->rt_mtu ||
+				ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
 				change = true;
 			if (!change)
 				return true;
@@ -561,8 +561,8 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
 		/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
-		if (ort->rt_mtu != nrt->rt_mtu) ||
-			(ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
+		if (ort->rt_mtu != nrt->rt_mtu ||
+			ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
 			change = true;
 		if (!change)
 			return true;
