@@ -674,7 +674,7 @@ ipv6_getstate(struct interface *ifp)
 }
 
 static int
-ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
+ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 {
 	struct interface *ifp;
 	uint32_t pltime, vltime;
@@ -711,31 +711,11 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		ia->prefix_vltime = ia->prefix_pltime = ND6_INFINITE_LIFETIME;
 	}
 
-	if (timespecisset(&ia->acquired) &&
-	    (ia->prefix_pltime != ND6_INFINITE_LIFETIME ||
-	    ia->prefix_vltime != ND6_INFINITE_LIFETIME))
-	{
-		uint32_t elapsed;
-		struct timespec n;
-
-		if (now == NULL) {
-			clock_gettime(CLOCK_MONOTONIC, &n);
-			now = &n;
-		}
-		elapsed = (uint32_t)eloop_timespec_diff(now, &ia->acquired,
-		    NULL);
-		if (ia->prefix_pltime != ND6_INFINITE_LIFETIME) {
-			if (elapsed > ia->prefix_pltime)
-				ia->prefix_pltime = 0;
-			else
-				ia->prefix_pltime -= elapsed;
-		}
-		if (ia->prefix_vltime != ND6_INFINITE_LIFETIME) {
-			if (elapsed > ia->prefix_vltime)
-				ia->prefix_vltime = 0;
-			else
-				ia->prefix_vltime -= elapsed;
-		}
+	if (timespecisset(&ia->acquired)) {
+		ia->prefix_pltime = lifetime_left(ia->prefix_pltime,
+		    &ia->acquired, now);
+		ia->prefix_vltime = lifetime_left(ia->prefix_vltime,
+		    &ia->acquired, now);
 	}
 
 	loglevel = ia->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG;
@@ -880,7 +860,7 @@ find_unit:
 #endif
 
 int
-ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
+ipv6_addaddr(struct ipv6_addr *ia, struct timespec *now)
 {
 	int r;
 #ifdef ALIAS_ADDR
@@ -975,8 +955,6 @@ ipv6_doaddr(struct ipv6_addr *ia, struct timespec *now)
 	    IN6_IS_ADDR_UNSPECIFIED(&ia->addr))
 		return 0;
 
-	if (!timespecisset(now))
-		clock_gettime(CLOCK_MONOTONIC, now);
 	ipv6_addaddr(ia, now);
 	return ia->flags & IPV6_AF_NEW ? 1 : 0;
 }
@@ -1070,12 +1048,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 					ipv6_deleteaddr(ap);
 				if (!(ap->iface->options->options &
 				    DHCPCD_EXITING) && apf)
-				{
-					if (!timespecisset(&now))
-						clock_gettime(CLOCK_MONOTONIC,
-						    &now);
 					ipv6_addaddr(apf, &now);
-				}
 				if (drop == 2)
 					ipv6_freeaddr(ap);
 			}
@@ -2073,7 +2046,7 @@ valid:
 }
 
 void
-ipv6_addtempaddrs(struct interface *ifp, const struct timespec *now)
+ipv6_addtempaddrs(struct interface *ifp, struct timespec *now)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
@@ -2306,7 +2279,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	if (ctx->ra_routers == NULL)
 		return 0;
 
-	clock_gettime(CLOCK_MONOTONIC, &now);
+	timespecclear(&now);
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired)
@@ -2328,7 +2301,8 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
-			rt->rt_expires = lifetime_left(rinfo->lifetime, &rinfo->acquired, &now);
+			rt->rt_expires = lifetime_left(rinfo->lifetime,
+			    &rinfo->acquired, &now);
 			rt->rt_updated = rinfo->acquired;
 
 			rt_proto_add(routes, rt);
@@ -2344,7 +2318,9 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_PREF
 				rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
-				rt->rt_expires = lifetime_left(addr->prefix_vltime, &addr->acquired, &now);
+				rt->rt_expires =
+				    lifetime_left(addr->prefix_vltime,
+				    &addr->acquired, &now);
 				rt->rt_updated = addr->acquired;
 
 				rt_proto_add(routes, rt);
@@ -2378,7 +2354,8 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_PREF
 		rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
-		rt->rt_expires = lifetime_left(rap->lifetime, &rap->acquired, &now);
+		rt->rt_expires = lifetime_left(rap->lifetime,
+		    &rap->acquired, &now);
 		rt->rt_updated = rap->acquired;
 
 		rt_proto_add(routes, rt);

@@ -1702,7 +1702,6 @@ ipv6nd_expirera(void *arg)
 	struct interface *ifp;
 	struct ra *rap, *ran;
 	struct timespec now;
-	uint32_t elapsed;
 	bool expired, valid;
 	struct ipv6_addr *ia;
 	struct routeinfo *rinfo, *rinfob;
@@ -1714,11 +1713,11 @@ ipv6nd_expirera(void *arg)
 #endif
 	struct nd_opt_dnssl dnssl;
 	struct nd_opt_rdnss rdnss;
-	unsigned int next = 0, ltime;
+	uint32_t next = 0, ltime, elapsed;
 	size_t nexpired = 0;
 
 	ifp = arg;
-	clock_gettime(CLOCK_MONOTONIC, &now);
+	timespecclear(&now);
 	expired = false;
 
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ra_routers, next, ran) {
@@ -1726,10 +1725,10 @@ ipv6nd_expirera(void *arg)
 			continue;
 		valid = false;
 		/* lifetime may be set to infinite by rfc4191 route information */
-		if (rap->lifetime && rap->lifetime != ND6_INFINITE_LIFETIME) {
-			elapsed = (uint32_t)eloop_timespec_diff(&now,
-			    &rap->acquired, NULL);
-			if (elapsed >= rap->lifetime || rap->doexpire) {
+		if (rap->lifetime) {
+			ltime = lifetime_left(rap->lifetime,
+			    &rap->acquired, &now);
+			if (ltime == 0 || rap->doexpire) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1738,7 +1737,6 @@ ipv6nd_expirera(void *arg)
 				}
 			} else {
 				valid = true;
-				ltime = rap->lifetime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
 			}
@@ -1750,15 +1748,9 @@ ipv6nd_expirera(void *arg)
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
 			if (ia->prefix_vltime == 0)
 				continue;
-			if (ia->prefix_vltime == ND6_INFINITE_LIFETIME &&
-			    !rap->doexpire)
-			{
-				valid = true;
-				continue;
-			}
-			elapsed = (uint32_t)eloop_timespec_diff(&now,
-			    &ia->acquired, NULL);
-			if (elapsed >= ia->prefix_vltime || rap->doexpire) {
+			ltime = lifetime_left(ia->prefix_vltime,
+			    &ia->acquired, &now);
+			if (ltime == 0 || rap->doexpire) {
 				if (ia->flags & IPV6_AF_ADDED) {
 					logwarnx("%s: expired %s %s",
 					    ia->iface->name,
@@ -1776,7 +1768,6 @@ ipv6nd_expirera(void *arg)
 				expired = true;
 			} else {
 				valid = true;
-				ltime = ia->prefix_vltime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
 			}
@@ -1784,12 +1775,9 @@ ipv6nd_expirera(void *arg)
 
 		/* Expire route information */
 		TAILQ_FOREACH_SAFE(rinfo, &rap->rinfos, next, rinfob) {
-			if (rinfo->lifetime == ND6_INFINITE_LIFETIME &&
-			    !rap->doexpire)
-				continue;
-			elapsed = (uint32_t)eloop_timespec_diff(&now,
-			    &rinfo->acquired, NULL);
-			if (elapsed >= rinfo->lifetime || rap->doexpire) {
+			ltime = lifetime_left(rinfo->lifetime,
+			    &rinfo->acquired, &now);
+			if (ltime == 0 || rap->doexpire) {
 				logwarnx("%s: expired route %s",
 				    rap->iface->name, rinfo->sprefix);
 				TAILQ_REMOVE(&rap->rinfos, rinfo, next);

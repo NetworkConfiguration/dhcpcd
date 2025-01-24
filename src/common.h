@@ -150,5 +150,5 @@ ssize_t writefile(const char *, mode_t, const void *, size_t);
 int filemtime(const char *, time_t *);
 char *get_line(char ** __restrict, ssize_t * __restrict);
 int is_root_local(void);
-uint32_t lifetime_left(uint32_t, const struct timespec *, const struct timespec *);
+uint32_t lifetime_left(uint32_t, const struct timespec *, struct timespec *);
 #endif
