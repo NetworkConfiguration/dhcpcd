@@ -566,7 +566,6 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 			change = true;
 		if (!change)
 			return true;
-		change = true;
 	}
 
 #ifdef RTF_CLONING
