@@ -556,7 +556,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
 		/* If it has not been renewed by RA, and MTU is unchanged, skip */
-		if (ort->rt_updated == nrt->rt_updated &&
+		if (ort->rt_updated.tv_sec == nrt->rt_updated.tv_sec &&
 			ort->rt_mtu == nrt->rt_mtu)
 			return true;
 		change = true;
@@ -681,7 +681,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
 		    or->rt_mtu != rt->rt_mtu ||
-			or->rt_updated != rt->rt_updated)
+			or->rt_updated.tv_sec != rt->rt_updated.tv_sec)
 		{
 			if (!rt_add(kroutes, rt, or))
 				return false;
