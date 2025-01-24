@@ -121,6 +121,7 @@ struct rt {
 	size_t			rt_order;
 	rb_node_t		rt_tree;
 	uint32_t		rt_expires;	/* current lifetime of route */
+	struct timespec	rt_updated; /* time route was last updated */
 };
 
 extern const rb_tree_ops_t rt_compare_list_ops;

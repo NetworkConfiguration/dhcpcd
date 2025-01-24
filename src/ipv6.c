@@ -2329,6 +2329,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
 			rt->rt_expires = lifetime_left(rinfo->lifetime, &rinfo->acquired, &now);
+			rt->rt_updated = rinfo->acquired;
 
 			rt_proto_add(routes, rt);
 		}
@@ -2344,6 +2345,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 				rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
 				rt->rt_expires = lifetime_left(addr->prefix_vltime, &addr->acquired, &now);
+				rt->rt_updated = addr->acquired;
 
 				rt_proto_add(routes, rt);
 			}
@@ -2377,6 +2379,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
 		rt->rt_expires = lifetime_left(rap->lifetime, &rap->acquired, &now);
+		rt->rt_updated = rap->acquired;
 
 		rt_proto_add(routes, rt);
 	}
