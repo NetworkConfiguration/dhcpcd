@@ -57,7 +57,9 @@
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #endif
 #define VENDORCLASSID_MAX_LEN	255
-#define CLIENTID_MAX_LEN	48
+/* Can't use the entire 255B allowed by the length field, since
+ * the first byte is the type of clientid */
+#define CLIENTID_MAX_LEN	254
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
 #define	MUDURL_MAX_LEN		255
