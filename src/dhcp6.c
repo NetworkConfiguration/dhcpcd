@@ -1780,9 +1780,11 @@ dhcp6_startinform(void *arg)
 	struct interface *ifp;
 	struct dhcp6_state *state;
 	int llevel;
+	struct if_options *ifo;
 
 	ifp = arg;
 	state = D6_STATE(ifp);
+	ifo = ifp->options;
 	llevel = state->failed ? LOG_DEBUG : LOG_INFO;
 	logmessage(llevel, "%s: requesting DHCPv6 information", ifp->name);
 	state->state = DH6S_INFORM;
@@ -1791,6 +1793,9 @@ dhcp6_startinform(void *arg)
 	state->IRT = INF_TIMEOUT;
 	state->MRT = state->inf_max_rt;
 	state->MRC = 0;
+
+	/* Ensure we always request INFO_REFRESH_TIME as per rfc8415 */
+	add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 
 	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
@@ -4055,10 +4060,9 @@ dhcp6_start1(void *arg)
 		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
 #endif
 
-	if (state->state == DH6S_INFORM) {
-		add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+	if (state->state == DH6S_INFORM)
 		dhcp6_startinform(ifp);
-	} else {
+	else {
 		del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 		dhcp6_startinit(ifp);
 	}
