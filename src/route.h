@@ -59,6 +59,11 @@
 #  define HAVE_ROUTE_METRIC 1
 # endif
 #endif
+#ifndef HAVE_ROUTE_LIFETIME
+# if defined(__linux__)
+#  define HAVE_ROUTE_LIFETIME 1
+# endif
+#endif
 
 #ifdef __linux__
 # include <linux/version.h> /* RTA_PREF is only an enum.... */
@@ -120,8 +125,9 @@ struct rt {
 #define	RTDF_GATELINK		0x40		/* Gateway is on link */
 	size_t			rt_order;
 	rb_node_t		rt_tree;
+#ifdef HAVE_ROUTE_LIFETIME
 	uint32_t		rt_expires;	/* current lifetime of route */
-	struct timespec	rt_updated; /* time route was last updated */
+#endif
 };
 
 extern const rb_tree_ops_t rt_compare_list_ops;

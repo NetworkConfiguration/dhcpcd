@@ -295,8 +295,6 @@ rt_desc(const char *cmd, const struct rt *rt)
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix, gateway);
-	logdebugx("route flags %d lifetime %d mtu %d",
-		rt->rt_flags, rt->rt_expires, rt->rt_mtu);
 }
 
 void
@@ -504,6 +502,24 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 #endif
 }
 
+/* Compare route details */
+static bool
+rt_changed(struct rt *nrt, struct rt *ort)
+{
+	/* MTU changed */
+	if (ort->rt_mtu != nrt->rt_mtu)
+		return true;
+
+#ifdef HAVE_ROUTE_LIFETIME
+	/* If the expired target time is different, we have updated our expired time
+	 * from a new RA and should pass that value on to the system */
+	if (abs(nrt->rt_expires - nrt->rt_expires) > 30)
+		return true;
+#endif
+
+	return false;
+}
+
 static bool
 rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 {
@@ -542,10 +558,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
-			/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
-			if (ort->rt_mtu != nrt->rt_mtu ||
-				ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
-				change = true;
+			change = rt_changed();
 			if (!change)
 				return true;
 			kroute = true;
@@ -560,10 +573,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    rt_cmp_netmask(ort, nrt) == 0 &&
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
-		/* If expiry has not been renewed by RA, and MTU is unchanged, skip */
-		if (ort->rt_mtu != nrt->rt_mtu ||
-			ort->rt_updated.tv_sec != nrt->rt_updated.tv_sec)
-			change = true;
+		change = rt_changed();
 		if (!change)
 			return true;
 	}
@@ -686,8 +696,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    !rt_cmp(rt, or) ||
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
-		    or->rt_mtu != rt->rt_mtu ||
-			or->rt_updated.tv_sec != rt->rt_updated.tv_sec)
+		    rt_changed())
 		{
 			if (!rt_add(kroutes, rt, or))
 				return false;

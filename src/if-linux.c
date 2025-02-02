@@ -1743,7 +1743,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 	/* add route lifetime */
 	if (rt->rt_expires != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_expires);
-
 	if (rt->rt_metric != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
 		    rt->rt_metric);
