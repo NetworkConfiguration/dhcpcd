@@ -126,7 +126,7 @@ struct rt {
 	size_t			rt_order;
 	rb_node_t		rt_tree;
 #ifdef HAVE_ROUTE_LIFETIME
-	uint32_t		rt_expires;	/* current lifetime of route */
+	uint32_t		rt_lifetime;	/* current lifetime of route */
 #endif
 };
 
