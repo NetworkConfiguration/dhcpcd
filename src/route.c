@@ -513,7 +513,7 @@ rt_changed(struct rt *nrt, struct rt *ort)
 #ifdef HAVE_ROUTE_LIFETIME
 	/* If the expired target time is different, we have updated our expired time
 	 * from a new RA and should pass that value on to the system */
-	if (abs(nrt->rt_expires - nrt->rt_expires) > 30)
+	if (abs((int64_t)nrt->rt_expires - (int64_t)ort->rt_expires) > 30)
 		return true;
 #endif
 
@@ -558,7 +558,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
-			change = rt_changed();
+			change = rt_changed(nrt, ort);
 			if (!change)
 				return true;
 			kroute = true;
@@ -573,7 +573,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    rt_cmp_netmask(ort, nrt) == 0 &&
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
-		change = rt_changed();
+		change = rt_changed(nrt, ort);
 		if (!change)
 			return true;
 	}
@@ -696,7 +696,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    !rt_cmp(rt, or) ||
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
-		    rt_changed())
+		    rt_changed(rt, or))
 		{
 			if (!rt_add(kroutes, rt, or))
 				return false;
