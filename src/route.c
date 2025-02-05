@@ -502,22 +502,30 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 #endif
 }
 
-/* Compare route details */
+/* Compare miscellaneous route details */
 static bool
-rt_changed(struct rt *nrt, struct rt *ort)
+rt_cmp_misc(struct rt *nrt, struct rt *ort)
 {
 	/* MTU changed */
 	if (ort->rt_mtu != nrt->rt_mtu)
-		return true;
+		return false;
 
 #ifdef HAVE_ROUTE_LIFETIME
-	/* If the expired target time is different, we have updated our expired time
-	 * from a new RA and should pass that value on to the system */
-	if (abs((int64_t)nrt->rt_expires - (int64_t)ort->rt_expires) > 30)
-		return true;
+	uint32_t deviation;
+
+	/* There might be a minor difference between kernel route
+	 * lifetime and our lifetime due to processing times.
+	 * We allow a small deviation to avoid needless route changes.
+	 * dhcpcd will expire the route regardless of route lifetime support. */
+	if (nrt->rt_lifetime > ort->rt_lifetime)
+		deviation = nrt->rt_lifetime - ort->rt_lifetime;
+	else
+		deviation = ort->rt_lifetime - nrt->rt_lifetime;
+	if (deviation > RTLIFETIME_DEV_MAX)
+		return false;
 #endif
 
-	return false;
+	return true;
 }
 
 static bool
@@ -558,9 +566,9 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
-			change = rt_changed(nrt, ort);
-			if (!change)
+			if (rt_cmp_misc(nrt, ort))
 				return true;
+			change = true;
 			kroute = true;
 		}
 	} else if (ort->rt_dflags & RTDF_FAKE &&
@@ -573,9 +581,9 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    rt_cmp_netmask(ort, nrt) == 0 &&
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
-		change = rt_changed(nrt, ort);
-		if (!change)
+		if (rt_cmp_misc(nrt, ort))
 			return true;
+		change = true;
 	}
 
 #ifdef RTF_CLONING
@@ -696,7 +704,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    !rt_cmp(rt, or) ||
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
-		    rt_changed(rt, or))
+		    !rt_cmp_misc(rt, or))
 		{
 			if (!rt_add(kroutes, rt, or))
 				return false;

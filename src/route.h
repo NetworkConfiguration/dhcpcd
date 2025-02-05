@@ -61,7 +61,7 @@
 #endif
 #ifndef HAVE_ROUTE_LIFETIME
 # if defined(__linux__)
-#  define HAVE_ROUTE_LIFETIME 1
+#  define HAVE_ROUTE_LIFETIME 1 /* For IPv6 routes only */
 # endif
 #endif
 
@@ -127,6 +127,7 @@ struct rt {
 	rb_node_t		rt_tree;
 #ifdef HAVE_ROUTE_LIFETIME
 	uint32_t		rt_lifetime;	/* current lifetime of route */
+#define	RTLIFETIME_DEV_MAX	2 		/* max deviation for cmp */
 #endif
 };
 

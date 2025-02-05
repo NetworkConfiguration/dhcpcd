@@ -752,11 +752,34 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			}
 			break;
 		}
-		case RTA_EXPIRES:
+#ifdef HAVE_ROUTE_LIFETIME
+		case RTA_CACHEINFO:
 		{
-			rt->rt_lifetime = *(uint32_t *)RTA_DATA(rta);
+			struct rta_cacheinfo ci;
+			static long hz;
+
+			if (hz == 0) {
+				hz = sysconf(_SC_CLK_TCK);
+				if (hz == -1)
+					hz = CLOCKS_PER_SEC;
+			}
+
+			memcpy(&ci, RTA_DATA(rta), sizeof(ci));
+			rt->rt_lifetime = (uint32_t)(ci.rta_expires / hz);
 			break;
 		}
+#endif
+#if 0
+		case RTA_EXPIRES:
+			/* Reading the kernel source, this is only
+			 * emitted by IPv4 multicast routes as a UINT64.
+			 * Although we can set it for IPv6 routes as a UINT32,
+			 * the kernel will massage the value to HZ and put it
+			 * into RTA_CACHINFO as read above.
+			 * Gotta love that consistency! */
+			rt->rt_lifetime = (uint32_t)*(uint64_t *)RTA_DATA(rta);
+			break;
+#endif
 		}
 
 		if (sa != NULL) {
@@ -1740,8 +1763,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (!sa_is_loopback(&rt->rt_gateway))
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
+#ifdef HAVE_ROUTE_LIFETIME
 	if (rt->rt_lifetime != 0)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, rt->rt_lifetime);
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES,rt->rt_lifetime);
+#endif
+
 	if (rt->rt_metric != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
 		    rt->rt_metric);
