@@ -2852,6 +2852,7 @@ void
 dhcp_drop(struct interface *ifp, const char *reason)
 {
 	struct dhcp_state *state = D_STATE(ifp);
+	struct if_options *ifo = ifp->options;
 
 	/* dhcp_start may just have been called and we don't yet have a state
 	 * but we do have a timeout, so punt it. */
@@ -2868,9 +2869,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->arping_index = -1;
 #endif
 
-	if (ifp->options->options & DHCPCD_RELEASE &&
-	    !(ifp->options->options & DHCPCD_INFORM))
-	{
+	if (ifo->options & DHCPCD_RELEASE && !(ifo->options & DHCPCD_INFORM)) {
 		/* Failure to send the release may cause this function to
 		 * re-enter so guard by setting the state. */
 		if (state->state == DHS_RELEASE)
@@ -2916,7 +2915,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->new = NULL;
 	state->new_len = 0;
 	state->reason = reason;
-	if (ifp->options->options & DHCPCD_CONFIGURE)
+	if (ifo->options & DHCPCD_CONFIGURE)
 		ipv4_applyaddr(ifp);
 	else {
 		state->addr = NULL;
@@ -2927,8 +2926,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->old = NULL;
 	state->old_len = 0;
 	state->lease.addr.s_addr = 0;
-	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
-	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
+	ifo->options &= ~(DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 
 	/* Close DHCP ports so a changed interface family is picked
 	 * up by a new BPF state. */
