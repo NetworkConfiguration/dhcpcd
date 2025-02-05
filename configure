@@ -437,6 +437,7 @@ int main(void) {
 EOF
 		if $CC -fsanitize=address _test.c -o _test 2>&3; then
 			echo "yes"
+			echo "CPPFLAGS+=	-DASAN" >>$CONFIG_MK
 			echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
 			echo "CFLAGS+=	-fno-omit-frame-pointer" >>$CONFIG_MK
 			echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK

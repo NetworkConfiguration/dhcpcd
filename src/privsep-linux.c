@@ -444,10 +444,6 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_shutdown
 	SECCOMP_ALLOW(__NR_shutdown),
 #endif
-#ifdef __NR_sigaltstack
-	/* Allows a clean exit when compiled for address sanitization. */
-	SECCOMP_ALLOW(__NR_sigaltstack),
-#endif
 #ifdef __NR_statx
 	SECCOMP_ALLOW(__NR_statx),
 #endif
@@ -468,6 +464,30 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_uname
 	SECCOMP_ALLOW(__NR_uname),
+#endif
+
+/* These are for compiling with address sanitization */
+#ifdef ASAN
+#ifdef __NR_futex
+	SECCOMP_ALLOW(__NR_futex),
+#endif
+#ifdef __NR_openat
+	SECCOMP_ALLOW(__NR_openat),
+#endif
+#ifdef __NR_readlink
+	SECCOMP_ALLOW(__NR_readlink),
+#endif
+#ifdef __NR_sigaltstack
+	SECCOMP_ALLOW(__NR_sigaltstack),
+#endif
+
+/* coredumps */
+#ifdef __NR_gettid
+	SECCOMP_ALLOW(__NR_gettid),
+#endif
+#ifdef __NR_tgkill
+	SECCOMP_ALLOW(__NR_tgkill),
+#endif
 #endif
 
 	/* Deny everything else */

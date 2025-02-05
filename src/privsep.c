@@ -129,10 +129,16 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	   STDOUT_FILENO : STDERR_FILENO;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
+#ifdef ASAN
+		logwarnx("not chrooting as compiled for ASAN");
+#else
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
+
 	if (chroot(pw->pw_dir) == -1 &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED))
 		logerr("%s: chroot: %s", __func__, pw->pw_dir);
+#endif
+
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
