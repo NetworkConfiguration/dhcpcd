@@ -56,13 +56,7 @@
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #endif
-#define VENDORCLASSID_MAX_LEN	255
-/* Can't use the entire 255B allowed by the length field, since
- * the first byte is the type of clientid */
-#define CLIENTID_MAX_LEN	254
-#define USERCLASS_MAX_LEN	255
-#define VENDOR_MAX_LEN		255
-#define	MUDURL_MAX_LEN		255
+#define	DHCP_OPTION_MAX_LEN	255
 
 #define DHCPCD_ARP			(1ULL << 0)
 #define DHCPCD_RELEASE			(1ULL << 1)
@@ -276,13 +270,14 @@ struct if_options {
 
 	char **environ;
 
-	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
+	char hostname[HOSTNAME_MAX_LEN + 1]; /* NUL terminated */
 	uint8_t fqdn;
-	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
-	uint8_t clientid[CLIENTID_MAX_LEN + 2];
-	uint8_t userclass[USERCLASS_MAX_LEN + 2];
-	uint8_t vendor[VENDOR_MAX_LEN + 2];
-	uint8_t mudurl[MUDURL_MAX_LEN + 2];
+	/* The first byte is the option length */
+	uint8_t vendorclassid[DHCP_OPTION_MAX_LEN + 1];
+	uint8_t clientid[DHCP_OPTION_MAX_LEN + 1];
+	uint8_t userclass[DHCP_OPTION_MAX_LEN + 1];
+	uint8_t vendor[DHCP_OPTION_MAX_LEN + 1];
+	uint8_t mudurl[DHCP_OPTION_MAX_LEN + 1];
 
 	size_t blacklist_len;
 	in_addr_t *blacklist;
