@@ -444,6 +444,10 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_shutdown
 	SECCOMP_ALLOW(__NR_shutdown),
 #endif
+#ifdef __NR_sigaltstack
+	/* Allows a clean exit when compiled for address sanitization. */
+	SECCOMP_ALLOW(__NR_sigaltstack),
+#endif
 #ifdef __NR_statx
 	SECCOMP_ALLOW(__NR_statx),
 #endif
