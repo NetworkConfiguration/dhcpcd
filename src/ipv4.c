@@ -524,6 +524,7 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
 
+	assert(addr != NULL);
 	logdebugx("%s: deleting IP address %s",
 	    addr->iface->name, addr->saddr);
 
@@ -760,7 +761,9 @@ ipv4_applyaddr(void *arg)
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
 			if (state->added) {
-				ipv4_deladdr(state->addr, 0);
+				/* Someone might have deleted our address */
+				if (state->addr != NULL)
+					ipv4_deladdr(state->addr, 0);
 				rt_build(ifp->ctx, AF_INET);
 			}
 			script_runreason(ifp, state->reason);
