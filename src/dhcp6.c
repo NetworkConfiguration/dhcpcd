@@ -1738,16 +1738,22 @@ static void
 dhcp6_startdiscover(void *arg)
 {
 	struct interface *ifp;
+	struct if_options *ifo;
 	struct dhcp6_state *state;
 	int llevel;
 	struct ipv6_addr *ia;
 
 	ifp = arg;
 	state = D6_STATE(ifp);
+	ifo = ifp->options;
 #ifndef SMALL
 	if (state->reason == NULL || strcmp(state->reason, "TIMEOUT6") != 0)
 		dhcp6_delete_delegates(ifp);
 #endif
+	/* Ensure we never request INFO_REFRESH_TIME,
+ 	 * this only belongs in Information-Request messages */
+	del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+
 	if (state->new == NULL && !state->failed)
 		llevel = LOG_INFO;
 	else
@@ -2826,10 +2832,6 @@ dhcp6_startinit(struct interface *ifp)
 	state->state = DH6S_INIT;
 	state->expire = ND6_INFINITE_LIFETIME;
 	state->lowpl = ND6_INFINITE_LIFETIME;
-
-	/* Ensure we never request INFO_REFRESH_TIME,
- 	 * this only belongs in Information-Request messages */
-	del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 
 	dhcp6_addrequestedaddrs(ifp);
 	has_ta = has_non_ta = 0;
