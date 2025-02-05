@@ -2816,19 +2816,25 @@ static void
 dhcp6_startinit(struct interface *ifp)
 {
 	struct dhcp6_state *state;
+	struct if_options *ifo;
 	ssize_t r;
 	uint8_t has_ta, has_non_ta;
 	size_t i;
 
 	state = D6_STATE(ifp);
+	ifo = ifp->options;
 	state->state = DH6S_INIT;
 	state->expire = ND6_INFINITE_LIFETIME;
 	state->lowpl = ND6_INFINITE_LIFETIME;
 
+	/* Ensure we never request INFO_REFRESH_TIME,
+ 	 * this only belongs in Information-Request messages */
+	del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+
 	dhcp6_addrequestedaddrs(ifp);
 	has_ta = has_non_ta = 0;
-	for (i = 0; i < ifp->options->ia_len; i++) {
-		switch (ifp->options->ia[i].ia_type) {
+	for (i = 0; i < ifo->ia_len; i++) {
+		switch (ifo->ia[i].ia_type) {
 		case D6_OPTION_IA_TA:
 			has_ta = 1;
 			break;
@@ -2839,14 +2845,14 @@ dhcp6_startinit(struct interface *ifp)
 
 	if (!(ifp->ctx->options & DHCPCD_TEST) &&
 	    !(has_ta && !has_non_ta) &&
-	    ifp->options->reboot != 0)
+	    ifo->reboot != 0)
 	{
 		r = dhcp6_readlease(ifp, 1);
 		if (r == -1) {
 			if (errno != ENOENT && errno != ESRCH)
 				logerr("%s: %s", __func__, state->leasefile);
 		} else if (r != 0 &&
-		    !(ifp->options->options & DHCPCD_ANONYMOUS))
+		    !(ifo->options & DHCPCD_ANONYMOUS))
 		{
 			/* RFC 3633 section 12.1 */
 #ifndef SMALL
@@ -4062,10 +4068,8 @@ dhcp6_start1(void *arg)
 
 	if (state->state == DH6S_INFORM)
 		dhcp6_startinform(ifp);
-	else {
-		del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+	else
 		dhcp6_startinit(ifp);
-	}
 
 #ifndef SMALL
 	dhcp6_activateinterfaces(ifp);
