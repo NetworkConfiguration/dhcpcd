@@ -2833,7 +2833,6 @@ dhcp6_startinit(struct interface *ifp)
 
 	state = D6_STATE(ifp);
 	ifo = ifp->options;
-	state->state = DH6S_INIT;
 	state->expire = ND6_INFINITE_LIFETIME;
 	state->lowpl = ND6_INFINITE_LIFETIME;
 
@@ -2862,7 +2861,8 @@ dhcp6_startinit(struct interface *ifp)
 		{
 			/* RFC 3633 section 12.1 */
 #ifndef SMALL
-			if (dhcp6_hasprefixdelegation(ifp))
+			if (state->state == DH6S_MANUALREBIND ||
+			    dhcp6_hasprefixdelegation(ifp))
 				dhcp6_startrebind(ifp);
 			else
 #endif
@@ -4124,7 +4124,10 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			 * Now that we don't remove delegated addresses when
 			 * reading the lease file this is the safe path.
 			 */
-			init_state = DH6S_INIT;
+			if (state->state == DH6S_MANUALREBIND)
+				init_state = DH6S_MANUALREBIND;
+			else
+				init_state = DH6S_INIT;
 			goto gogogo;
 		default:
 			/* Not possible, but sushes some compiler warnings. */
@@ -4158,8 +4161,8 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	TAILQ_INIT(&state->addrs);
 
 gogogo:
-	state->new_start = true;
 	state->state = init_state;
+	state->new_start = true;
 	state->lerror = 0;
 	state->failed = false;
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
@@ -4183,15 +4186,17 @@ dhcp6_reboot(struct interface *ifp)
 	if (state == NULL)
 		return;
 
-	state->lerror = 0;
 	switch (state->state) {
-	case DH6S_BOUND:
-		dhcp6_startrebind(ifp);
+	case DH6S_RENEW: /* FALLTHROUGH */
+	case DH6S_BOUND: /* FALLTHROUGH */
+	case DH6S_REBIND:
+		state->state = DH6S_MANUALREBIND;
 		break;
-	default:
-		dhcp6_startdiscoinform(ifp);
+	default: /* Appease compilers */
 		break;
 	}
+
+	/* Do nothing. On confirming the next lease we will REBIND instead. */
 }
 
 static void

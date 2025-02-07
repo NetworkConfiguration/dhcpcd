@@ -173,6 +173,7 @@ enum DH6S {
 	DH6S_DELEGATED,
 	DH6S_RELEASE,
 	DH6S_RELEASED,
+	DH6S_MANUALREBIND,
 };
 
 struct dhcp6_state {
