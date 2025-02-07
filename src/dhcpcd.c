@@ -723,6 +723,9 @@ dhcpcd_nocarrier_roaming(struct interface *ifp)
 #ifdef INET
 	dhcp_abort(ifp);
 #endif
+#ifdef INET6
+	ipv6nd_abort(ifp);
+#endif
 #ifdef DHCP6
 	dhcp6_abort(ifp);
 #endif

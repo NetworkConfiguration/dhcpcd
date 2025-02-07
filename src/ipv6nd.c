@@ -2053,6 +2053,15 @@ ipv6nd_startrs(struct interface *ifp)
 		ipv6nd_startrs1(ifp);
 }
 
+void
+ipv6nd_abort(struct interface *ifp)
+{
+
+	eloop_timeout_delete(ifp->ctx->eloop, ipv6nd_startrs1, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, ipv6nd_startrs2, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, ipv6nd_sendrsprobe, ifp);
+}
+
 static struct routeinfo *routeinfo_findalloc(struct ra *rap, const struct in6_addr *prefix, uint8_t prefix_len)
 {
 	struct routeinfo *ri;
