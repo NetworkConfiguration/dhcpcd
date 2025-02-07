@@ -162,7 +162,6 @@ int if_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
 #else
 #define	pioctl(ctx, req, data, len) ioctl((ctx)->pf_inet_fd, (req),(data),(len))
 #endif
-int if_getflags(struct interface *);
 int if_setflag(struct interface *, short, short);
 #define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING), 0)
 #define if_down(ifp) if_setflag((ifp), 0, IFF_UP);

@@ -205,9 +205,6 @@ if_carrier(struct interface *ifp, __unused const void *ifadata)
 	kstat_named_t		*knp;
 	link_state_t		linkstate;
 
-	if (if_getflags(ifp) == -1)
-		return LINK_UNKNOWN;
-
 	kcp = kstat_open();
 	if (kcp == NULL)
 		goto err;
@@ -226,7 +223,7 @@ if_carrier(struct interface *ifp, __unused const void *ifadata)
 
 	switch (linkstate) {
 	case LINK_STATE_UP:
-		ifp->flags |= IFF_UP;
+		ifp->flags |= IFF_UP; /* XXX Why? */
 		return LINK_UP;
 	case LINK_STATE_DOWN:
 		return LINK_DOWN;

@@ -1352,8 +1352,18 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 
 	/* All BSD's set IFF_UP on the interface when adding an address.
 	 * But not all BSD's emit this via RTM_IFINFO when they do this ... */
-	if (ifam->ifam_type == RTM_NEWADDR && !(ifp->flags & IFF_UP))
-		dhcpcd_handlecarrier(ifp, ifp->carrier, ifp->flags | IFF_UP);
+	if (ifam->ifam_type == RTM_NEWADDR && !(ifp->flags & IFF_UP)) {
+		struct ifreq ifr = { .ifr_flags = 0 };
+
+		/* Don't blindly assume the interface is up though.
+		 * We might get the address via a state change. */
+		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+		if (ioctl(ctx->pf_inet_fd, SIOCGIFFLAGS, &ifr) == -1)
+			return -1;
+		if (ifr.ifr_flags & IFF_UP)
+			dhcpcd_handlecarrier(ifp, ifp->carrier,
+			    ifp->flags | IFF_UP);
+	}
 
 	switch (rti_info[RTAX_IFA]->sa_family) {
 	case AF_LINK:
