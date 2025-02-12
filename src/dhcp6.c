@@ -2202,6 +2202,12 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	state->lerror = code;
 	errno = 0;
 
+	/* RFC 8415 18.2.10 */
+	if (code == D6_STATUS_USEMULTICAST) {
+		logdebugx("%s: server sent USEMULTICAST", ifp->name);
+		state->unicast = in6addr_any;
+	}
+
 	/* code cannot be D6_STATUS_OK, so there is a failure */
 	if (ifp->ctx->options & DHCPCD_TEST)
 		eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
