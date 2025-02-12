@@ -736,7 +736,7 @@ struct rfc3396_ctx {
  * when the option overflows the boundary and another option
  * is created to hold the resta of the data.
  * Tested against Wireshark-4.4.1 */
-#define RFC3396_BOUNDARY UINT8_MAX
+#define RFC3396_BOUNDARY 255UL
 static ssize_t
 rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
 {
