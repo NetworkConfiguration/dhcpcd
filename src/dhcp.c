@@ -49,6 +49,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -3715,7 +3716,8 @@ static void
 dhcp_readbpf(void *arg, unsigned short events)
 {
 	struct interface *ifp = arg;
-	uint8_t buf[FRAMELEN_MAX];
+	/* Sparc64 needs this buffer aligned */
+	alignas(sizeof(struct ip *)) uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct bpf *bpf = state->bpf;
