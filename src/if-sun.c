@@ -601,8 +601,8 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 		else if (!gateway_unspec)
 			rtm->rtm_flags |= RTF_GATEWAY;
 
-		if (rt->rt_dflags & RTDF_STATIC)
-			rtm->rtm_flags |= RTF_STATIC;
+		/* Make static so that in.routed does not delete it */
+		rtm->rtm_flags |= RTF_STATIC;
 
 		if (rt->rt_mtu != 0) {
 			rtm->rtm_inits |= RTV_MTU;
