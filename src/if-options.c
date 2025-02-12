@@ -762,7 +762,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'i':
 		if (arg)
 			s = parse_string((char *)ifo->vendorclassid + 1,
-			    VENDORCLASSID_MAX_LEN, arg);
+			    sizeof(ifo->vendorclassid) - 1, arg);
 		else
 			s = 0;
 		if (s == -1) {
@@ -1049,7 +1049,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (p == arg) {
 			arg++;
 			s = parse_string((char *)ifo->vendor + 1,
-			    VENDOR_MAX_LEN, arg);
+			    sizeof(ifo->vendor) - 1, arg);
 			if (s == -1) {
 				logerr("vendor");
 				return -1;
@@ -1076,7 +1076,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 
 		arg = p + 1;
-		s = VENDOR_MAX_LEN - ifo->vendor[0] - 2;
+		s = sizeof(ifo->vendor) - 1 - ifo->vendor[0] - 2;
 		if (inet_aton(arg, &addr) == 1) {
 			if (s < 6) {
 				s = -1;
@@ -1203,11 +1203,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options |= DHCPCD_XID_HWADDR;
 		break;
 	case 'I':
-		/* Strings have a type of 0 */;
-		ifo->clientid[1] = 0;
 		if (arg)
+			/* If parse_hwaddr cannot decoded arg as a
+			 * hardware address then the first byte
+			 * in the clientid will be zero to indicate
+			 * a string value. */
 			s = parse_hwaddr((char *)ifo->clientid + 1,
-			    CLIENTID_MAX_LEN, arg);
+			    sizeof(ifo->clientid) - 1, arg);
 		else
 			s = 0;
 		if (s == -1) {
@@ -2469,7 +2471,8 @@ invalid_token:
 		break;
 	case O_MUDURL:
 		ARG_REQUIRED;
-		s = parse_string((char *)ifo->mudurl + 1, MUDURL_MAX_LEN, arg);
+		s = parse_string((char *)ifo->mudurl + 1,
+		    sizeof(ifo->mudurl) - 1, arg);
 		if (s == -1) {
 			logerr("mudurl");
 			return -1;
