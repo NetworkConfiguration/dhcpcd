@@ -818,6 +818,7 @@ $abort && exit 1
 if [ -z "$CLOSEFROM" ]; then
 	printf "Testing for closefrom ... "
 	cat <<EOF >_closefrom.c
+#include <stdlib.h>
 #include <unistd.h>
 int main(void) {
 	closefrom(3);
