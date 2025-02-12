@@ -3407,6 +3407,48 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 }
 
 static void
+dhcp6_adjust_max_rt(struct interface *ifp,
+    struct dhcp6_message *r, size_t len)
+{
+	struct dhcp6_state *state = D6_STATE(ifp);
+	uint8_t *o;
+	uint16_t ol;
+
+	/* RFC 8415 */
+	o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
+	if (o != NULL && ol == sizeof(uint32_t)) {
+		uint32_t max_rt;
+
+		memcpy(&max_rt, o, sizeof(max_rt));
+		max_rt = ntohl(max_rt);
+		if (max_rt >= 60 && max_rt <= 86400) {
+			logdebugx("%s: SOL_MAX_RT %llu -> %u",
+			    ifp->name,
+			    (unsigned long long)state->sol_max_rt,
+			    max_rt);
+			state->sol_max_rt = max_rt;
+		} else
+			logerrx("%s: invalid SOL_MAX_RT %u", ifp->name, max_rt);
+	}
+
+	o = dhcp6_findmoption(r, len, D6_OPTION_INF_MAX_RT, &ol);
+	if (o != NULL && ol == sizeof(uint32_t)) {
+		uint32_t max_rt;
+
+		memcpy(&max_rt, o, sizeof(max_rt));
+		max_rt = ntohl(max_rt);
+		if (max_rt >= 60 && max_rt <= 86400) {
+			logdebugx("%s: INF_MAX_RT %llu -> %u",
+			    ifp->name,
+			    (unsigned long long)state->inf_max_rt,
+			    max_rt);
+			state->inf_max_rt = max_rt;
+		} else
+			logerrx("%s: invalid INF_MAX_RT %u", ifp->name, max_rt);
+	}
+}
+
+static void
 dhcp6_recvif(struct interface *ifp, const char *sfrom,
     struct dhcp6_message *r, size_t len)
 {
@@ -3526,6 +3568,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
+			dhcp6_adjust_max_rt(ifp, r, len);
 			if (dhcp6_validatelease(ifp, r, len, sfrom, NULL) == -1)
 			{
 				/*
@@ -3594,39 +3637,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			}
 		}
 
-		/* RFC7083 */
-		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
-		if (o && ol == sizeof(uint32_t)) {
-			uint32_t max_rt;
-
-			memcpy(&max_rt, o, sizeof(max_rt));
-			max_rt = ntohl(max_rt);
-			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebugx("%s: SOL_MAX_RT %llu -> %u",
-				    ifp->name,
-				    (unsigned long long)state->sol_max_rt,
-				    max_rt);
-				state->sol_max_rt = max_rt;
-			} else
-				logerr("%s: invalid SOL_MAX_RT %u",
-				    ifp->name, max_rt);
-		}
-		o = dhcp6_findmoption(r, len, D6_OPTION_INF_MAX_RT, &ol);
-		if (o && ol == sizeof(uint32_t)) {
-			uint32_t max_rt;
-
-			memcpy(&max_rt, o, sizeof(max_rt));
-			max_rt = ntohl(max_rt);
-			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebugx("%s: INF_MAX_RT %llu -> %u",
-				    ifp->name,
-				    (unsigned long long)state->inf_max_rt,
-				    max_rt);
-				state->inf_max_rt = max_rt;
-			} else
-				logerrx("%s: invalid INF_MAX_RT %u",
-				    ifp->name, max_rt);
-		}
+		dhcp6_adjust_max_rt(ifp, r, len);
 		if (dhcp6_validatelease(ifp, r, len, sfrom, NULL) == -1)
 			return;
 		break;
