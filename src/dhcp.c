@@ -3068,7 +3068,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t type, tmp;
+	uint8_t type;
 	struct in_addr addr;
 	unsigned int i;
 	char *msg;
@@ -3078,6 +3078,9 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
+#endif
+#ifdef IPV4LL
+	uint8_t tmp;
 #endif
 #ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *ia;
