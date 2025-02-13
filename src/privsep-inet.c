@@ -215,6 +215,7 @@ ps_inet_startcb(struct ps_process *psp)
 	return ret;
 }
 
+#if defined(INET) || defined(DHCP6)
 static bool
 ps_inet_validudp(struct msghdr *msg, uint16_t sport, uint16_t dport)
 {
@@ -233,6 +234,7 @@ ps_inet_validudp(struct msghdr *msg, uint16_t sport, uint16_t dport)
 	}
 	return true;
 }
+#endif
 
 #ifdef INET6
 static bool

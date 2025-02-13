@@ -655,8 +655,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	uint8_t *request, *require, *no, *reject;
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl, odl;
-	struct vivco *vivco;
-	const struct vivco *vivco_endp = ifo->vivco + ifo->vivco_len;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -665,16 +663,22 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct group grpbuf;
 #endif
 #ifdef DHCP6
-	size_t sl;
 	struct if_ia *ia;
 	uint8_t iaid[4];
+#endif
+#if defined(DHCP6) || ((defined(INET) || defined(INET6)) && !defined(SMALL))
+	size_t sl;
+#endif
 #ifndef SMALL
-	struct in6_addr in6addr;
+#ifdef DHCP6
 	struct if_sla *sla, *slap;
+#endif
+	struct vivco *vivco;
+	const struct vivco *vivco_endp = ifo->vivco + ifo->vivco_len;
+	struct in6_addr in6addr;
 	struct vsio **vsiop = NULL, *vsio;
 	size_t *vsio_lenp = NULL, opt_max, opt_header;
 	struct vsio_so *vsio_so;
-#endif
 #endif
 
 	dop = NULL;
@@ -2951,11 +2955,11 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	struct rt *rt;
 #endif
 	struct dhcp_opt *opt;
-	struct vivco *vo;
 #ifdef AUTH
 	struct token *token;
 #endif
 #ifndef SMALL
+	struct vivco *vo;
 	struct vsio *vsio;
 	struct vsio_so *vsio_so;
 #endif
