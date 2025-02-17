@@ -182,6 +182,18 @@ if_setflag(struct interface *ifp, short setflag, short unsetflag)
 	return 0;
 }
 
+unsigned int
+if_mtu(struct interface *ifp)
+{
+	struct ifreq ifr = { .ifr_mtu = 0 };
+
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMTU, &ifr) == -1)
+		return 0;
+
+	return (unsigned int)ifr.ifr_mtu;
+}
+
 bool
 if_is_link_up(const struct interface *ifp)
 {
@@ -685,6 +697,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			}
 		}
 
+		ifp->mtu = if_mtu(ifp);
 		ifp->vlanid = if_vlanid(ifp);
 
 #ifdef SIOCGIFPRIORITY

@@ -1053,7 +1053,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	struct interface *ifp = arg;
 	int r;
 	size_t len;
-	struct rtattr *rta, *hwaddr;
+	struct rtattr *rta, *hwaddr, *mtu;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
 
@@ -1082,7 +1082,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	rta = (void *)((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
-	hwaddr = NULL;
+	hwaddr = mtu = NULL;
 
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
@@ -1097,6 +1097,9 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 			break;
 		case IFLA_ADDRESS:
 			hwaddr = rta;
+			break;
+		case IFLA_MTU:
+			mtu = rta;
 			break;
 		}
 	}
@@ -1138,6 +1141,9 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 		dhcpcd_handleinterface(ctx, 1, ifn);
 		return 0;
 	}
+
+	if (mtu != NULL)
+		ifp->mtu = *(unsigned int *)RTA_DATA(mtu);
 
 	/* Re-read hardware address and friends */
 	if (!(ifi->ifi_flags & IFF_UP)) {

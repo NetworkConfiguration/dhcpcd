@@ -80,6 +80,7 @@ struct interface {
 	uint16_t hwtype; /* ARPHRD_ETHER for example */
 	unsigned char hwaddr[HWADDR_LEN];
 	uint8_t hwlen;
+	unsigned int mtu;
 	unsigned short vlanid;
 	unsigned int metric;
 	int carrier;

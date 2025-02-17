@@ -506,9 +506,19 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 static bool
 rt_cmp_misc(struct rt *nrt, struct rt *ort)
 {
-	/* MTU changed */
+#if defined(__FreeBSD__) || defined(__DragonFly__)
+	/* FreeBSD puts the interface MTU into the route MTU
+	 * if the route does not define it's own. */
+	unsigned int nmtu, omtu;
+
+	nmtu = nrt->rt_mtu ? nrt->rt_mtu : nrt->rt_ifp->mtu;
+	omtu = ort->rt_mtu ? ort->rt_mtu : ort->rt_ifp->mtu;
+	if (omtu != nmtu)
+		return false;
+#else
 	if (ort->rt_mtu != nrt->rt_mtu)
 		return false;
+#endif
 
 #ifdef HAVE_ROUTE_LIFETIME
 	uint32_t deviation;

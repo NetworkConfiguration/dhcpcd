@@ -1252,6 +1252,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return 0;
 
+	ifp->mtu = if_mtu(ifp);
 	link_state = if_carrier(ifp, &ifm->ifm_data);
 	dhcpcd_handlecarrier(ifp, link_state, (unsigned int)ifm->ifm_flags);
 	return 0;
