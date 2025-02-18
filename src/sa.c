@@ -419,11 +419,6 @@ sa_cmp(const struct sockaddr *sa1, const struct sockaddr *sa2)
 	assert(sa1 != NULL);
 	assert(sa2 != NULL);
 
-	/* Treat AF_UNSPEC as the unspecified address. */
-	if ((sa1->sa_family == AF_UNSPEC || sa2->sa_family == AF_UNSPEC) &&
-	    sa_is_unspecified(sa1) && sa_is_unspecified(sa2))
-		return 0;
-
 	if (sa1->sa_family != sa2->sa_family)
 		return sa1->sa_family - sa2->sa_family;
 

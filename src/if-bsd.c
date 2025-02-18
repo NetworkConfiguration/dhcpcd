@@ -887,10 +887,22 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
 	if_copysa(&rt->rt_dest, rti_info[RTAX_DST]);
+
 	if (rtm->rtm_addrs & RTA_NETMASK) {
 		if_copysa(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
-		if (rt->rt_netmask.sa_family == 255) /* Why? */
-			rt->rt_netmask.sa_family = rt->rt_dest.sa_family;
+		/*
+		 * Netmask family and length are ignored by traditional
+		 * userland tools such as route and netstat and are assumed
+		 * to match the destination sockaddr.
+		 * This is fortunate because BSD kernels use a radix tree
+		 * to store routes which adjusts the netmask at the point
+		 * of insertion where this information is lost.
+		 * We can just sub in the values from the destination address.
+		 *
+		 * This is currently true for all BSD kernels.
+		 */
+		rt->rt_netmask.sa_family = rt->rt_dest.sa_family;
+		rt->rt_netmask.sa_len = rt->rt_dest.sa_len;
 	}
 
 	/* dhcpcd likes an unspecified gateway to indicate via the link.
