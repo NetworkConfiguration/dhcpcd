@@ -188,7 +188,7 @@ if_mtu(struct interface *ifp)
 	struct ifreq ifr = { .ifr_mtu = 0 };
 
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMTU, &ifr) == -1)
+	if (if_ioctl(ifp->ctx, SIOCGIFMTU, &ifr, sizeof(ifr)) == -1)
 		return 0;
 
 	return (unsigned int)ifr.ifr_mtu;

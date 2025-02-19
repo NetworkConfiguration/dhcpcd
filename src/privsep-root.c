@@ -251,8 +251,7 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 	case SIOCGIFPRIORITY:	/* FALLTHROUGH */
 #endif
 	case SIOCSIFFLAGS:	/* FALLTHROUGH */
-	case SIOCGIFMTU:	/* FALLTHROUGH */
-	case SIOCSIFMTU:
+	case SIOCGIFMTU:
 		break;
 	default:
 		errno = EPERM;
