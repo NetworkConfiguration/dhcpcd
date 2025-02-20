@@ -965,19 +965,24 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	struct rt_msghdr *rtm;
 	int mib[6] = { CTL_NET, PF_ROUTE, 0, af, NET_RT_DUMP, 0 };
 	size_t bufl;
-	char *buf, *p, *end;
+	char *buf = NULL, *p, *end;
 	struct rt rt, *rtn;
 
+again:
 	if (if_sysctl(ctx, mib, __arraycount(mib), NULL, &bufl, NULL, 0) == -1)
-		return -1;
-	if (bufl == 0)
+		goto err;
+	if (bufl == 0) {
+		free(buf);
 		return 0;
-	if ((buf = malloc(bufl)) == NULL)
-		return -1;
+	}
+	if ((p = realloc(buf, bufl)) == NULL)
+		goto err;
+	buf = p;
 	if (if_sysctl(ctx, mib, __arraycount(mib), buf, &bufl, NULL, 0) == -1)
 	{
-		free(buf);
-		return -1;
+		if (errno == ENOMEM)
+			goto again;
+		goto err;
 	}
 
 	end = buf + bufl;
@@ -1001,6 +1006,10 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	}
 	free(buf);
 	return p == end ? 0 : -1;
+
+err:
+	free(buf);
+	return -1;
 }
 
 #ifdef INET
