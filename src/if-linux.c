@@ -1770,8 +1770,12 @@ if_route(unsigned char cmd, const struct rt *rt)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
 #ifdef HAVE_ROUTE_LIFETIME
-	if (rt->rt_lifetime != 0)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES,rt->rt_lifetime);
+	if (rt->rt_lifetime != 0) {
+		uint32_t expires;
+
+		expires = lifetime_left(rt->rt_lifetime, &rt->rt_aquired, NULL);
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, expires);
+	}
 #endif
 
 	if (rt->rt_metric != 0)
