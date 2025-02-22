@@ -2170,7 +2170,8 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 
 #ifdef IPV4LL
 	/* Stop IPv4LL now we have a working DHCP address */
-	if (!IN_LINKLOCAL(ntohl(ia->s_addr)))
+	if ((!IN_LINKLOCAL(ntohl(ia->s_addr)))
+		&& (ifp->options->options & DHCPCD_IPV4LL))
 		ipv4ll_drop(ifp);
 #endif
 
@@ -3329,7 +3330,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			switch (tmp) {
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
-				ipv4ll_drop(ifp);
+				if (ifp->options->options & DHCPCD_IPV4LL)
+					ipv4ll_drop(ifp);
 #ifdef ARP
 				arp_drop(ifp);
 #endif
