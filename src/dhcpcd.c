@@ -2173,9 +2173,6 @@ main(int argc, char **argv, char **envp)
 	ctx.options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (ctx.options & DHCPCD_DEBUG)
-		logsetopts(logopts | LOGERR_DEBUG);
-
 	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 printpidfile:
 		/* If we have any other args, we should run as a single dhcpcd

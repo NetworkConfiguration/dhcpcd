@@ -174,6 +174,7 @@ const struct option cf_options[] = {
 	{"request_time",    required_argument, NULL, O_REQUEST_TIME},
 	{"fallback_time",   required_argument, NULL, O_FALLBACK_TIME},
 	{"ipv4ll_time",     required_argument, NULL, O_IPV4LL_TIME},
+	{"nosyslog",        no_argument,       NULL, O_NOSYSLOG},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -740,7 +741,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		break;
 	case 'd':
-		ifo->options |= DHCPCD_DEBUG;
+		logsetopts(loggetopts() | LOGERR_DEBUG);
 		break;
 	case 'e':
 		ARG_REQUIRED;
@@ -2548,6 +2549,14 @@ invalid_token:
 		}
 		break;
 #endif
+	case O_NOSYSLOG:
+		{
+			unsigned int logopts = loggetopts();
+
+			logopts &= ~LOGERR_LOG;
+			logsetopts(logopts);
+		}
+		break;
 	default:
 		return 0;
 	}

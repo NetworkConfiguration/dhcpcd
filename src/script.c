@@ -471,7 +471,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		if (efprintf(fp, "af_waiting=%d", af) == -1)
 			goto eexit;
 	}
-	if (ifo->options & DHCPCD_DEBUG) {
+	if (loggetopts() & LOGERR_DEBUG) {
 		if (efprintf(fp, "syslog_debug=true") == -1)
 			goto eexit;
 	}
