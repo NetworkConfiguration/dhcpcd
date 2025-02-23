@@ -148,7 +148,6 @@ __CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 static void ipv6nd_handledata(void *, unsigned short);
 static struct routeinfo *routeinfo_findalloc(struct ra *, const struct in6_addr *, uint8_t);
 static void routeinfohead_free(struct routeinfohead *);
-static void ipv6nd_startrs2(void *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -1498,8 +1497,6 @@ nodhcp6:
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
 #undef FREE_RAP
-
-	eloop_timeout_add_sec(ifp->ctx->eloop, 5, ipv6nd_startrs2, ifp);
 }
 
 bool
