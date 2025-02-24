@@ -33,6 +33,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <getopt.h>
 #include <grp.h>
 #include <inttypes.h>
@@ -2875,7 +2876,7 @@ read_config(struct dhcpcd_ctx *ctx,
 				skip = 1;
 				continue;
 			}
-			if (ifname && strcmp(line, ifname) == 0)
+			if (ifname && fnmatch(line, ifname, 0) == 0)
 				skip = 0;
 			else
 				skip = 1;

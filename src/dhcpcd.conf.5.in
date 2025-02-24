@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 23, 2025
+.Dd February 24, 2025
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -446,6 +446,8 @@ encodes the FQDN hostname as specified in
 .It Ic interface Ar interface
 Subsequent options are only parsed for this
 .Ar interface .
+Pattern matching is allowed by
+.Xr fnmatch 3 .
 .It Ic ipv4ll_time Ar seconds
 Wait for
 .Ar seconds

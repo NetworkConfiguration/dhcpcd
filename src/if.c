@@ -250,7 +250,7 @@ if_hasconf(struct dhcpcd_ctx *ctx, const char *ifname)
 	int i;
 
 	for (i = 0; i < ctx->ifcc; i++) {
-		if (strcmp(ctx->ifcv[i], ifname) == 0)
+		if (fnmatch(ctx->ifcv[i], ifname, 0) == 0)
 			return 1;
 	}
 	return 0;
