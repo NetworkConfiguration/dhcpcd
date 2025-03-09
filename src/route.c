@@ -511,8 +511,8 @@ rt_cmp_misc(struct rt *nrt, struct rt *ort)
 	 * if the route does not define it's own. */
 	unsigned int nmtu, omtu;
 
-	nmtu = nrt->rt_mtu ? nrt->rt_mtu : nrt->rt_ifp->mtu;
-	omtu = ort->rt_mtu ? ort->rt_mtu : ort->rt_ifp->mtu;
+	nmtu = nrt->rt_mtu ? nrt->rt_mtu : (unsigned int)nrt->rt_ifp->mtu;
+	omtu = ort->rt_mtu ? ort->rt_mtu : (unsigned int)ort->rt_ifp->mtu;
 	if (omtu != nmtu)
 		return false;
 #else
