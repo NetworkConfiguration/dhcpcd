@@ -2236,12 +2236,18 @@ dhcp_arp_defend_failed(struct arp_state *astate)
 {
 	struct interface *ifp = astate->iface;
 	struct dhcp_state *state = D_STATE(ifp);
+	unsigned int delay;
 
 	if (!(ifp->options->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		dhcp_decline(ifp);
 	dhcp_drop(ifp, "EXPIRED");
 	dhcp_unlink(ifp->ctx, state->leasefile);
-	dhcp_start1(ifp);
+
+	// Delay restarting to give time for the BPF ARP process to exit
+	// as we may spawn a new one with a different filter fairly quickly
+	delay = MSEC_PER_SEC +
+		(arc4random_uniform(MSEC_PER_SEC * 2) - MSEC_PER_SEC);
+	eloop_timeout_add_msec(ifp->ctx->eloop, delay, dhcp_start1, ifp);
 }
 #endif
 

@@ -1850,6 +1850,7 @@ bpf_open(const struct interface *ifp,
 	if (bpf == NULL)
 		return NULL;
 	bpf->bpf_ifp = ifp;
+	bpf->bpf_flags = BPF_EOF;
 
 	/* Allocate a suitably large buffer for a single packet. */
 	bpf->bpf_size = ETH_FRAME_LEN;
