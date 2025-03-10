@@ -875,18 +875,20 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, FILE *fp, const char *prefix,
     const uint8_t *, size_t, struct dhcp_opt **),
     const uint8_t *od, size_t ol)
 {
-	size_t i, eos, eol;
+	size_t i, eos, eol, buflen, tol;
 	ssize_t eo;
 	unsigned int eoc;
-	const uint8_t *eod;
+	const uint8_t *eod, *tod;
 	int ov;
 	struct dhcp_opt *eopt, *oopt;
 	char *pfx;
+	uint8_t *buf, *nbuf;
 
 	/* If no embedded or encapsulated options, it's easy */
 	if (opt->embopts_len == 0 && opt->encopts_len == 0) {
 		if (opt->type & OT_RESERVED)
 			return;
+		ol = dhcp_optlen(opt, ol);
 		if (print_option(fp, prefix, opt, 1, od, ol, ifname) == -1)
 			logerr("%s: %s %d", ifname, __func__, opt->option);
 		return;
@@ -944,7 +946,6 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, FILE *fp, const char *prefix,
 		od += (size_t)eo;
 		ol -= (size_t)eo;
 	}
-
 	/* Enumerate our encapsulated options */
 	if (opt->encopts_len && ol > 0) {
 		/* Zero any option indexes
@@ -962,10 +963,17 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, FILE *fp, const char *prefix,
 			}
 		}
 
-		while ((eod = dgetopt(ctx, &eos, &eoc, &eol, od, ol, &oopt))) {
-			for (i = 0, eopt = opt->encopts;
-			    i < opt->encopts_len;
-			    i++, eopt++)
+		tod = od;
+		tol = ol;
+		for (i = 0, eopt = opt->encopts;
+		    i < opt->encopts_len;
+		    i++, eopt++)
+		{
+			buflen = 0;
+			buf = NULL;
+			for (od = tod, ol = tol;
+			     eod = dgetopt(ctx, &eos, &eoc, &eol, od, ol, &oopt);
+			     od += eos + eol, ol -= eos + eol)
 			{
 				if (eopt->option != eoc)
 					continue;
@@ -973,16 +981,30 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, FILE *fp, const char *prefix,
 					if (oopt == NULL)
 						/* Report error? */
 						continue;
+					dhcp_envoption(ctx, fp, pfx, ifname, oopt,
+					               dgetopt, eod, eol);
+				} else {
+					eol = dhcp_optlen(eopt, eol);
+					nbuf = realloc(buf, eol + buflen);
+					if (nbuf == NULL) {
+						free(buf);
+						goto out;
+					}
+					buf = nbuf;
+					memcpy(buf + buflen, eod, eol);
+					buflen += eol;
 				}
-				dhcp_envoption(ctx, fp, pfx, ifname,
-				    eopt->type & OT_OPTION ? oopt:eopt,
-				    dgetopt, eod, eol);
 			}
-			od += eos + eol;
-			ol -= eos + eol;
+			if (!(eopt->type & OT_OPTION)) {
+				if (print_option(fp, pfx, eopt, 1, buf, buflen,
+						 ifname) == -1)
+					logerr("%s: %s %d.%d/%zu",
+					       ifname, __func__,
+					       opt->option, eopt->option, i);
+				free(buf);
+		        }
 		}
 	}
-
 out:
 	free(pfx);
 }
