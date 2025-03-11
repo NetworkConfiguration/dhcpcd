@@ -1316,10 +1316,12 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	script_runreason(ifp, "RECONFIGURE");
 	dhcpcd_initstate1(ifp, argc, argv, 0);
 #ifdef INET
-	dhcp_reboot_newopts(ifp, oldopts);
+	if (ifp->options->options & DHCPCD_DHCP)
+		dhcp_reboot_newopts(ifp, oldopts);
 #endif
 #ifdef DHCP6
-	dhcp6_reboot(ifp);
+	if (ifp->options->options & DHCPCD_DHCP6)
+		dhcp6_reboot(ifp);
 #endif
 	dhcpcd_prestartinterface(ifp);
 }
