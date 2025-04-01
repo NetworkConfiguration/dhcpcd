@@ -672,25 +672,28 @@ recv_again:
 	return r;
 }
 
-static int
-if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
+static struct rt *
+if_nlmtort(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
 	size_t len;
 	struct rtmsg *rtm;
 	struct rtattr *rta;
 	unsigned int ifindex;
 	struct sockaddr *sa;
+	struct rt *rt;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if (len < sizeof(*rtm)) {
 		errno = EBADMSG;
-		return -1;
+		return NULL;
 	}
 	rtm = (struct rtmsg *)NLMSG_DATA(nlm);
 	if (rtm->rtm_table != RT_TABLE_MAIN)
-		return -1;
+		return NULL;
 
-	memset(rt, 0, sizeof(*rt));
+	rt = rt_new0(ctx);
+	if (rt == NULL)
+		return NULL;
 	if (rtm->rtm_type == RTN_UNREACHABLE)
 		rt->rt_flags |= RTF_REJECT;
 
@@ -718,8 +721,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
                            ignore the route as may otherwise appear to overlap
                            with routes set/removed by dhcpcd */
 			if (!sa_is_unspecified(psa)) {
+				rt_free(rt);
 				errno = ENOTSUP;
-				return -1;
+				return NULL;
 			}
 			break;
 		}
@@ -816,10 +820,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	#endif
 
 	if (rt->rt_ifp == NULL) {
+		rt_free(rt);
 		errno = ESRCH;
-		return -1;
+		return NULL;
 	}
-	return 0;
+	return rt;
 }
 
 static int
@@ -829,7 +834,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	size_t len;
 	int cmd;
 	struct priv *priv;
-	struct rt rt;
+	struct rt *rt;
 
 	switch (nlm->nlmsg_type) {
 	case RTM_NEWROUTE:
@@ -858,8 +863,9 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	if (nlm->nlmsg_pid == priv->route_pid)
 		return 0;
 
-	if (if_copyrt(ctx, &rt, nlm) == 0)
-		rt_recvrt(cmd, &rt, (pid_t)nlm->nlmsg_pid);
+	rt = if_nlmtort(ctx, nlm);
+	if (rt != NULL)
+		rt_recvrt(cmd, rt, (pid_t)nlm->nlmsg_pid);
 
 	return 0;
 }
@@ -1787,26 +1793,20 @@ if_route(unsigned char cmd, const struct rt *rt)
 }
 
 static int
-_if_initrt(struct dhcpcd_ctx *ctx, void *arg,
+_if_initrt(struct dhcpcd_ctx *ctx, __unused void *arg,
     struct nlmsghdr *nlm)
 {
-	struct rt rt, *rtn;
-	rb_tree_t *kroutes = arg;
+	struct rt *rt;
 
-	if (if_copyrt(ctx, &rt, nlm) != 0)
+	if ((rt = if_nlmtort(ctx, nlm)) == NULL)
 		return 0;
-	if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
-		logerr(__func__);
-		return 0;
-	}
-	memcpy(rtn, &rt, sizeof(*rtn));
-	if (rb_tree_insert_node(kroutes, rtn) != rtn)
-		rt_free(rtn);
+	if (rb_tree_insert_node(&ctx->kroutes, rt) != rt)
+		rt_free(rt);
 	return 0;
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
+if_initrt(struct dhcpcd_ctx *ctx, int af)
 {
 	struct nlmr nlm = {
 	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
@@ -1817,7 +1817,7 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	};
 
 	return if_sendnetlink(ctx, NETLINK_ROUTE, &nlm.hdr,
-	    &_if_initrt, kroutes);
+	    &_if_initrt, NULL);
 }
 
 #ifdef INET
