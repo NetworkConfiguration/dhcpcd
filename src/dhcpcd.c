@@ -2587,6 +2587,7 @@ start_manager:
 		}
 	}
 
+	rt_discover(&ctx);
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
 			dhcpcd_initstate1(ifp, argc, argv, 0);

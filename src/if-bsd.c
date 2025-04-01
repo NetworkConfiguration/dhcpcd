@@ -866,24 +866,45 @@ if_realroute(const struct rt_msghdr *rtm)
 	return true;
 }
 
-static int
-if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
+static struct rt *
+if_rtmtort(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 	const struct sockaddr *rti_info[RTAX_MAX];
+	struct interface *ifp;
+	struct rt *rt;
 
 	if (!(rtm->rtm_addrs & RTA_DST)) {
 		errno = EINVAL;
-		return -1;
+		return NULL;
 	}
 	if (rtm->rtm_type != RTM_MISS && !(rtm->rtm_addrs & RTA_GATEWAY)) {
 		errno = EINVAL;
-		return -1;
+		return NULL;
 	}
 
 	if (get_addrs(rtm->rtm_addrs, (const char *)rtm + sizeof(*rtm),
 	              rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
-		return -1;
-	memset(rt, 0, sizeof(*rt));
+		return NULL;
+
+	if (rtm->rtm_index)
+		ifp = if_findindex(ctx->ifaces, rtm->rtm_index);
+	else if (rtm->rtm_addrs & RTA_IFP)
+		ifp = if_findsa(ctx, rti_info[RTAX_IFP]);
+	else if (rtm->rtm_addrs & RTA_GATEWAY)
+		ifp = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
+	else
+		ifp = if_findsa(ctx, rti_info[RTAX_DST]);
+
+	if (ifp == NULL && rtm->rtm_type == RTM_MISS)
+		ifp = if_find(ctx->ifaces, "lo0");
+
+	if (ifp == NULL) {
+		errno = ESRCH;
+		return NULL;
+	}
+
+	rt = rt_new0(ctx);
+	rt->rt_ifp = ifp;
 
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
 	if_copysa(&rt->rt_dest, rti_info[RTAX_DST]);
@@ -924,23 +945,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 
 	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
-	if (rtm->rtm_index)
-		rt->rt_ifp = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP)
-		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_IFP]);
-	else if (rtm->rtm_addrs & RTA_GATEWAY)
-		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
-	else
-		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_DST]);
-
-	if (rt->rt_ifp == NULL && rtm->rtm_type == RTM_MISS)
-		rt->rt_ifp = if_find(ctx->ifaces, "lo0");
-
-	if (rt->rt_ifp == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-	return 0;
+	return rt;
 }
 
 static int
@@ -960,13 +965,13 @@ if_sysctl(struct dhcpcd_ctx *ctx,
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
+if_initrt(struct dhcpcd_ctx *ctx, int af)
 {
 	struct rt_msghdr *rtm;
 	int mib[6] = { CTL_NET, PF_ROUTE, 0, af, NET_RT_DUMP, 0 };
 	size_t bufl;
 	char *buf = NULL, *p, *end;
-	struct rt rt, *rtn;
+	struct rt *rt;
 
 again:
 	if (if_sysctl(ctx, mib, __arraycount(mib), NULL, &bufl, NULL, 0) == -1)
@@ -994,15 +999,10 @@ again:
 		}
 		if (!if_realroute(rtm))
 			continue;
-		if (if_copyrt(ctx, &rt, rtm) != 0)
+		if ((rt = if_rtmtort(ctx, rtm)) == NULL)
 			continue;
-		if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
-			logerr(__func__);
-			break;
-		}
-		memcpy(rtn, &rt, sizeof(*rtn));
-		if (rb_tree_insert_node(kroutes, rtn) != rtn)
-			rt_free(rtn);
+		if (rb_tree_insert_node(&ctx->kroutes, rt) != rt)
+			rt_free(rt);
 	}
 	free(buf);
 	return p == end ? 0 : -1;
@@ -1282,7 +1282,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 static int
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
-	struct rt rt;
+	struct rt *rt;
 
 	if (rtm->rtm_msglen < sizeof(*rtm)) {
 		errno = EINVAL;
@@ -1301,7 +1301,7 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	if (if_copyrt(ctx, &rt, rtm) == -1)
+	if ((rt = if_rtmtort(ctx, rtm)) == NULL)
 		return errno == ENOTSUP ? 0 : -1;
 
 #ifdef INET6
@@ -1311,21 +1311,21 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	 * existance with a hardware address.
 	 * Ensure we don't call this for a newly incomplete state.
 	 */
-	if (rt.rt_dest.sa_family == AF_INET6 &&
-	    (rt.rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
-	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK)))
+	if (rt->rt_dest.sa_family == AF_INET6 &&
+	    (rt->rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
+	    !(rtm->rtm_type == RTM_ADD && !(rt->rt_dflags & RTDF_GATELINK)))
 	{
 		bool reachable;
 
 		reachable = (rtm->rtm_type == RTM_ADD ||
 		    rtm->rtm_type == RTM_CHANGE) &&
-		    rt.rt_dflags & RTDF_GATELINK;
-		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, reachable);
+		    rt->rt_dflags & RTDF_GATELINK;
+		ipv6nd_neighbour(ctx, &rt->rt_ss_dest.sin6.sin6_addr, reachable);
 	}
 #endif
 
 	if (rtm->rtm_type != RTM_MISS && if_realroute(rtm))
-		rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
+		rt_recvrt(rtm->rtm_type, rt, rtm->rtm_pid);
 	return 0;
 }
 

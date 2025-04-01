@@ -142,6 +142,7 @@ struct dhcpcd_ctx {
 	size_t ctl_extra;
 
 	rb_tree_t routes;	/* our routes */
+	rb_tree_t kroutes;	/* kernel routes */
 #ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_t froutes;	/* free routes for re-use */
 #endif

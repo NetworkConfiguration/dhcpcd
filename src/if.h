@@ -249,7 +249,7 @@ int xsocket(int, int, int);
 int xsocketpair(int, int, int, int[2]);
 
 int if_route(unsigned char, const struct rt *rt);
-int if_initrt(struct dhcpcd_ctx *, rb_tree_t *, int);
+int if_initrt(struct dhcpcd_ctx *, int);
 
 int if_missfilter(struct interface *, struct sockaddr *);
 int if_missfilter_apply(struct dhcpcd_ctx *);

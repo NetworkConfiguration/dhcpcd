@@ -238,10 +238,20 @@ static const rb_tree_ops_t rt_compare_free_ops = {
 #endif
 
 void
+rt_discover(struct dhcpcd_ctx *ctx)
+{
+
+	rt_headclear(&ctx->kroutes, AF_UNSPEC);
+	if (if_initrt(ctx, AF_UNSPEC) != 0)
+		logerr("%s: if_initrt", __func__);
+}
+
+void
 rt_init(struct dhcpcd_ctx *ctx)
 {
 
 	rb_tree_init(&ctx->routes, &rt_compare_os_ops);
+	rb_tree_init(&ctx->kroutes, &rt_compare_os_ops);
 #ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_init(&ctx->froutes, &rt_compare_free_ops);
 #endif
@@ -347,6 +357,7 @@ rt_dispose(struct dhcpcd_ctx *ctx)
 
 	assert(ctx != NULL);
 	rt_headfree(&ctx->routes);
+	rt_headfree(&ctx->kroutes);
 #ifdef RT_FREE_ROUTE_TABLE
 	rt_headfree(&ctx->froutes);
 #ifdef RT_FREE_ROUTE_TABLE_STATS
@@ -372,11 +383,10 @@ rt_new0(struct dhcpcd_ctx *ctx)
 #endif
 	} else
 #endif
-	if ((rt = malloc(sizeof(*rt))) == NULL) {
+	if (rt == NULL && (rt = malloc(sizeof(*rt))) == NULL)
 		logerr(__func__);
-		return NULL;
-	}
-	memset(rt, 0, sizeof(*rt));
+	else
+		memset(rt, 0, sizeof(*rt));
 	return rt;
 }
 
@@ -472,10 +482,11 @@ rt_freeif(struct interface *ifp)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 void
-rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
+rt_recvrt(int cmd, struct rt *rt, pid_t pid)
 {
 	struct dhcpcd_ctx *ctx;
 	struct rt *f;
+	bool freert = false;
 
 	assert(rt != NULL);
 	assert(rt->rt_ifp != NULL);
@@ -484,6 +495,25 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 	ctx = rt->rt_ifp->ctx;
 
 	switch(cmd) {
+	case RTM_ADD:		/* FALLTHROUGH */
+	case RTM_CHANGE:	/* FALLTHROUGH */
+	case RTM_DELETE:
+		/* For any of these actions, we delete any matching
+		 * kernel route we have. */
+		f = rb_tree_find_node(&ctx->kroutes, rt);
+		if (f != NULL) {
+			rb_tree_remove_node(&ctx->kroutes, f);
+			rt_free(f);
+		}
+		break;
+	}
+
+	switch(cmd) {
+	case RTM_ADD:		/* FALLTHROUGH */
+	case RTM_CHANGE:
+		if (rb_tree_insert_node(&ctx->kroutes, rt) != rt) /* safety */
+			freert = true;
+		break;
 	case RTM_DELETE:
 		f = rb_tree_find_node(&ctx->routes, rt);
 		if (f != NULL) {
@@ -501,6 +531,9 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 	if (rt->rt_dest.sa_family == AF_INET)
 		ipv4ll_recvrt(cmd, rt);
 #endif
+
+	if (freert)
+		rt_free(rt);
 }
 
 /* Compare miscellaneous route details */
@@ -553,12 +586,12 @@ rt_cmp_lifetime(struct rt *nrt, struct rt *ort)
 #endif
 
 static bool
-rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
+rt_add(struct rt *nrt, struct rt *ort)
 {
 	struct dhcpcd_ctx *ctx;
 	struct rt *krt;
 	int loglevel = LOG_INFO;
-	bool change, result;
+	bool change;
 
 	assert(nrt != NULL);
 	ctx = nrt->rt_ifp->ctx;
@@ -578,7 +611,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    sa_is_unspecified(&nrt->rt_netmask))
 		return false;
 
-	krt = rb_tree_find_node(kroutes, nrt);
+	krt = rb_tree_find_node(&ctx->kroutes, nrt);
 	if (krt != NULL &&
 	    krt->rt_ifp == nrt->rt_ifp &&
 	    /* Only test flags dhcpcd controls */
@@ -616,10 +649,8 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 
 	if (change) {
-		if (if_route(RTM_CHANGE, nrt) != -1) {
-			result = true;
-			goto out;
-		}
+		if (if_route(RTM_CHANGE, nrt) != -1)
+			return true;
 		if (errno != ESRCH)
 			logerr("if_route (CHG)");
 	}
@@ -631,9 +662,12 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 		if (krt != NULL) {
 			if (if_route(RTM_DELETE, krt) == -1 && errno != ESRCH)
 				logerr("if_route (DEL)");
+			else {
+				rb_tree_remove_node(&ctx->kroutes, krt);
+				rt_free(krt);
+			}
 		}
-		result = true;
-		goto out;
+		return true;
 	}
 
 	/* If the kernel claims the route exists we need to rip out the
@@ -650,6 +684,10 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	if (krt != NULL) {
 		if (if_route(RTM_DELETE, krt) == -1 && errno != ESRCH)
 			logerr("if_route (DEL)");
+		else {
+			rb_tree_remove_node(&ctx->kroutes, krt);
+			rt_free(krt);
+		}
 	}
 #ifdef ROUTE_PER_GATEWAY
 	/* The OS allows many routes to the same dest with different gateways.
@@ -665,22 +703,14 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 
 	/* Shouldn't need to check for EEXIST, but some kernels don't
 	 * dump the subnet route just after we added the address. */
-	if (if_route(RTM_ADD, nrt) != -1 || errno == EEXIST) {
-		result = true;
-		goto out;
-	}
+	if (if_route(RTM_ADD, nrt) != -1 || errno == EEXIST)
+		return true;
 
 #ifdef HAVE_ROUTE_METRIC
 logerr:
 #endif
 	logerr("if_route (ADD)");
-
-out:
-	if (krt != NULL) {
-		rb_tree_remove_node(kroutes, krt);
-		rt_free(krt);
-	}
-	return result;
+	return false;
 }
 
 static bool
@@ -709,7 +739,7 @@ rt_cmp(const struct rt *r1, const struct rt *r2)
 }
 
 static bool
-rt_doroute(rb_tree_t *kroutes, struct rt *rt)
+rt_doroute(struct rt *rt)
 {
 	struct dhcpcd_ctx *ctx;
 	struct rt *or;
@@ -729,20 +759,20 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 #endif
 		    rt_cmp_mtu(rt, or) != 0)
 		{
-			if (!rt_add(kroutes, rt, or))
+			if (!rt_add(rt, or))
 				return false;
 		}
 		rb_tree_remove_node(&ctx->routes, or);
 		rt_free(or);
 	} else {
 		if (rt->rt_dflags & RTDF_FAKE) {
-			or = rb_tree_find_node(kroutes, rt);
+			or = rb_tree_find_node(&ctx->kroutes, rt);
 			if (or == NULL)
 				return false;
 			if (rt_cmp(rt, or) == 0)
 				return false;
 		} else {
-			if (!rt_add(kroutes, rt, NULL))
+			if (!rt_add(rt, NULL))
 				return false;
 		}
 	}
@@ -753,15 +783,12 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 void
 rt_build(struct dhcpcd_ctx *ctx, int af)
 {
-	rb_tree_t routes, added, kroutes;
+	rb_tree_t routes, added;
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
 	rb_tree_init(&routes, &rt_compare_proto_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
-	rb_tree_init(&kroutes, &rt_compare_os_ops);
-	if (if_initrt(ctx, &kroutes, af) != 0)
-		logerr("%s: if_initrt", __func__);
 	ctx->rt_order = 0;
 	ctx->options |= DHCPCD_RTBUILD;
 
@@ -798,7 +825,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		/* Is this route already in our table? */
 		if (rb_tree_find_node(&added, rt) != NULL)
 			continue;
-		if (rt_doroute(&kroutes, rt)) {
+		if (rt_doroute(rt)) {
 			rb_tree_remove_node(&routes, rt);
 			if (rb_tree_insert_node(&added, rt) != rt) {
 				errno = EEXIST;
@@ -845,5 +872,4 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 
 getfail:
 	rt_headclear(&routes, AF_UNSPEC);
-	rt_headclear(&kroutes, AF_UNSPEC);
 }

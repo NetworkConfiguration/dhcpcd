@@ -134,6 +134,7 @@ extern const rb_tree_ops_t rt_compare_list_ops;
 extern const rb_tree_ops_t rt_compare_proto_ops;
 
 void rt_init(struct dhcpcd_ctx *);
+void rt_discover(struct dhcpcd_ctx *);
 void rt_dispose(struct dhcpcd_ctx *);
 void rt_free(struct rt *);
 void rt_freeif(struct interface *);
@@ -147,7 +148,7 @@ struct rt * rt_new(struct interface *);
 struct rt * rt_proto_add_ctx(rb_tree_t *, struct rt *, struct dhcpcd_ctx *);
 struct rt * rt_proto_add(rb_tree_t *, struct rt *);
 int rt_cmp_dest(const struct rt *, const struct rt *);
-void rt_recvrt(int, const struct rt *, pid_t);
+void rt_recvrt(int, struct rt *, pid_t);
 void rt_build(struct dhcpcd_ctx *, int);
 
 #endif
