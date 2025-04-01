@@ -1145,7 +1145,7 @@ dhcpcd_handlelink(void *arg, unsigned short events)
 			dhcpcd_linkoverflow(ctx);
 			return;
 		}
-		if (errno != ENOTSUP)
+		if (errno != ENOTSUP && errno != ENXIO)
 			logerr(__func__);
 	}
 }
