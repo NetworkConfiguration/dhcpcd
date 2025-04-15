@@ -1059,7 +1059,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		state = LINK_UP;
 		flags |= IFF_UP;
 	}
-	ifp->mtu = if_mtu(ifp);
+	ifp->mtu = if_getmtu(ifp);
 	dhcpcd_handlecarrier(ifp, state, flags);
 	return 0;
 }
