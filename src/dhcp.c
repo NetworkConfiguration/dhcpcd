@@ -4335,7 +4335,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	if (cmd == RTM_DELADDR) {
 		if (state->addr == ia) {
 			loginfox("%s: pid %d deleted IP address %s",
-			    ifp->name, pid, ia->saddr);
+			    ifp->name, (int)pid, ia->saddr);
 			dhcp_close(ifp);
 			state->addr = NULL;
 			/* Don't clear the added state as we need

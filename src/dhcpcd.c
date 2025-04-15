@@ -1896,7 +1896,7 @@ dhcpcd_pidfile_timeout(void *arg)
 	if(pid == -1)
 		eloop_exit(ctx->eloop, EXIT_SUCCESS);
 	else if (++ctx->duid_len >= 100) { /* overload duid_len */
-		logerrx("pid %d failed to exit", pid);
+		logerrx("pid %d failed to exit", (int)pid);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 	} else
 		eloop_timeout_add_msec(ctx->eloop, 100,
@@ -2247,7 +2247,7 @@ printpidfile:
 	if (sig != 0) {
 		pid = pidfile_read(ctx.pidfile);
 		if (pid != 0 && pid != -1)
-			loginfox("sending signal %s to pid %d", siga, pid);
+			loginfox("sending signal %s to pid %d", siga, (int)pid);
 		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
 			if (pid != 0 && pid != -1 && errno != ESRCH) {
 				logerr("kill");
@@ -2260,7 +2260,7 @@ printpidfile:
 			if (sig == SIGHUP || sig == SIGUSR1)
 				goto exit_success;
 			/* Spin until it exits */
-			loginfox("waiting for pid %d to exit", pid);
+			loginfox("waiting for pid %d to exit", (int)pid);
 			dhcpcd_pidfile_timeout(&ctx);
 			goto run_loop;
 		}
@@ -2386,7 +2386,7 @@ printpidfile:
 			else
 				logerrx(PACKAGE
 				    " already running on pid %d (%s)",
-				    pid, ctx.pidfile);
+				    (int)pid, ctx.pidfile);
 			goto exit_failure;
 		}
 	}
@@ -2467,12 +2467,12 @@ printpidfile:
 
 	/* We have now forked, setsid, forked once more.
 	 * From this point on, we are the controlling daemon. */
-	logdebugx("spawned manager process on PID %d", getpid());
+	logdebugx("spawned manager process on PID %d", (int)getpid());
 
 start_manager:
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
-		logerr("%s: pidfile_lock %d", __func__, pid);
+		logerr("%s: pidfile_lock %d", __func__, (int)pid);
 #ifdef PRIVSEP
 		/* privsep has not started ... */
 		ctx.options &= ~DHCPCD_PRIVSEP;

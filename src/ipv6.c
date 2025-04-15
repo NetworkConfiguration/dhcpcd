@@ -1849,7 +1849,7 @@ ipv6_handleifa_addrs(int cmd,
 
 		if (cmd == RTM_DELADDR && ia->flags & IPV6_AF_ADDED)
 			logwarnx("%s: pid %d deleted address %s",
-			    ia->iface->name, pid, ia->saddr);
+			    ia->iface->name, (int)pid, ia->saddr);
 
 		/* Check DAD.
 		 * On Linux we can get IN6_IFF_DUPLICATED via RTM_DELADDR. */

@@ -490,7 +490,7 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 			char buf[32];
 
 			rb_tree_remove_node(&ctx->routes, f);
-			snprintf(buf, sizeof(buf), "pid %d deleted", pid);
+			snprintf(buf, sizeof(buf), "pid %d deleted", (int)pid);
 			rt_desc(LOG_WARNING, buf, f);
 			rt_free(f);
 		}
