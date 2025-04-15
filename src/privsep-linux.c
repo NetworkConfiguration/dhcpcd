@@ -468,9 +468,6 @@ static struct sock_filter ps_seccomp_filter[] = {
 
 /* These are for compiling with address sanitization */
 #ifdef ASAN
-#ifdef __NR_futex
-	SECCOMP_ALLOW(__NR_futex),
-#endif
 #ifdef __NR_openat
 	SECCOMP_ALLOW(__NR_openat),
 #endif
@@ -482,12 +479,42 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 
 /* coredumps */
-#ifdef __NR_gettid
-	SECCOMP_ALLOW(__NR_gettid),
-#endif
 #ifdef __NR_tgkill
 	SECCOMP_ALLOW(__NR_tgkill),
 #endif
+#endif
+
+/* valgrind */
+#ifdef __NR_futex
+	SECCOMP_ALLOW(__NR_futex),
+#endif
+#ifdef __NR_gettid
+	SECCOMP_ALLOW(__NR_gettid),
+#endif
+#ifdef __NR_rt_sigtimedwait
+	SECCOMP_ALLOW(__NR_rt_sigtimedwait),
+#endif
+#ifdef VALGRIND
+#ifdef __NR_unlink
+	/* This is dangerous, and also pointless as in privsep
+	 * we are no longer root and thus cannot unlink the valgrind
+	 * pipes anyway. */
+	SECCOMP_ALLOW(__NR_unlink),
+#endif
+#endif
+
+/* hardened-malloc */
+#ifdef __NR_mprotect
+	SECCOMP_ALLOW(__NR_mprotect),
+#endif
+#ifdef __NR_mremap
+	SECCOMP_ALLOW(__NR_mremap),
+#endif
+#ifdef __NR_pkey_alloc
+	SECCOMP_ALLOW(__NR_pkey_alloc),
+#endif
+#ifdef __NR_pkey_mprotect
+	SECCOMP_ALLOW(__NR_pkey_mprotect),
 #endif
 
 	/* Deny everything else */
