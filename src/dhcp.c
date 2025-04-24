@@ -2384,8 +2384,8 @@ dhcp_bound(struct interface *ifp, uint8_t old_state)
 	if (ctx->options & DHCPCD_MANAGER ||
 	    ifp->options->options & DHCPCD_STATIC ||
 	    (state->old != NULL &&
-		state->old->yiaddr == state->new->yiaddr) ||
-	    (old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
+	     state->old->yiaddr == state->new->yiaddr &&
+	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
 		return;
 
 	dhcp_closeinet(ifp);
