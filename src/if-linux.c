@@ -1137,7 +1137,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 
 	/* Handle interface being renamed */
 	if (strcmp(ifp->name, ifn) != 0) {
-		dhcpcd_handleinterface(ctx, -1, ifn);
+		dhcpcd_handleinterface(ctx, -1, ifp->name);
 		dhcpcd_handleinterface(ctx, 1, ifn);
 		return 0;
 	}
