@@ -522,18 +522,19 @@ option instead.
 Timeout after
 .Ar seconds ,
 instead of the default 30.
+On timeout,
+.Nm
+will exit if the
+.Fl 1 ,
+.Fl Fl oneshot
+option has been given,
+otherwise it will fork into the background and keep on
+trying.
 A setting of 0
 .Ar seconds
 causes
 .Nm
 to wait forever to get a lease.
-If
-.Nm
-is working on a single interface then
-.Nm
-will exit when a timeout occurs, otherwise
-.Nm
-will fork into the background.
 .It Fl u , Fl Fl userclass Ar class
 Tags the DHCPv4 message with the userclass
 .Ar class .
