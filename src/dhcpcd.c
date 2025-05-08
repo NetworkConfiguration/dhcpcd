@@ -208,7 +208,8 @@ handle_exit_timeout(void *arg)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
-	ctx->options |= DHCPCD_NOWAITIP;
+
+	ctx->options |= DHCPCD_BACKGROUND;
 	dhcpcd_daemonise(ctx);
 }
 
@@ -366,7 +367,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	int exit_code;
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
-	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
+	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_BACKGROUND)))
 	{
 		if (!dhcpcd_ipwaited(ctx))
 			return;
