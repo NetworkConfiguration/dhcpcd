@@ -539,6 +539,8 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 		sin = (const void *)sa;
 		if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
 			return ia->iface;
+		if ((ia = ipv6_finddstaddr(ctx, &sin->sin6_addr)))
+			return ia->iface;
 		break;
 	}
 #endif
@@ -1004,12 +1006,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	case AF_INET6:
 	{
 		struct in6_addr			addr6, mask6;
+		const struct in6_addr		*dstaddr6;
 		const struct sockaddr_in6	*sin6;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
+		sin6 = (const void *)rti_info[RTAX_BRD];
+		dstaddr6 = sin6 ? &sin6->sin6_addr : NULL;
 
 		if (ifam->ifam_type == RTM_DELADDR) {
 			struct ipv6_addr	*ia;
@@ -1029,7 +1034,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifalias, &addr6, ipv6_prefixlen(&mask6), flags, 0);
+		    NULL, ifalias, &addr6, ipv6_prefixlen(&mask6),
+		    dstaddr6, flags, 0);
 		break;
 	}
 #endif

@@ -665,6 +665,8 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 			return if_findindex(ctx->ifaces, scope);
 		if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
 			return ia->iface;
+		if ((ia = ipv6_finddstaddr(ctx, &sin->sin6_addr)))
+			return ia->iface;
 		break;
 	}
 #endif
@@ -1508,12 +1510,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	case AF_INET6:
 	{
 		struct in6_addr addr6, mask6;
+		const struct in6_addr *dstaddr6;
 		const struct sockaddr_in6 *sin6;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
+		sin6 = (const void *)rti_info[RTAX_BRD];
+		dstaddr6 = sin6 ? &sin6->sin6_addr : NULL;
 
 		/*
 		 * If the address was deleted, lets check if it's
@@ -1539,7 +1544,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 #endif
 
 		ipv6_handleifa(ctx, ifam->ifam_type, NULL,
-		    ifp->name, &addr6, ipv6_prefixlen(&mask6), flags, pid);
+		    ifp->name, &addr6, ipv6_prefixlen(&mask6),
+		    dstaddr6, flags, pid);
 		break;
 	}
 #endif
