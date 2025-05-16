@@ -597,7 +597,7 @@ ipv6_checkaddrflags(void *arg)
 		/* Simulate the kernel announcing the new address. */
 		ipv6_handleifa(ia->iface->ctx, RTM_NEWADDR,
 		    ia->iface->ctx->ifaces, ia->iface->name,
-		    &ia->addr, ia->prefix_len, ia->dstaddr, flags, 0);
+		    &ia->addr, ia->prefix_len, &ia->dstaddr, flags, 0);
 	} else {
 		/* Still tentative? Check again in a bit. */
 		eloop_timeout_add_msec(ia->iface->ctx->eloop,
