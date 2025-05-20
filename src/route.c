@@ -674,6 +674,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 logerr:
 #endif
 	logerr("if_route (ADD)");
+	result = false;
 
 out:
 	if (krt != NULL) {
