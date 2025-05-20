@@ -189,6 +189,11 @@ static void routeinfohead_free(struct routeinfohead *);
 #define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)
 #define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
 
+/* Clear these addrflags on receipt of a new RA before adding the new flags
+ * dervived from the RA. */
+#define RA_STALE_FLAGS \
+	(IPV6_AF_ONLINK | IPV6_AF_AUTOCONF | IPV6_AF_ROUTER | IPV6_AF_STALE)
+
 void
 ipv6nd_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -1294,8 +1299,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				else
 					ia->prefix_pltime = ia->prefix_vltime;
 
+				ia->flags &= ~RA_STALE_FLAGS;
 				ia->flags |= flags;
-				ia->flags &= ~IPV6_AF_STALE;
 				ia->acquired = rap->acquired;
 
 #ifdef IPV6_MANAGETEMPADDR
