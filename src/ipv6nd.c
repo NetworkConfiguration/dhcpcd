@@ -507,7 +507,7 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 				continue;
 			if (ra1->lifetime == 0 && ra2->lifetime != 0)
 				continue;
-			if (!ra1->isreachable && ra2->reachable)
+			if (!ra1->isreachable && ra2->isreachable)
 				continue;
 			if (ipv6nd_rtpref(ra1->flags) <= ipv6nd_rtpref(ra2->flags))
 				continue;
