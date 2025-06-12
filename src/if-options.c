@@ -1995,6 +1995,15 @@ err_sla:
 				return -1;
 			}
 			*fp++ = '\0';
+		} else if (strcasecmp(arg, "truncated") == 0) {
+			t |= OT_TRUNCATED;
+			arg = strskipwhite(fp);
+			fp = strwhite(arg);
+			if (fp == NULL) {
+				logerrx("incomplete truncated type");
+				return -1;
+			}
+			*fp++ = '\0';
 		}
 		if (strcasecmp(arg, "ipaddress") == 0)
 			t |= OT_ADDRIPV4;
@@ -2083,6 +2092,10 @@ err_sla:
 				np = NULL;
 				t |= OT_RESERVED;
 			}
+		}
+		if (t & OT_TRUNCATED && t != (OT_ADDRIPV6 | OT_TRUNCATED)) {
+			logerrx("truncated only works for ip6address");
+			return -1;
 		}
 		if (opt != O_EMBED) {
 			for (dl = 0, ndop = *dop; dl < *dop_len; dl++, ndop++)
