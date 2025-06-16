@@ -2830,6 +2830,16 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	/* Parse our options file */
 	buflen = dhcp_readfile(ctx, ctx->cffile, buf, sizeof(buf));
+	/* If we can't find the config file in the new location,
+	 * retry the old location. */
+	if (buflen == -1 && errno == ENOENT &&
+	    strcmp(ctx->cffile, CONFIG) == 0)
+	{
+		const int olderrno = errno;
+		buflen = dhcp_readfile(ctx, CONFIG_OLD, buf, sizeof(buf));
+		errno = olderrno;
+	}
+
 	if (buflen == -1) {
 		/* dhcpcd can continue without it, but no DNS options
 		 * would be requested ... */

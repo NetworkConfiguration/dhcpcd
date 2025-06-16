@@ -218,11 +218,15 @@ space-separated list of delegated prefixes.
 When
 .Nm
 runs, it loads
-.Pa @SYSCONFDIR@/dhcpcd.enter-hook ,
+.Pa @SYSCONFDIR@/dhcpcd/enter-hook ,
 any scripts found in
+.Pa @SYSCONFDIR@/dhcpcd/enter-hooks.d ,
+in lexical order, any scripts found in
 .Pa @HOOKDIR@
-in lexical order, then finally
-.Pa @SYSCONFDIR@/dhcpcd.exit-hook .
+in lexical order, any scripts found in
+.Pa @SYSCONFDIR@/dhcpcd/exit-hooks.d .
+in lexical order, and then finally
+.Pa @SYSCONFDIR@/dhcpcd/exit-hook .
 .Sh SEE ALSO
 .Xr dhcpcd 8
 .Sh AUTHORS

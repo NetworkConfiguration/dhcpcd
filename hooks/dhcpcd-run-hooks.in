@@ -335,7 +335,11 @@ service_condcommand()
 # /etc/resolv.conf how they want and stop the system scripts ever updating it.
 for hook in \
 	@SYSCONFDIR@/dhcpcd.enter-hook \
+	@SYSCONFDIR@/dhcpcd/enter-hook \
+	@SYSCONFDIR@/dhcpcd/enter-hooks.d/* \
 	@HOOKDIR@/* \
+	@SYSCONFDIR@/dhcpcd/exit-hooks.d/*
+	@SYSCONFDIR@/dhcpcd/exit-hook
 	@SYSCONFDIR@/dhcpcd.exit-hook
 do
 	case "$hook" in

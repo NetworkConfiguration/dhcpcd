@@ -94,14 +94,21 @@ _maninstall: ${MAN5} ${MAN8}
 	${INSTALL} -m ${MANMODE} ${MAN8} ${DESTDIR}${MANDIR}/man8
 
 _confinstall:
-	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}
+	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}/dhcpcd
+	# Copy existig config to new location if not present
+	if ! [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd/dhcpcd.conf ] && \
+	    [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf ]; then \
+		mv ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf \
+			${DESTDIR}${SYSCONFDIR}/dhcpcd; \
+	fi
 	# Install a new default config if not present
-	if ! [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf ]; then \
-		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}; \
+	if ! [ -e ${DESTDIR}${SYSCONFDIR}/dhcpcd/dhcpcd.conf ]; then \
+		${INSTALL} -m ${CONFMODE} dhcpcd.conf \
+			${DESTDIR}${SYSCONFDIR}/dhcpcd; \
 		if [ "${UNCOMMENT_NTP}" = yes ]; then \
 			${SED} -i \
 			    -e 's/#option ntp_servers/option ntp_servers/' \
-			    ${DESTDIR}/${SYSCONFDIR}/dhcpcd.conf; \
+			    ${DESTDIR}/${SYSCONFDIR}/dhcpcd/dhcpcd.conf; \
 		fi; \
 	fi
 	

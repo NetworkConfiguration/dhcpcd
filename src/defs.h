@@ -36,7 +36,10 @@
 #endif
 
 #ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
+# define CONFIG			SYSCONFDIR "/" PACKAGE "/" PACKAGE ".conf"
+#endif
+#ifndef CONFIG_OLD
+# define CONFIG_OLD		SYSCONFDIR "/" PACKAGE ".conf"
 #endif
 #ifndef SCRIPT
 # define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
