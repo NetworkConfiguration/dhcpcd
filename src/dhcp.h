@@ -45,6 +45,10 @@
 #include "auth.h"
 #include "dhcp-common.h"
 
+/* IP header values */
+#define DHCP_TTL		128	/* IPDEFTTL of 64 maybe to low */
+#define DHCP_TOS		IPTOS_LOWDELAY /* try to get DHCP fast */
+
 /* UDP port numbers for BOOTP */
 #define BOOTPS			67
 #define BOOTPC			68

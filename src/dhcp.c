@@ -1786,10 +1786,16 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	ip->ip_len = udp->uh_ulen;
 	udp->uh_sum = in_cksum(udpp, sizeof(*ip) + sizeof(*udp) + length, NULL);
 
+	/* RFC 6864 4.1
+	 * The IPv4 ID field MUST NOT be used for purposes other than
+	 * fragmentation and reassembly.
+	 *
+	 * DHCP cannot be fragmented.
+	 */
 	ip->ip_v = IPVERSION;
 	ip->ip_hl = sizeof(*ip) >> 2;
-	ip->ip_id = (uint16_t)arc4random_uniform(UINT16_MAX);
-	ip->ip_ttl = IPDEFTTL;
+	ip->ip_tos = DHCP_TOS;
+	ip->ip_ttl = DHCP_TTL;
 	ip->ip_len = htons((uint16_t)(sizeof(*ip) + sizeof(*udp) + length));
 	ip->ip_sum = in_cksum(ip, sizeof(*ip), NULL);
 	if (ip->ip_sum == 0)
