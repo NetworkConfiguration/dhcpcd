@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Linux interface driver for dhcpcd
- * Copyright (c) 2006-2024 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -702,6 +702,27 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_DST:
 			sa = &rt->rt_dest;
 			break;
+		case RTA_SRC:
+		{
+			union sa_ss ssa;
+			struct sockaddr *psa = (struct sockaddr *)&ssa;
+			socklen_t salen;
+
+			psa->sa_family = rtm->rtm_family;
+			salen = sa_addrlen(psa);
+			memcpy((char *)psa + sa_addroffset(psa),
+			       RTA_DATA(rta), MIN(salen, RTA_PAYLOAD(rta)));
+			/* if ip-route "from" address is not unspecified,
+                           route is source-based, eg:
+                             <dest-net> from <source-net> via ... dev ...
+                           ignore the route as may otherwise appear to overlap
+                           with routes set/removed by dhcpcd */
+			if (!sa_is_unspecified(psa)) {
+				errno = ENOTSUP;
+				return -1;
+			}
+			break;
+		}
 		case RTA_GATEWAY:
 			sa = &rt->rt_gateway;
 			break;
@@ -731,6 +752,34 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			}
 			break;
 		}
+#ifdef HAVE_ROUTE_LIFETIME
+		case RTA_CACHEINFO:
+		{
+			struct rta_cacheinfo ci;
+			static long hz;
+
+			if (hz == 0) {
+				hz = sysconf(_SC_CLK_TCK);
+				if (hz == -1)
+					hz = CLOCKS_PER_SEC;
+			}
+
+			memcpy(&ci, RTA_DATA(rta), sizeof(ci));
+			rt->rt_lifetime = (uint32_t)(ci.rta_expires / hz);
+			break;
+		}
+#endif
+#if 0
+		case RTA_EXPIRES:
+			/* Reading the kernel source, this is only
+			 * emitted by IPv4 multicast routes as a UINT64.
+			 * Although we can set it for IPv6 routes as a UINT32,
+			 * the kernel will massage the value to HZ and put it
+			 * into RTA_CACHINFO as read above.
+			 * Gotta love that consistency! */
+			rt->rt_lifetime = (uint32_t)*(uint64_t *)RTA_DATA(rta);
+			break;
+#endif
 		}
 
 		if (sa != NULL) {
@@ -827,7 +876,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	int ret;
 #endif
 #ifdef INET6
-	struct in6_addr *local6 = NULL, *address6 = NULL;
+	struct in6_addr *local6 = NULL, *addr6 = NULL, *dstaddr6 = NULL;
 	int flags;
 #endif
 
@@ -908,7 +957,10 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 			case IFA_ADDRESS:
-				address6 = (struct in6_addr *)RTA_DATA(rta);
+				addr6 = (struct in6_addr *)RTA_DATA(rta);
+				break;
+			case IFA_BROADCAST:
+				dstaddr6 = (struct in6_addr *)RTA_DATA(rta);
 				break;
 			case IFA_LOCAL:
 				local6 = (struct in6_addr *)RTA_DATA(rta);
@@ -916,13 +968,13 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			}
 		}
 		if (local6 != NULL)
-			address6 = local6;
-		if (address6 == NULL)
+			addr6 = local6;
+		if (addr6 == NULL)
 			break; /* should be impossible */
 
 		/* Validate RTM_DELADDR really means address deleted
 		 * and anything else really means address exists. */
-		flags = if_addrflags6(ifp, address6, NULL);
+		flags = if_addrflags6(ifp, addr6, NULL);
 		if (nlm->nlmsg_type == RTM_DELADDR) {
 			if (flags != -1)
 				break;
@@ -932,8 +984,8 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		}
 
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    address6, ifa->ifa_prefixlen, ifa->ifa_flags,
-		    (pid_t)nlm->nlmsg_pid);
+		    addr6, ifa->ifa_prefixlen, dstaddr6,
+		    ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
 		break;
 #endif
 	}
@@ -1004,7 +1056,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	struct interface *ifp = arg;
 	int r;
 	size_t len;
-	struct rtattr *rta, *hwaddr;
+	struct rtattr *rta, *hwaddr, *mtu;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
 
@@ -1033,7 +1085,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	rta = (void *)((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
-	hwaddr = NULL;
+	hwaddr = mtu = NULL;
 
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
@@ -1048,6 +1100,9 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 			break;
 		case IFLA_ADDRESS:
 			hwaddr = rta;
+			break;
+		case IFLA_MTU:
+			mtu = rta;
 			break;
 		}
 	}
@@ -1085,10 +1140,13 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 
 	/* Handle interface being renamed */
 	if (strcmp(ifp->name, ifn) != 0) {
-		dhcpcd_handleinterface(ctx, -1, ifn);
+		dhcpcd_handleinterface(ctx, -1, ifp->name);
 		dhcpcd_handleinterface(ctx, 1, ifn);
 		return 0;
 	}
+
+	if (mtu != NULL)
+		ifp->mtu = (int)*(unsigned int *)RTA_DATA(mtu);
 
 	/* Re-read hardware address and friends */
 	if (!(ifi->ifi_flags & IFF_UP)) {
@@ -1714,6 +1772,15 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (!sa_is_loopback(&rt->rt_gateway))
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
+#ifdef HAVE_ROUTE_LIFETIME
+	if (rt->rt_lifetime != 0) {
+		uint32_t expires;
+
+		expires = lifetime_left(rt->rt_lifetime, &rt->rt_aquired, NULL);
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, expires);
+	}
+#endif
+
 	if (rt->rt_metric != 0)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
 		    rt->rt_metric);
@@ -1786,6 +1853,7 @@ bpf_open(const struct interface *ifp,
 	if (bpf == NULL)
 		return NULL;
 	bpf->bpf_ifp = ifp;
+	bpf->bpf_flags = BPF_EOF;
 
 	/* Allocate a suitably large buffer for a single packet. */
 	bpf->bpf_size = ETH_FRAME_LEN;

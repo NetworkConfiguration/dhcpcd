@@ -118,6 +118,10 @@ distclean: clean
 	rm -f *.diff *.patch *.orig *.rej
 
 _import-src: ${SRCS} ${MAN5} ${MAN8}
+	@if ! [ -e ../config.h ]; then \
+		echo "Cowardly refusing to import-src unless configured" >&2; \
+		exit 1; \
+	fi
 	${INSTALL} -d ${DESTDIR}/src
 	for x in defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5} ${MAN8}; do \
 		[ ! -e "$$x" ] || cp $$x ${DESTDIR}/src; \

@@ -129,6 +129,12 @@ still. If you do this, please report the issue so that we can adjust the
 SECCOMP filter so that dhcpcd can use SECCOMP once more.
 Or convince the libc/kernel people to adpot something more maintainable
 like FreeBSD's capsicum or OpenBSD's pledge.
+To test ASAN with privsep you need to add ASAN to CPPFLAGS.
+To test Valgrind with privsep you can optionally add VALGRIND to CPPFLAGS.
+For both they need some syscalls which are potentially dangerous and thus
+are disabled by default.
+For Valgrind, it needs to unlink the pipe files which it can't do anyway
+as it's dropped permissions. Otherwise it works fine.
 
 ## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.

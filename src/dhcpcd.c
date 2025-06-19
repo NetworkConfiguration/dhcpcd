@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2024 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  */
 
-static const char dhcpcd_copyright[] = "Copyright (c) 2006-2024 Roy Marples";
+static const char dhcpcd_copyright[] = "Copyright (c) 2006-2025 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/socket.h>
@@ -198,7 +198,7 @@ handle_exit_timeout(void *arg)
 
 	ctx = arg;
 	logerrx("timed out");
-	if (!(ctx->options & DHCPCD_MANAGER)) {
+	if (ctx->options & DHCPCD_ONESHOT) {
 		struct interface *ifp;
 
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
@@ -208,7 +208,8 @@ handle_exit_timeout(void *arg)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
-	ctx->options |= DHCPCD_NOWAITIP;
+
+	ctx->options |= DHCPCD_BACKGROUND;
 	dhcpcd_daemonise(ctx);
 }
 
@@ -366,7 +367,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	int exit_code;
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
-	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
+	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_BACKGROUND)))
 	{
 		if (!dhcpcd_ipwaited(ctx))
 			return;
@@ -722,6 +723,9 @@ dhcpcd_nocarrier_roaming(struct interface *ifp)
 #endif
 #ifdef INET
 	dhcp_abort(ifp);
+#endif
+#ifdef INET6
+	ipv6nd_abort(ifp);
 #endif
 #ifdef DHCP6
 	dhcp6_abort(ifp);
@@ -1142,7 +1146,7 @@ dhcpcd_handlelink(void *arg, unsigned short events)
 			dhcpcd_linkoverflow(ctx);
 			return;
 		}
-		if (errno != ENOTSUP)
+		if (errno != ENOTSUP && errno != ENXIO)
 			logerr(__func__);
 	}
 }
@@ -1153,10 +1157,8 @@ dhcpcd_checkcarrier(void *arg)
 	struct interface *ifp0 = arg, *ifp;
 
 	ifp = if_find(ifp0->ctx->ifaces, ifp0->name);
-	if (ifp == NULL || ifp->carrier == ifp0->carrier)
-		return;
-
-	dhcpcd_handlecarrier(ifp, ifp0->carrier, ifp0->flags);
+	if (ifp != NULL)
+		dhcpcd_handlecarrier(ifp, ifp0->carrier, ifp0->flags);
 	if_free(ifp0);
 }
 
@@ -1315,10 +1317,12 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	script_runreason(ifp, "RECONFIGURE");
 	dhcpcd_initstate1(ifp, argc, argv, 0);
 #ifdef INET
-	dhcp_reboot_newopts(ifp, oldopts);
+	if (ifp->options->options & DHCPCD_DHCP)
+		dhcp_reboot_newopts(ifp, oldopts);
 #endif
 #ifdef DHCP6
-	dhcp6_reboot(ifp);
+	if (ifp->options->options & DHCPCD_DHCP6)
+		dhcp6_reboot(ifp);
 #endif
 	dhcpcd_prestartinterface(ifp);
 }
@@ -1893,7 +1897,7 @@ dhcpcd_pidfile_timeout(void *arg)
 	if(pid == -1)
 		eloop_exit(ctx->eloop, EXIT_SUCCESS);
 	else if (++ctx->duid_len >= 100) { /* overload duid_len */
-		logerrx("pid %d failed to exit", pid);
+		logerrx("pid %d failed to exit", (int)pid);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 	} else
 		eloop_timeout_add_msec(ctx->eloop, 100,
@@ -2172,9 +2176,6 @@ main(int argc, char **argv, char **envp)
 	ctx.options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (ctx.options & DHCPCD_DEBUG)
-		logsetopts(logopts | LOGERR_DEBUG);
-
 	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 printpidfile:
 		/* If we have any other args, we should run as a single dhcpcd
@@ -2247,7 +2248,7 @@ printpidfile:
 	if (sig != 0) {
 		pid = pidfile_read(ctx.pidfile);
 		if (pid != 0 && pid != -1)
-			loginfox("sending signal %s to pid %d", siga, pid);
+			loginfox("sending signal %s to pid %d", siga, (int)pid);
 		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
 			if (pid != 0 && pid != -1 && errno != ESRCH) {
 				logerr("kill");
@@ -2260,7 +2261,7 @@ printpidfile:
 			if (sig == SIGHUP || sig == SIGUSR1)
 				goto exit_success;
 			/* Spin until it exits */
-			loginfox("waiting for pid %d to exit", pid);
+			loginfox("waiting for pid %d to exit", (int)pid);
 			dhcpcd_pidfile_timeout(&ctx);
 			goto run_loop;
 		}
@@ -2386,7 +2387,7 @@ printpidfile:
 			else
 				logerrx(PACKAGE
 				    " already running on pid %d (%s)",
-				    pid, ctx.pidfile);
+				    (int)pid, ctx.pidfile);
 			goto exit_failure;
 		}
 	}
@@ -2467,12 +2468,12 @@ printpidfile:
 
 	/* We have now forked, setsid, forked once more.
 	 * From this point on, we are the controlling daemon. */
-	logdebugx("spawned manager process on PID %d", getpid());
+	logdebugx("spawned manager process on PID %d", (int)getpid());
 
 start_manager:
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
-		logerr("%s: pidfile_lock %d", __func__, pid);
+		logerr("%s: pidfile_lock %d", __func__, (int)pid);
 #ifdef PRIVSEP
 		/* privsep has not started ... */
 		ctx.options &= ~DHCPCD_PRIVSEP;

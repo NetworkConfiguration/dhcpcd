@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2024 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -548,7 +548,7 @@ ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	    IN_ARE_ADDR_EQUAL(&state->addr->addr, &ia->addr))
 	{
 		loginfox("%s: pid %d deleted IP address %s",
-		    ifp->name, pid, ia->saddr);
+		    ifp->name, (int)pid, ia->saddr);
 		ipv4ll_defend_failed(ifp);
 		return ia;
 	}

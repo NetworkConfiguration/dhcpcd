@@ -71,7 +71,7 @@ distinfo: dist
 	${SHA256} ${DISTFILE} >${DISTINFO}
 	wc -c <${DISTFILE} \
 		| xargs printf 'Size   (${DISTFILE}) = %s\n' >>${DISTINFO}
-	${PGP} --armour --detach-sign ${DISTFILE}
+	${PGP} --sign --armour --detach ${DISTFILE}
 	chmod 644 ${DISTSIGN}
 	ls -l ${DISTFILE} ${DISTINFO} ${DISTSIGN}
 

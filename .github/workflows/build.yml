@@ -20,7 +20,7 @@ jobs:
     - uses: actions/checkout@v2
     
     - name: Configure
-      run: ./configure --prefix=/usr
+      run: ./configure
 
     - name: Build
       run: make
@@ -29,7 +29,7 @@ jobs:
       run: make tests
 
   openbsd:
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     steps:
     - name: Bootstrap OpenBSD-latest
       uses: mario-campos/emulate@v1
@@ -44,9 +44,7 @@ jobs:
         git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
         cd build
         [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
-        echo "configure"
-        ./configure --prefix=/usr
-        echo "building"
+        ./configure
         make
 
     - name: Tests
@@ -56,7 +54,7 @@ jobs:
         make tests
 
   freebsd:
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     steps:
     - name: Bootstrap FreeBSD-latest
       uses: mario-campos/emulate@v1
@@ -71,9 +69,7 @@ jobs:
         git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
         cd build
         [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
-        echo "configure"
-        ./configure --prefix=/usr
-        echo "building"
+        ./configure
         make
 
     - name: Tests
@@ -82,7 +78,19 @@ jobs:
          make tests
 
   netbsd:
-    runs-on: macos-12
+    strategy:
+      matrix:
+        args:
+          -
+          - --disable-ipv4
+          - --disable-arp
+          - --disable-ipv4ll
+          - --disable-ipv6
+          - --disable-dhcp6
+        cppflags:
+          -
+          - -DSMALL
+    runs-on: ubuntu-latest
     steps:
     - name: Bootstrap NetBSD-latest
       uses: mario-campos/emulate@v1
@@ -94,9 +102,7 @@ jobs:
         git clone --depth=1 "${{ github.server_url }}/${{ github.repository }}" build
         cd build
         [ "${{ github.event.pull_request.number }}" = "" ] || (echo "fetching PR ${{ github.event.pull_request.number }}"; git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }} && git checkout "pr-${{ github.event.pull_request.number }}")
-        echo "configure"
-        ./configure --prefix=/usr
-        echo "building"
+        CFLAGS=-Werror CPPFLAGS="${{ matrix.cppflags }}" ./configure ${{ matrix.args }}
         make
 
     - name: Tests

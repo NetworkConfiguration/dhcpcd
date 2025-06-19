@@ -257,7 +257,7 @@ return_pid:
 	 * Then write the process ID. */
 	if (ftruncate(pidfile_fd, 0) == -1 ||
 	    lseek(pidfile_fd, 0, SEEK_SET) == -1 ||
-	    dprintf(pidfile_fd, "%d\n", pidfile_pid) == -1)
+	    dprintf(pidfile_fd, "%d\n", (int)pidfile_pid) == -1)
 	{
 		int error = errno;
 

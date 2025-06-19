@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2024 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -170,6 +170,7 @@ struct ipv6_addr {
 	struct timespec created;
 	struct timespec acquired;
 	struct in6_addr addr;
+	struct in6_addr dstaddr;
 	int addr_flags;
 	unsigned int flags;
 	char saddr[INET6_ADDRSTRLEN];
@@ -254,14 +255,15 @@ int ipv6_userprefix( const struct in6_addr *, short prefix_len,
 void ipv6_checkaddrflags(void *);
 void ipv6_markaddrsstale(struct interface *, unsigned int);
 void ipv6_deletestaleaddrs(struct interface *);
-int ipv6_addaddr(struct ipv6_addr *, const struct timespec *);
+int ipv6_addaddr(struct ipv6_addr *, struct timespec *);
 int ipv6_doaddr(struct ipv6_addr *, struct timespec *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *addrs);
 void ipv6_deleteaddr(struct ipv6_addr *);
 void ipv6_freedrop_addrs(struct ipv6_addrhead *, int, unsigned int,
     const struct interface *);
 void ipv6_handleifa(struct dhcpcd_ctx *ctx, int, struct if_head *,
-    const char *, const struct in6_addr *, uint8_t, int, pid_t);
+    const char *, const struct in6_addr *, uint8_t,
+    const struct in6_addr *, int, pid_t);
 int ipv6_handleifa_addrs(int, struct ipv6_addrhead *, const struct ipv6_addr *,
     pid_t);
 struct ipv6_addr *ipv6_iffindaddr(struct interface *,
@@ -273,6 +275,8 @@ int ipv6_findaddrmatch(const struct ipv6_addr *, const struct in6_addr *,
 struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, unsigned int);
 struct ipv6_addr *ipv6_findmaskaddr(struct dhcpcd_ctx *,
+    const struct in6_addr *);
+struct ipv6_addr *ipv6_finddstaddr(struct dhcpcd_ctx *,
     const struct in6_addr *);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL, IN6_IFF_NOTUSEABLE)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
@@ -289,7 +293,7 @@ void ipv6_freedrop(struct interface *, int);
 struct ipv6_addr *ipv6_createtempaddr(struct ipv6_addr *,
     const struct timespec *);
 struct ipv6_addr *ipv6_settemptime(struct ipv6_addr *, int);
-void ipv6_addtempaddrs(struct interface *, const struct timespec *);
+void ipv6_addtempaddrs(struct interface *, struct timespec *);
 void ipv6_regentempaddrs(void *);
 #endif
 

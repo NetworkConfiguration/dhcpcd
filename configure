@@ -437,6 +437,7 @@ int main(void) {
 EOF
 		if $CC -fsanitize=address _test.c -o _test 2>&3; then
 			echo "yes"
+			echo "CPPFLAGS+=	-DASAN" >>$CONFIG_MK
 			echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
 			echo "CFLAGS+=	-fno-omit-frame-pointer" >>$CONFIG_MK
 			echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK
@@ -817,6 +818,7 @@ $abort && exit 1
 if [ -z "$CLOSEFROM" ]; then
 	printf "Testing for closefrom ... "
 	cat <<EOF >_closefrom.c
+#include <stdlib.h>
 #include <unistd.h>
 int main(void) {
 	closefrom(3);
@@ -1148,9 +1150,31 @@ EOF
 	echo "$CONSTTIME_MEMEQUAL"
 	rm -f _consttime_memequal.c _consttime_memequal
 fi
+if [ "$CONSTTIME_MEMEQUAL" = no ] && [ -z "$TIMINGSAFE_BCMP" ]; then
+	printf "Testing for timingsafe_bcmp ... "
+	cat <<EOF >_timingsafe_bcmp.c
+#include <string.h>
+int main(void) {
+	return timingsafe_bcmp("deadbeef", "deadbeef", 8);
+}
+EOF
+	if $XCC _timingsafe_bcmp.c -o _timingsafe_bcmp 2>&3; then
+		TIMINGSAFE_BCMP=yes
+	else
+		TIMINGSAFE_BCMP=no
+	fi
+	echo "$TIMINGSAFE_BCMP"
+	rm -f _timingsafe_bcmp.c _timingsafe_bcmp
+fi
+
 if [ "$CONSTTIME_MEMEQUAL" = no ]; then
-	echo "#include			\"compat/consttime_memequal.h\"" \
-	    >>$CONFIG_H
+	if [ "$TIMINGSAFE_BCMP" = yes ]; then
+		echo "#define	consttime_memequal	!timingsafe_bcmp" \
+		    >>$CONFIG_H
+	else
+		echo "#include			\"compat/consttime_memequal.h\"" \
+		    >>$CONFIG_H
+	fi
 fi
 
 if [ -z "$DPRINTF" ]; then

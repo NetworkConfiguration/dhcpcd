@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2024 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -723,6 +724,77 @@ dhcp_message_add_addr(struct bootp *bootp,
 	return 0;
 }
 
+#ifndef SMALL
+struct rfc3396_ctx {
+	uint8_t code;
+	uint8_t *len;
+	uint8_t **buf;
+	size_t buflen;
+};
+
+/* Encode data as a DHCP Long Option, RFC 3396. */
+/* NOTE: Wireshark does not decode this correctly
+ * when the option overflows the boundary and another option
+ * is created to hold the resta of the data.
+ * Tested against Wireshark-4.4.1 */
+#define RFC3396_BOUNDARY 255UL
+static ssize_t
+rfc3396_write(struct rfc3396_ctx *ctx, void *data, size_t len)
+{
+	uint8_t *datap = data;
+	size_t wlen, left, r = 0;
+
+	while (len != 0) {
+		if (ctx->len == NULL || *ctx->len == RFC3396_BOUNDARY) {
+			if (ctx->buflen < 2) {
+				errno = ENOMEM;
+				return -1;
+			}
+			*(*ctx->buf)++ = ctx->code;
+			ctx->len = (*ctx->buf)++;
+			*ctx->len = 0;
+			ctx->buflen -= 2;
+			r += 2;
+		}
+
+		wlen = len < RFC3396_BOUNDARY ? len : RFC3396_BOUNDARY;
+		left = RFC3396_BOUNDARY - *ctx->len;
+		if (left < wlen)
+			wlen = left;
+		if (ctx->buflen < wlen) {
+			errno = ENOMEM;
+			return -1;
+		}
+
+		memcpy(*ctx->buf, datap, wlen);
+		datap += wlen;
+		*ctx->buf += wlen;
+		ctx->buflen -= wlen;
+		*ctx->len = (uint8_t)(*ctx->len + wlen);
+		len -= wlen;
+		r += wlen;
+	}
+
+	return (ssize_t)r;
+}
+
+static ssize_t
+rfc3396_write_byte(struct rfc3396_ctx *ctx, uint8_t byte)
+{
+
+	return rfc3396_write(ctx, &byte, sizeof(byte));
+}
+
+static uint8_t *
+rfc3396_zero(struct rfc3396_ctx *ctx) {
+	uint8_t *zerop = *ctx->buf, zero = 0;
+
+	if (rfc3396_write(ctx, &zero, sizeof(zero)) == -1)
+		return NULL;
+	return zerop;
+}
+#endif
+
 static ssize_t
 make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 {
@@ -738,7 +810,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	const struct dhcp_lease *lease = &state->lease;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
-	const struct vivco *vivco;
 	int mtu;
 #ifdef AUTH
 	uint8_t *auth, auth_len;
@@ -1067,33 +1138,77 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		       p += ifo->mudurl[0] + 1;
 		}
 
+#ifndef SMALL
 		if (ifo->vivco_len &&
 		    !has_option_mask(ifo->nomask, DHO_VIVCO))
 		{
-			AREA_CHECK(sizeof(ul));
-			*p++ = DHO_VIVCO;
-			lp = p++;
-			*lp = sizeof(ul);
-			ul = htonl(ifo->vivco_en);
-			memcpy(p, &ul, sizeof(ul));
-			p += sizeof(ul);
-			for (i = 0, vivco = ifo->vivco;
-			    i < ifo->vivco_len;
-			    i++, vivco++)
-			{
-				AREA_FIT(vivco->len);
-				if (vivco->len + 2 + *lp > 255) {
-					logerrx("%s: VIVCO option too big",
-					    ifp->name);
-					free(bootp);
-					return -1;
-				}
-				*p++ = (uint8_t)vivco->len;
-				memcpy(p, vivco->data, vivco->len);
-				p += vivco->len;
+			struct vivco *vivco = ifo->vivco;
+			size_t vlen = ifo->vivco_len;
+			struct rfc3396_ctx rctx = {
+				.code = DHO_VIVCO,
+				.buf = &p,
+				.buflen = AREA_LEFT,
+			};
+
+			for (; vlen > 0; vivco++, vlen--) {
+				ul = htonl(vivco->en);
+				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
+					goto toobig;
+				lp = rfc3396_zero(&rctx);
+				if (lp == NULL)
+					goto toobig;
+				if (rfc3396_write_byte(&rctx,
+				    (uint8_t)vivco->len) == -1)
+					goto toobig;
+				if (rfc3396_write(&rctx,
+				    vivco->data, vivco->len) == -1)
+					goto toobig;
 				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
 		}
+		
+		if (ifo->vsio_len &&
+		    !has_option_mask(ifo->nomask, DHO_VIVSO))
+		{
+			struct vsio *vso = ifo->vsio;
+			size_t vlen = ifo->vsio_len;
+			struct vsio_so *so;
+			size_t slen;
+			struct rfc3396_ctx rctx = {
+				.code = DHO_VIVSO,
+				.buf = &p,
+				.buflen = AREA_LEFT,
+			};
+
+			for (; vlen > 0; vso++, vlen--) {
+				if (vso->so_len == 0)
+					continue;
+
+				so = vso->so;
+				slen = vso->so_len;
+
+				ul = htonl(vso->en);
+				if (rfc3396_write(&rctx, &ul, sizeof(ul)) == -1)
+					goto toobig;
+				lp = rfc3396_zero(&rctx);
+				if (lp == NULL)
+					goto toobig;
+
+				for (; slen > 0; so++, slen--) {
+					if (rfc3396_write_byte(&rctx,
+					    (uint8_t)so->opt) == -1)
+						goto toobig;
+					if (rfc3396_write_byte(&rctx,
+					    (uint8_t)so->len) == -1)
+						goto toobig;
+					if (rfc3396_write(&rctx,
+					    so->data, so->len) == -1)
+						goto toobig;
+					*lp = (uint8_t)(*lp + so->len + 2);
+				}
+			}
+		}
+#endif
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
@@ -2055,7 +2170,8 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 
 #ifdef IPV4LL
 	/* Stop IPv4LL now we have a working DHCP address */
-	if (!IN_LINKLOCAL(ntohl(ia->s_addr)))
+	if ((!IN_LINKLOCAL(ntohl(ia->s_addr)))
+		&& (ifp->options->options & DHCPCD_IPV4LL))
 		ipv4ll_drop(ifp);
 #endif
 
@@ -2120,12 +2236,18 @@ dhcp_arp_defend_failed(struct arp_state *astate)
 {
 	struct interface *ifp = astate->iface;
 	struct dhcp_state *state = D_STATE(ifp);
+	unsigned int delay;
 
 	if (!(ifp->options->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		dhcp_decline(ifp);
 	dhcp_drop(ifp, "EXPIRED");
 	dhcp_unlink(ifp->ctx, state->leasefile);
-	dhcp_start1(ifp);
+
+	// Delay restarting to give time for the BPF ARP process to exit
+	// as we may spawn a new one with a different filter fairly quickly
+	delay = MSEC_PER_SEC +
+		(arc4random_uniform(MSEC_PER_SEC * 2) - MSEC_PER_SEC);
+	eloop_timeout_add_msec(ifp->ctx->eloop, delay, dhcp_start1, ifp);
 }
 #endif
 
@@ -2247,6 +2369,46 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 #endif
 
 #endif /* ARP */
+
+static void
+dhcp_bound(struct interface *ifp, uint8_t old_state)
+{
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct dhcp_state *state = D_STATE(ifp);
+
+	/* Close the BPF filter as we can now receive DHCP messages
+	 * on a UDP socket. */
+	dhcp_closebpf(ifp);
+
+	/* If not in manager mode, open an address specific socket. */
+	if (ctx->options & DHCPCD_MANAGER ||
+	    ifp->options->options & DHCPCD_STATIC ||
+	    (state->old != NULL &&
+	     state->old->yiaddr == state->new->yiaddr &&
+	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
+		return;
+
+	dhcp_closeinet(ifp);
+#ifdef PRIVSEP
+	if (IN_PRIVSEP_SE(ctx)) {
+		if (ps_inet_openbootp(state->addr) == -1)
+		    logerr(__func__);
+		return;
+	}
+#endif
+
+	state->udp_rfd = dhcp_openudp(&state->addr->addr);
+	if (state->udp_rfd == -1) {
+		logerr(__func__);
+		/* We still need to work, so re-open BPF. */
+		dhcp_openbpf(ifp);
+		return;
+	}
+
+	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
+	    dhcp_handleifudp, ifp) == -1)
+		logerr("%s: eloop_event_add", __func__);
+}
 
 void
 dhcp_bind(struct interface *ifp)
@@ -2374,7 +2536,18 @@ dhcp_bind(struct interface *ifp)
 
 	old_state = state->added;
 
-	if (!(ifo->options & DHCPCD_CONFIGURE)) {
+	if (ifo->options & DHCPCD_CONFIGURE) {
+		/* Add the address */
+		if (ipv4_applyaddr(ifp) == NULL) {
+			/* There was an error adding the address.
+			 * If we are in oneshot, exit with a failure. */
+			if (ctx->options & DHCPCD_ONESHOT) {
+				loginfox("exiting due to oneshot");
+				eloop_exit(ctx->eloop, EXIT_FAILURE);
+			}
+			return;
+		}
+	} else {
 		struct ipv4_addr *ia;
 
 		script_runreason(ifp, state->reason);
@@ -2383,61 +2556,13 @@ dhcp_bind(struct interface *ifp)
 		/* We we are not configuring the address, we need to keep
 		 * the BPF socket open if the address does not exist. */
 		ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
-		if (ia != NULL) {
-			state->addr = ia;
-			state->added = STATE_ADDED;
-			dhcp_closebpf(ifp);
-			goto openudp;
-		}
-		return;
+		if (ia == NULL)
+			return;
+		state->addr = ia;
+		state->added = STATE_ADDED;
 	}
 
-	/* Add the address */
-	if (ipv4_applyaddr(ifp) == NULL) {
-		/* There was an error adding the address.
-		 * If we are in oneshot, exit with a failure. */
-		if (ctx->options & DHCPCD_ONESHOT) {
-			loginfox("exiting due to oneshot");
-			eloop_exit(ctx->eloop, EXIT_FAILURE);
-		}
-		return;
-	}
-
-	/* Close the BPF filter as we can now receive DHCP messages
-	 * on a UDP socket. */
-	dhcp_closebpf(ifp);
-
-openudp:
-	/* If not in manager mode, open an address specific socket. */
-	if (ctx->options & DHCPCD_MANAGER ||
-	    ifo->options & DHCPCD_STATIC ||
-	    (state->old != NULL &&
-	     state->old->yiaddr == state->new->yiaddr &&
-	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
-		return;
-
-	dhcp_closeinet(ifp);
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ctx)) {
-		if (ps_inet_openbootp(state->addr) == -1)
-		    logerr(__func__);
-		return;
-	}
-#endif
-
-	state->udp_rfd = dhcp_openudp(&state->addr->addr);
-	if (state->udp_rfd == -1) {
-		logerr(__func__);
-		/* Address sharing without manager mode is not supported.
-		 * It's also possible another DHCP client could be running,
-		 * which is even worse.
-		 * We still need to work, so re-open BPF. */
-		dhcp_openbpf(ifp);
-		return;
-	}
-	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
-	    dhcp_handleifudp, ifp) == -1)
-		logerr("%s: eloop_event_add", __func__);
+	dhcp_bound(ifp, old_state);
 }
 
 static size_t
@@ -2738,6 +2863,7 @@ void
 dhcp_drop(struct interface *ifp, const char *reason)
 {
 	struct dhcp_state *state = D_STATE(ifp);
+	struct if_options *ifo = ifp->options;
 
 	/* dhcp_start may just have been called and we don't yet have a state
 	 * but we do have a timeout, so punt it. */
@@ -2754,9 +2880,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->arping_index = -1;
 #endif
 
-	if (ifp->options->options & DHCPCD_RELEASE &&
-	    !(ifp->options->options & DHCPCD_INFORM))
-	{
+	if (ifo->options & DHCPCD_RELEASE && !(ifo->options & DHCPCD_INFORM)) {
 		/* Failure to send the release may cause this function to
 		 * re-enter so guard by setting the state. */
 		if (state->state == DHS_RELEASE)
@@ -2802,7 +2926,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->new = NULL;
 	state->new_len = 0;
 	state->reason = reason;
-	if (ifp->options->options & DHCPCD_CONFIGURE)
+	if (ifo->options & DHCPCD_CONFIGURE)
 		ipv4_applyaddr(ifp);
 	else {
 		state->addr = NULL;
@@ -2813,8 +2937,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->old = NULL;
 	state->old_len = 0;
 	state->lease.addr.s_addr = 0;
-	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
-	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
+	ifo->options &= ~(DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 
 	/* Close DHCP ports so a changed interface family is picked
 	 * up by a new BPF state. */
@@ -2952,7 +3075,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t type, tmp;
+	uint8_t type;
 	struct in_addr addr;
 	unsigned int i;
 	char *msg;
@@ -2962,6 +3085,9 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
+#endif
+#ifdef IPV4LL
+	uint8_t tmp;
 #endif
 #ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *ia;
@@ -3210,7 +3336,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			switch (tmp) {
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
-				ipv4ll_drop(ifp);
+				if (ifp->options->options & DHCPCD_IPV4LL)
+					ipv4ll_drop(ifp);
 #ifdef ARP
 				arp_drop(ifp);
 #endif
@@ -3600,7 +3727,8 @@ static void
 dhcp_readbpf(void *arg, unsigned short events)
 {
 	struct interface *ifp = arg;
-	uint8_t buf[FRAMELEN_MAX];
+	/* Sparc64 needs this buffer aligned */
+	alignas(sizeof(struct ip *)) uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct bpf *bpf = state->bpf;
@@ -4207,7 +4335,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	if (cmd == RTM_DELADDR) {
 		if (state->addr == ia) {
 			loginfox("%s: pid %d deleted IP address %s",
-			    ifp->name, pid, ia->saddr);
+			    ifp->name, (int)pid, ia->saddr);
 			dhcp_close(ifp);
 			state->addr = NULL;
 			/* Don't clear the added state as we need
@@ -4230,18 +4358,15 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 	ifo = ifp->options;
 
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ifp->ctx) &&
-	    !(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
+	if (!(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
 	    IN_ARE_ADDR_EQUAL(&state->lease.addr, &ia->addr))
 	{
+		uint8_t old_state = state->added;
+
 		state->addr = ia;
 		state->added = STATE_ADDED;
-		dhcp_closebpf(ifp);
-		if (ps_inet_openbootp(ia) == -1)
-		    logerr(__func__);
+		dhcp_bound(ifp, old_state);
 	}
-#endif
 
 	/* If we have requested a specific address, return now.
 	 * The below code is only for when inform or static has been
