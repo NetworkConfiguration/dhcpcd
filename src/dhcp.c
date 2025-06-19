@@ -894,8 +894,20 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	p += 4;				\
 } while (0 /* CONSTCOND */)
 
-	/* Options are listed in numerical order as per RFC 7844 Section 3.1
-	 * XXX: They should be randomised. */
+	/*
+	 * RFC 7844 3.1 says options should be randomised, but if not
+	 * then in numerical order.
+	 * RFC 2131 makes no mention of any ordering requirement by the client.
+	 * RFC 2132 says this about the Parameter Request List option:
+	 *     The client MAY list the options in order of preference.
+	 *
+	 * Some DHCP servers sadly ignore this and require message type first.
+	 */
+
+	AREA_CHECK(3);
+	*p++ = DHO_MESSAGETYPE;
+	*p++ = 1;
+	*p++ = type;
 
 	bool putip = false;
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
@@ -909,11 +921,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			PUT_ADDR(DHO_IPADDRESS, &lease->addr);
 		}
 	}
-
-	AREA_CHECK(3);
-	*p++ = DHO_MESSAGETYPE;
-	*p++ = 1;
-	*p++ = type;
 
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
 		if (type == DHCP_RELEASE || putip) {
