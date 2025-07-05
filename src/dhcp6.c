@@ -3403,12 +3403,8 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		dhcp6_script_try_run(ifp, 0);
 	}
 
-	if (ifp->ctx->options & DHCPCD_TEST ||
-	    (ifp->options->options & DHCPCD_INFORM &&
-	    !(ifp->ctx->options & DHCPCD_MANAGER)))
-	{
+	if (ifp->ctx->options & DHCPCD_TEST)
 		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-	}
 }
 
 static void
