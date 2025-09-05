@@ -34,7 +34,7 @@ DEPEND!=	test -e .depend && echo ".depend" || echo ""
 
 CLEANFILES+=	*.tar.xz
 
-.PHONY:		import import-bsd dev test
+.PHONY:		import import-bsd dev test uninstall
 
 .SUFFIXES:	.in
 
@@ -108,6 +108,18 @@ _confinstall:
 eginstall:
 
 install: proginstall _maninstall _confinstall eginstall
+
+uninstall:
+	# Remove binary
+	rm -f ${DESTDIR}${SBINDIR}/${PROG}
+	# Remove man pages
+	rm -f ${DESTDIR}${MANDIR}/man5/${MAN5}
+	rm -f ${DESTDIR}${MANDIR}/man8/${MAN8}
+	# Remove embedded definitions file
+	rm -f ${DESTDIR}${LIBEXECDIR}/${DHCPCD_DEF}
+	# Note: We don't remove dhcpcd.conf as it may contain user customizations
+	# Note: We don't remove ${DBDIR} as it may contain user data
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}

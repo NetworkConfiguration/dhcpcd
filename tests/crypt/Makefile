@@ -34,3 +34,5 @@ ${PROG}: ${DEPEND} ${OBJS}
 
 test: ${PROG}
 	./${PROG}
+
+uninstall:

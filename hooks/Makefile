@@ -61,6 +61,21 @@ maninstall: ${MAN8}
 
 install: proginstall eginstall maninstall
 
+.PHONY: uninstall
+
+uninstall:
+	# Remove binary
+	rm -f ${DESTDIR}${BINDIR}/${PROG}
+	# Remove hook scripts
+	for script in ${SCRIPTS}; do rm -f ${DESTDIR}${SCRIPTSDIR}/$$script; done
+	# Remove example hook files
+	for file in ${FILES}; do rm -f ${DESTDIR}${FILESDIR}/$$file; done
+	# Remove man page
+	rm -f ${DESTDIR}${MANDIR}/man8/${MAN8}
+	# Try to remove directories if empty (ignore errors)
+	-rmdir ${DESTDIR}${SCRIPTSDIR} 2>/dev/null || true
+	-rmdir ${DESTDIR}${FILESDIR} 2>/dev/null || true
+
 import: ${SCRIPTS} ${FILES}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks

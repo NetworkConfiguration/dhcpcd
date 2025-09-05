@@ -17,7 +17,7 @@ DISTSIGN=	${DISTFILE}.asc
 
 CLEANFILES+=	*.tar.xz
 
-.PHONY:		hooks import import-bsd tests
+.PHONY:		hooks import import-bsd tests uninstall
 
 .SUFFIXES:	.in
 
@@ -42,6 +42,9 @@ install:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 proginstall:
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+
+uninstall:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 clean:

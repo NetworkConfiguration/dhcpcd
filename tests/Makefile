@@ -7,6 +7,9 @@ install:
 
 proginstall:
 
+uninstall:
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+
 clean:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 

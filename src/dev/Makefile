@@ -41,5 +41,9 @@ eginstall:
 
 install: proginstall
 
+uninstall:
+	for plugin in ${DPLUGS}; do rm -f ${DESTDIR}${DEVDIR}/$$plugin; done
+	-rmdir ${DESTDIR}${DEVDIR} 2>/dev/null || true
+
 clean:
 	rm -f ${CLEANFILES}
