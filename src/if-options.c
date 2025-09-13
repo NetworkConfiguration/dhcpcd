@@ -2093,7 +2093,7 @@ err_sla:
 				t |= OT_RESERVED;
 			}
 		}
-		if (t & OT_TRUNCATED && t != (OT_ADDRIPV6 | OT_TRUNCATED)) {
+		if (t & OT_TRUNCATED && !(t & OT_ADDRIPV6)) {
 			logerrx("truncated only works for ip6address");
 			return -1;
 		}
