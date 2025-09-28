@@ -2401,7 +2401,7 @@ printpidfile:
 	if (!(ctx.options & DHCPCD_DAEMONISE))
 		goto start_manager;
 
-	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET|SOCK_CXNB, 0, fork_fd) == -1) {
+	if (xsocketpair(AF_UNIX, SOCK_STREAM|SOCK_CXNB, 0, fork_fd) == -1) {
 		logerr("socketpair");
 		goto exit_failure;
 	}
