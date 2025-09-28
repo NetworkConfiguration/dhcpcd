@@ -1092,7 +1092,7 @@ ps_recvmsg(int rfd, unsigned short events, uint16_t cmd, int wfd)
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	len = recvmsg(rfd, &msg, 0);
+	len = recvmsg(rfd, &msg, MSG_WAITALL);
 	if (len == -1) {
 		logerr("%s: recvmsg", __func__);
 		return len;

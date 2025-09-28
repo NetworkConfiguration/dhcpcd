@@ -412,7 +412,7 @@ logreadfd(int fd)
 		.msg_iovlen = sizeof(iov) / sizeof(iov[0])
 	};
 
-	len = (int)recvmsg(fd, &msg, 0);
+	len = (int)recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1 || len == 0)
 		return -1;
 	if ((size_t)len < sizeof(pri) + sizeof(pid) ||
