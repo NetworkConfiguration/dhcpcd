@@ -921,8 +921,8 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp->iov_len = msg->msg_controllen;
 		m.msg_iovlen = 4;
 
-		for (i = 0; i < (int)msg->msg_iovlen; i++) {
-			if ((size_t)(m.msg_iovlen + i) >= __arraycount(iov)) {
+		for (i = 0; i < msg->msg_iovlen; i++) {
+			if (m.msg_iovlen + i >= (int)__arraycount(iov)) {
 				errno =	ENOBUFS;
 				return -1;
 			}
