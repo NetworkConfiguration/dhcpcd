@@ -2712,15 +2712,8 @@ exit1:
 #ifdef USE_SIGNALS
 	/* If still attached, detach from the launcher */
 	if (ctx.options & DHCPCD_STARTED && ctx.fork_fd != -1) {
-		struct iovec iov[] = {
-			{ .iov_base = &i, .iov_len = sizeof(i) }
-		};
-		struct msghdr msg = {
-			.msg_iov = iov,
-			.msg_iovlen = __arraycount(iov),
-		};
-		if (sendmsg(ctx.fork_fd, &msg, MSG_EOR) == -1)
-			logerr("%s: sendmsg", __func__);
+		if (send(ctx.fork_fd, &i, sizeof(i), MSG_EOR) == -1)
+			logerr("%s: send", __func__);
 	}
 #endif
 
