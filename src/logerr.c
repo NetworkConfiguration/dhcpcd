@@ -227,6 +227,8 @@ vlogmessage(int pri, const char *fmt, va_list args)
 
 		len = vsnprintf(buf, sizeof(buf), fmt, args);
 		if (len != -1) {
+			if ((size_t)len >= sizeof(buf))
+				len = (int)sizeof(buf) - 1;
 			iov[2].iov_len = (size_t)(len + 1);
 			struct msghdr msg = {
 				.msg_iov = iov,

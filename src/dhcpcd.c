@@ -355,6 +355,20 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 }
 #endif
 
+static ssize_t
+dhcpcd_write_fork(struct dhcpcd_ctx *ctx, int exit_code)
+{
+	struct iovec iov[] = {
+		{ .iov_base = &exit_code, .iov_len = sizeof(exit_code) }
+	};
+	struct msghdr msg = {
+		.msg_iov = iov,
+		.msg_iovlen = __arraycount(iov),
+	};
+
+	return sendmsg(ctx->fork_fd, &msg, MSG_EOR);
+}
+
 /* Returns the pid of the child, otherwise 0. */
 void
 dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
@@ -393,7 +407,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	exit_code = EXIT_SUCCESS;
-	if (write(ctx->fork_fd, &exit_code, sizeof(exit_code)) == -1)
+	if (dhcpcd_write_fork(ctx, exit_code) == -1)
 		logerr(__func__);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
@@ -1448,9 +1462,8 @@ dhcpcd_signal_cb(int sig, void *arg)
 	}
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
-		if (sig != SIGHUP &&
-		    write(ctx->fork_fd, &sig, sizeof(sig)) == -1)
-			logerr("%s: write", __func__);
+		if (sig != SIGHUP && dhcpcd_write_fork(ctx, sig) == -1)
+			logerr("%s: dhcpcd_write_fork", __func__);
 		return;
 	}
 
@@ -2401,7 +2414,7 @@ printpidfile:
 	if (!(ctx.options & DHCPCD_DAEMONISE))
 		goto start_manager;
 
-	if (xsocketpair(AF_UNIX, SOCK_STREAM|SOCK_CXNB, 0, fork_fd) == -1) {
+	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET|SOCK_CXNB, 0, fork_fd) == -1) {
 		logerr("socketpair");
 		goto exit_failure;
 	}
@@ -2712,8 +2725,15 @@ exit1:
 #ifdef USE_SIGNALS
 	/* If still attached, detach from the launcher */
 	if (ctx.options & DHCPCD_STARTED && ctx.fork_fd != -1) {
-		if (write(ctx.fork_fd, &i, sizeof(i)) == -1)
-			logerr("%s: write", __func__);
+		struct iovec iov[] = {
+			{ .iov_base = &i, .iov_len = sizeof(i) }
+		};
+		struct msghdr msg = {
+			.msg_iov = iov,
+			.msg_iovlen = __arraycount(iov),
+		};
+		if (sendmsg(ctx.fork_fd, &msg, MSG_EOR) == -1)
+			logerr("%s: sendmsg", __func__);
 	}
 #endif
 
