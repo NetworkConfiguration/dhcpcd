@@ -895,7 +895,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		{ .iov_base = NULL, },	/* payload 2 */
 		{ .iov_base = NULL, },	/* payload 3 */
 	};
-	struct msghdr m = { .msg_iov = iov };
+	struct msghdr m = { .msg_iov = iov, .msg_iovlen = 1 };
 	ssize_t len;
 
 	if (msg != NULL) {
@@ -909,6 +909,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp->iov_base = msg->msg_name;
 		iovp->iov_len = msg->msg_namelen;
 		iovp++;
+		m.msg_iovlen++;
 
 		cmsg_padlen =
 		    CALC_CMSG_PADLEN(msg->msg_controllen, msg->msg_namelen);
@@ -916,22 +917,23 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp->iov_len = cmsg_padlen;
 		iovp->iov_base = cmsg_padlen != 0 ? padding : NULL;
 		iovp++;
+		m.msg_iovlen++;
 
 		iovp->iov_base = msg->msg_control;
 		iovp->iov_len = msg->msg_controllen;
-		m.msg_iovlen = 4;
+		iovp++;
+		m.msg_iovlen++;
 
-		for (i = 0; i < msg->msg_iovlen; i++) {
+		for (i = 0; i < (int)msg->msg_iovlen; i++) {
 			if ((size_t)(m.msg_iovlen++) > __arraycount(iov)) {
 				errno =	ENOBUFS;
 				return -1;
 			}
-			iovp++;
 			iovp->iov_base = msg->msg_iov[i].iov_base;
 			iovp->iov_len = msg->msg_iov[i].iov_len;
+			iovp++;
 		}
-	} else
-		m.msg_iovlen = 1;
+	}
 
 	len = sendmsg(fd, &m, MSG_EOR);
 
