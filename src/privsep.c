@@ -922,7 +922,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		m.msg_iovlen = 4;
 
 		for (i = 0; i < msg->msg_iovlen; i++) {
-			if (m.msg_iovlen + i >= (int)__arraycount(iov)) {
+			if ((size_t)(m.msg_iovlen++) > __arraycount(iov)) {
 				errno =	ENOBUFS;
 				return -1;
 			}
@@ -930,7 +930,6 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 			iovp->iov_base = msg->msg_iov[i].iov_base;
 			iovp->iov_len = msg->msg_iov[i].iov_len;
 		}
-		m.msg_iovlen += i;
 	} else
 		m.msg_iovlen = 1;
 
