@@ -895,7 +895,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		{ .iov_base = NULL, },	/* payload 2 */
 		{ .iov_base = NULL, },	/* payload 3 */
 	};
-	int iovlen;
+	struct msghdr m = { .msg_iov = iov };
 	ssize_t len;
 
 	if (msg != NULL) {
@@ -919,10 +919,10 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 
 		iovp->iov_base = msg->msg_control;
 		iovp->iov_len = msg->msg_controllen;
-		iovlen = 4;
+		m.msg_iovlen = 4;
 
 		for (i = 0; i < (int)msg->msg_iovlen; i++) {
-			if ((size_t)(iovlen + i) > __arraycount(iov)) {
+			if ((size_t)(m.msg_iovlen + i) > __arraycount(iov)) {
 				errno =	ENOBUFS;
 				return -1;
 			}
@@ -930,12 +930,11 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 			iovp->iov_base = msg->msg_iov[i].iov_base;
 			iovp->iov_len = msg->msg_iov[i].iov_len;
 		}
-		iovlen += i;
+		m.msg_iovlen += i;
 	} else
-		iovlen = 1;
+		m.msg_iovlen = 1;
 
-	len = sendmsg(fd,
-	    &(struct msghdr){ .msg_iov = iov, .msg_iovlen = iovlen }, MSG_EOR);
+	len = sendmsg(fd, &m, MSG_EOR);
 
 	if (len == -1) {
 		if (ctx->options & DHCPCD_FORKED &&
@@ -1030,6 +1029,7 @@ ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 		{ .iov_base = &psm, .iov_len = sizeof(psm) },
 		{ .iov_base = data, .iov_len = 0 },
 	};
+	struct msghdr m = { .msg_iov = iov, .msg_iovlen = __arraycount(iov) };
 	size_t dl = sizeof(data);
 	socklen_t cmsg_padlen =
 	    CALC_CMSG_PADLEN(msg->msg_controllen, msg->msg_namelen);
@@ -1065,9 +1065,8 @@ ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 	    psm.ps_namelen + psm.ps_controllen + psm.ps_datalen + cmsg_padlen;
 	if (psm.ps_datalen != 0)
 		memcpy(p, msg->msg_iov[0].iov_base, psm.ps_datalen);
-	return sendmsg(fd,
-	    &(struct msghdr){ .msg_iov = iov, .msg_iovlen = __arraycount(iov) },
-	    MSG_EOR);
+
+	return sendmsg(fd, &m, MSG_EOR);
 
 nobufs:
 	errno = ENOBUFS;
