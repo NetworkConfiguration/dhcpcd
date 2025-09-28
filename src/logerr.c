@@ -413,8 +413,13 @@ logreadfd(int fd)
 	};
 
 	len = (int)recvmsg(fd, &msg, 0);
-	if (len == -1)
+	if (len == -1 || len == 0)
 		return -1;
+	if ((size_t)len < sizeof(pri) + sizeof(pid) ||
+	    msg.msg_flags & MSG_TRUNC) {
+		errno = EMSGSIZE;
+		return -1;
+	}
 
 	ctx->log_pid = pid;
 	logmessage(pri, "%s", buf);
