@@ -355,20 +355,6 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 }
 #endif
 
-static ssize_t
-dhcpcd_write_fork(struct dhcpcd_ctx *ctx, int exit_code)
-{
-	struct iovec iov[] = {
-		{ .iov_base = &exit_code, .iov_len = sizeof(exit_code) }
-	};
-	struct msghdr msg = {
-		.msg_iov = iov,
-		.msg_iovlen = __arraycount(iov),
-	};
-
-	return sendmsg(ctx->fork_fd, &msg, MSG_EOR);
-}
-
 /* Returns the pid of the child, otherwise 0. */
 void
 dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
@@ -407,7 +393,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	exit_code = EXIT_SUCCESS;
-	if (dhcpcd_write_fork(ctx, exit_code) == -1)
+	if (send(ctx->fork_fd, &exit_code, sizeof(exit_code), MSG_EOR) == -1)
 		logerr(__func__);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
@@ -1462,8 +1448,9 @@ dhcpcd_signal_cb(int sig, void *arg)
 	}
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
-		if (sig != SIGHUP && dhcpcd_write_fork(ctx, sig) == -1)
-			logerr("%s: dhcpcd_write_fork", __func__);
+		if (sig != SIGHUP &&
+		    send(ctx->fork_fd, &sig, sizeof(sig), MSG_EOR) == -1)
+			logerr("%s: send", __func__);
 		return;
 	}
 
