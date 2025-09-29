@@ -415,11 +415,14 @@ logreadfd(int fd)
 	len = (int)recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1 || len == 0)
 		return -1;
-	if ((size_t)len < sizeof(pri) + sizeof(pid) ||
+	/* Ensure we received the minimum and at least one character to log */
+	if ((size_t)len < sizeof(pri) + sizeof(pid) + 1 ||
 	    msg.msg_flags & MSG_TRUNC) {
 		errno = EMSGSIZE;
 		return -1;
 	}
+	/* Ensure what we receive is NUL terminated */
+	buf[(size_t)len - (sizeof(pri) + sizeof(pid)) - 1] = '\0';
 
 	ctx->log_pid = pid;
 	logmessage(pri, "%s", buf);
