@@ -758,6 +758,12 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
+	/* When exiting with persistence, don't change any routing
+	 * which maybe affected by interfaces stopping. */
+	if ((ctx->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) ==
+	    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+		return;
+
 	rb_tree_init(&routes, &rt_compare_proto_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
 	rb_tree_init(&kroutes, &rt_compare_os_ops);
