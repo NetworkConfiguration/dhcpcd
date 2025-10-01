@@ -1474,7 +1474,8 @@ ipv6_addlinklocal(struct interface *ifp)
 	struct ipv6_addr *ap, *ap2;
 	int dadcounter;
 
-	if (!(ifp->options->options & DHCPCD_CONFIGURE))
+	if (!(ifp->options->options & DHCPCD_CONFIGURE) ||
+	    !(ifp->options->options & DHCPCD_IPV6RS))
 		return 0;
 
 	/* Check sanity before malloc */
