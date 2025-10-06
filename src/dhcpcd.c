@@ -462,7 +462,9 @@ dhcpcd_dropped(struct interface *ifp)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 
-	if (dhcpcd_ifrunning(ifp))
+	if (ifp->options == NULL ||
+	    !(ifp->options->options & DHCPCD_STOPPING) ||
+	    dhcpcd_ifrunning(ifp))
 		return;
 
 	/* De-activate the interface */
