@@ -2899,8 +2899,11 @@ dhcp_deconfigure(void *arg)
 	state->lease.addr.s_addr = 0;
 	ifo->options &= ~(DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 
-	dhcp_free(ifp);
-	dhcpcd_dropped(ifp);
+	if (ifo->options & DHCPCD_STOPPING) {
+		dhcp_free(ifp);
+		dhcpcd_dropped(ifp);
+	} else
+		dhcp_close(ifp);
 }
 
 void
