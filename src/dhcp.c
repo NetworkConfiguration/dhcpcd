@@ -2872,11 +2872,16 @@ dhcp_deconfigure(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
+	const char *reason;
 
 #ifdef AUTH
 	dhcp_auth_reset(&state->auth);
 #endif
 
+	if (state->state == DHS_RELEASE)
+		reason = "RELEASE";
+	else
+		reason = state->reason;
 	state->state = DHS_NONE;
 	free(state->offer);
 	state->offer = NULL;
@@ -2891,8 +2896,8 @@ dhcp_deconfigure(void *arg)
 	else {
 		state->addr = NULL;
 		state->added = 0;
-		script_runreason(ifp, state->reason);
 	}
+	script_runreason(ifp, reason);
 	free(state->old);
 	state->old = NULL;
 	state->old_len = 0;
