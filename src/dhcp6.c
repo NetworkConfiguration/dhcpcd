@@ -2125,9 +2125,11 @@ dhcp6_startrelease(struct interface *ifp)
 	state->MRC = REL_MAX_RC;
 	state->MRCcallback = dhcp6_finishrelease;
 
-	if (dhcp6_makemessage(ifp) == -1)
+	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
-	else
+		/* not much we can do apart from finish now */
+		dhcp6_finishrelease(ifp);
+	} else
 		dhcp6_sendrelease(ifp);
 }
 
