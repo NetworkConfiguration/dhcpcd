@@ -448,6 +448,7 @@ ipv4ll_drop(struct interface *ifp)
 
 	assert(ifp != NULL);
 
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	ipv4ll_freearp(ifp);
 
 	if ((ifp->options->options & DHCPCD_NODROP) == DHCPCD_NODROP)
@@ -481,6 +482,9 @@ ipv4ll_drop(struct interface *ifp)
 		rt_build(ifp->ctx, AF_INET);
 		script_runreason(ifp, "IPV4LL");
 	}
+
+	ipv4ll_free(ifp);
+	dhcpcd_dropped(ifp);
 }
 
 void
