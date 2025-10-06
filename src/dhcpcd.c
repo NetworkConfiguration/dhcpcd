@@ -1961,8 +1961,12 @@ dhcpcd_exit_timeout(void *arg)
 	pid_t pid;
 
 	pid = pidfile_read(ctx->pidfile);
-	logwarnx("pid %lld failed to exit", (long long)pid);
-	eloop_exit(ctx->eloop, EXIT_FAILURE);
+	if (pid == -1)
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+	else {
+		logwarnx("pid %lld failed to exit", (long long)pid);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+	}
 }
 
 static int dup_null(int fd)
