@@ -35,13 +35,10 @@
 #include <stdio.h>
 
 #include "config.h"
-#ifdef HAVE_SYS_QUEUE_H
-#include <sys/queue.h>
-#endif
-
 #include "defs.h"
 #include "control.h"
 #include "if-options.h"
+#include "queue.h"
 
 #define HWADDR_LEN	20
 #define IF_SSIDLEN	32
