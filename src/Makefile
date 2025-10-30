@@ -21,7 +21,11 @@ DHCPCD_DEFS=	dhcpcd-definitions.conf dhcpcd-definitions-small.conf
 
 PCOMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
 PCRYPT_SRCS=	${CRYPT_SRCS:compat/%=${TOP}/compat/%}
-OBJS+=		${SRCS:.c=.o} ${PCRYPT_SRCS:.c=.o} ${PCOMPAT_SRCS:.c=.o}
+PVENDOR_SRCS=	${VENDOR_SRCS:vendor/%=${TOP}/vendor/%}
+OBJS+=		${SRCS:.c=.o}
+OBJS+=		${PCRYPT_SRCS:.c=.o}
+OBJS+=		${PCOMPAT_SRCS:.c=.o}
+OBJS+=		${PVENDOR_SRCS:.c=.o}
 
 MAN5=		dhcpcd.conf.5
 MAN8=		dhcpcd.8
@@ -133,14 +137,21 @@ _import-src: ${SRCS} ${MAN5} ${MAN8}
 			[ ! -e "../$$x" ] || cp "../$$x" ${DESTDIR}/compat; \
 		done; \
 	fi
+	if [ -n "${VENDOR_SRCS}" ]; then \
+		${INSTALL} -d ${DESTDIR}/vendor; \
+		cp ../vendor/queue.h ${DESTDIR}/vendor; \
+		for x in ${VENDOR_SRCS} ${VENDOR_SRCS:.c=.h}; do \
+			[ ! -e "../$$x" ] || cp "../$$x" ${DESTDIR}/compat; \
+		done; \
+	fi
 	if ! grep HAVE_SYS_BITOPS_H ../config.h; then \
 		cp ../compat/bitops.h ${DESTDIR}/compat; \
 	fi
 	if grep compat/consttime_memequal.h ../config.h; then \
 		cp ../compat/consttime_memequal.h ${DESTDIR}/compat; \
 	fi
-	if [ -e ${DESTDIR}/compat/rb.c ]; then \
-		cp ../compat/rbtree.h ${DESTDIR}/compat; \
+	if [ -e ${DESTDIR}/vendor/rbtree.c ]; then \
+		cp ../vendor/rbtree.h ${DESTDIR}/vendor; \
 	fi
 	if [ -e ${DESTDIR}/compat/strtoi.c ]; then \
 		cp ../compat/_strtoi.h ${DESTDIR}/compat; \
