@@ -55,6 +55,9 @@ all: ${TOP}/config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 dev:
 	cd dev && ${MAKE}
 
+../vendor/rbtree.o:
+	${CC} ${CFLAGS} ${CPPFLAGS} ${RBTREE_CFLAGS} ${RBTREE_CPPFLAGS} -c $< -o $@
+
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
