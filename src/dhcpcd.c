@@ -1450,8 +1450,9 @@ dhcpcd_signal_cb(int sig, void *arg)
 		return;
 	}
 
-	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
-		if (sig != SIGHUP &&
+	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED)
+	{
+		if (ctx->fork_fd != -1 && sig != SIGHUP &&
 		    send(ctx->fork_fd, &sig, sizeof(sig), MSG_EOR) == -1)
 			logerr("%s: send", __func__);
 		return;
@@ -2243,7 +2244,7 @@ printpidfile:
 	eloop_signal_set_cb(ctx.eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
 	    dhcpcd_signal_cb, &ctx);
-	if (eloop_signal_mask(ctx.eloop, &ctx.sigset) == -1) {
+	if (eloop_signal_mask(ctx.eloop) == -1) {
 		logerr("%s: eloop_signal_mask", __func__);
 		goto exit_failure;
 	}
@@ -2408,6 +2409,7 @@ printpidfile:
 		logerr("socketpair");
 		goto exit_failure;
 	}
+
 	switch (pid = fork()) {
 	case -1:
 		logerr("fork");
@@ -2421,23 +2423,33 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
-		if (eloop_event_add(ctx.eloop, ctx.fork_fd, ELE_READ,
-		    dhcpcd_fork_cb, &ctx) == -1)
-			logerr("%s: eloop_event_add", __func__);
-
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
 		}
 		/* Ensure we can never get a controlling terminal */
-		switch (pid = fork()) {
-		case -1:
+		pid = fork();
+		if (pid == -1) {
 			logerr("fork");
 			goto exit_failure;
-		case 0:
-			eloop_forked(ctx.eloop);
-			break;
-		default:
+		}
+		/* setsid again to ensure our child processes have the
+		 * correct ppid */
+		if (pid == 0 && setsid() == -1) {
+			logerr("%s: setsid", __func__);
+			goto exit_failure;
+		}
+		if (eloop_forked(ctx.eloop, ELF_KEEP_ALL) == -1) {
+			logerr("%s: eloop_forked", __func__);
+			goto exit_failure;
+		}
+		if (eloop_event_add(ctx.eloop, ctx.fork_fd, ELE_READ,
+		    dhcpcd_fork_cb, &ctx) == -1)
+		{
+			logerr("%s: eloop_event_add", __func__);
+			goto exit_failure;
+		}
+		if (pid != 0) {
 			ctx.options |= DHCPCD_FORKED; /* A lie */
 			i = EXIT_SUCCESS;
 			goto exit1;
@@ -2651,7 +2663,7 @@ start_manager:
 	}
 
 run_loop:
-	i = eloop_start(ctx.eloop, &ctx.sigset);
+	i = eloop_start(ctx.eloop);
 	if (i < 0) {
 		logerr("%s: eloop_start", __func__);
 		goto exit_failure;

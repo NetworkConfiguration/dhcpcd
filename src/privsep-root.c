@@ -87,6 +87,9 @@ ps_root_readerrorcb(void *arg, unsigned short events)
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
 
+	if (events & ELE_HANGUP)
+		goto out;
+
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
@@ -111,22 +114,17 @@ out:
 ssize_t
 ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-	struct psr_ctx psr_ctx = {
-	    .psr_ctx = ctx,
-	    .psr_data = data, .psr_datalen = len,
-	};
-	int fd = PS_ROOT_FD(ctx);
+	struct psr_ctx *pc = ctx->ps_root->psp_data;
+	int err;
 
-	if (eloop_event_add(ctx->ps_eloop, fd, ELE_READ,
-	    ps_root_readerrorcb, &psr_ctx) == -1)
-		return -1;
+	pc->psr_data = data;
+	pc->psr_datalen = len;
+	err = eloop_start(ctx->ps_eloop);
+	if (err < 0)
+		return err;
 
-	eloop_enter(ctx->ps_eloop);
-	eloop_start(ctx->ps_eloop, &ctx->sigset);
-	eloop_event_delete(ctx->ps_eloop, fd);
-
-	errno = psr_ctx.psr_error.psr_errno;
-	return psr_ctx.psr_error.psr_result;
+	errno = pc->psr_error.psr_errno;
+	return pc->psr_error.psr_result;
 }
 
 #ifdef PRIVSEP_GETIFADDRS
@@ -180,15 +178,15 @@ ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 	struct psr_ctx psr_ctx = {
 	    .psr_ctx = ctx,
 	};
-	int fd = PS_ROOT_FD(ctx);
+	int fd = PS_ROOT_FD(ctx), err;
 
 	if (eloop_event_add(ctx->ps_eloop, fd, ELE_READ,
 	    ps_root_mreaderrorcb, &psr_ctx) == -1)
 		return -1;
 
-	eloop_enter(ctx->ps_eloop);
-	eloop_start(ctx->ps_eloop, &ctx->sigset);
-	eloop_event_delete(ctx->ps_eloop, fd);
+	err = eloop_start(ctx->ps_eloop, &ctx->sigset);
+	if (err < 0)
+		return err;
 
 	errno = psr_ctx.psr_error.psr_errno;
 	*data = psr_ctx.psr_data;
@@ -873,8 +871,9 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		.psi_cmd = PS_ROOT,
 	};
 	struct ps_process *psp;
-	int logfd[2], datafd[2];
+	int logfd[2] = { -1, -1}, datafd[2] = { -1, -1};
 	pid_t pid;
+	struct psr_ctx *pc;
 
 	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, logfd) == -1)
 		return -1;
@@ -892,10 +891,30 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		return -1;
 #endif
 
+
+	pc = malloc(sizeof(*pc));
+	if (pc == NULL)
+		return -1;
+	pc->psr_ctx = ctx;
+
 	psp = ctx->ps_root = ps_newprocess(ctx, &id);
+	if (psp == NULL)
+	{
+		free(pc);
+		return -1;
+	}
 	strlcpy(psp->psp_name, "privileged proxy", sizeof(psp->psp_name));
 	pid = ps_startprocess(psp, ps_root_recvmsg, NULL,
-	    ps_root_startcb, ps_root_signalcb, PSF_ELOOP);
+	    ps_root_startcb, PSF_ELOOP);
+	if (pid == -1) {
+		free(pc);
+		return -1;
+	}
+
+	psp->psp_data = pc;
+	if (eloop_event_add(ctx->ps_eloop, psp->psp_fd, ELE_READ,
+	    ps_root_readerrorcb, pc) == -1)
+		return -1;
 
 	if (pid == 0) {
 		ctx->ps_log_fd = logfd[0]; /* Keep open to pass to processes */
@@ -916,7 +935,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	close(datafd[1]);
 	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd, ELE_READ,
 	    ps_root_dispatch, ctx) == -1)
-		return 1;
+		return -1;
 
 	return pid;
 }

@@ -156,9 +156,6 @@ struct dhcpcd_ctx {
 	int seq;	/* route message sequence no */
 	int sseq;	/* successful seq no sent */
 
-#ifdef USE_SIGNALS
-	sigset_t sigset;
-#endif
 	struct eloop *eloop;
 
 	char *script;

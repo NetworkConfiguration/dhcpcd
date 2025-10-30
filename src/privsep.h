@@ -184,6 +184,7 @@ struct ps_process {
 	char psp_name[PSP_NAMESIZE];
 	uint16_t psp_proto;
 	const char *psp_protostr;
+	void *psp_data;
 	bool psp_started;
 
 #ifdef INET
@@ -245,7 +246,7 @@ int ps_seccomp_enter(void);
 pid_t ps_startprocess(struct ps_process *,
     void (*recv_msg)(void *, unsigned short),
     void (*recv_unpriv_msg)(void *, unsigned short),
-    int (*callback)(struct ps_process *), void (*)(int, void *),
+    int (*callback)(struct ps_process *),
     unsigned int);
 int ps_stopprocess(struct ps_process *);
 struct ps_process *ps_findprocess(struct dhcpcd_ctx *, struct ps_id *);

@@ -350,7 +350,7 @@ pid_t
 ps_startprocess(struct ps_process *psp,
     void (*recv_msg)(void *, unsigned short),
     void (*recv_unpriv_msg)(void *, unsigned short),
-    int (*callback)(struct ps_process *), void (*signal_cb)(int, void *),
+    int (*callback)(struct ps_process *),
     unsigned int flags)
 {
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
@@ -433,28 +433,25 @@ ps_startprocess(struct ps_process *psp,
 	    getpid(), ctx->ps_log_fd, ctx->ps_data_fd, psp->psp_fd);
 #endif
 
-	eloop_clear(ctx->eloop, -1);
-	eloop_forked(ctx->eloop);
-	eloop_signal_set_cb(ctx->eloop,
-	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
-	/* ctx->sigset aready has the initial sigmask set in main() */
-	if (eloop_signal_mask(ctx->eloop, NULL) == -1) {
-		logerr("%s: eloop_signal_mask", __func__);
-		goto errexit;
-	}
-
 	if (ctx->fork_fd != -1) {
-		/* Already removed from eloop thanks to above clear. */
 		close(ctx->fork_fd);
 		ctx->fork_fd = -1;
 	}
 
-	/* This process has no need of the blocking inner eloop. */
-	if (!(flags & PSF_ELOOP)) {
-		eloop_free(ctx->ps_eloop);
-		ctx->ps_eloop = NULL;
-	} else
-		eloop_forked(ctx->ps_eloop);
+	if (eloop_forked(ctx->eloop, ELF_KEEP_SIGNALS) == -1) {
+		logerr("%s: eloop_forked", __func__);
+		goto errexit;
+	}
+	if (ctx->ps_eloop != NULL) {
+		if (eloop_forked(ctx->ps_eloop, ELF_KEEP_SIGNALS) == -1) {
+			logerr("%s: eloop_forked", __func__);
+			goto errexit;
+		}
+		if (!(flags & PSF_ELOOP)) {
+			eloop_free(ctx->ps_eloop);
+			ctx->ps_eloop = NULL;
+		}
+	}
 
 	pidfile_clean();
 	ps_freeprocesses(ctx, psp);
@@ -478,7 +475,7 @@ ps_startprocess(struct ps_process *psp,
 	if (eloop_event_add(ctx->eloop, psp->psp_fd, ELE_READ,
 	    recv_msg, psp) == -1)
 	{
-		logerr("%d %s: eloop_event_add XX fd %d", getpid(), __func__, psp->psp_fd);
+		logerr("%s: eloop_event_add", __func__);
 		goto errexit;
 	}
 
@@ -556,11 +553,8 @@ ps_start(struct dhcpcd_ctx *ctx)
 	TAILQ_INIT(&ctx->ps_processes);
 
 	/* We need an inner eloop to block with. */
-	if ((ctx->ps_eloop = eloop_new()) == NULL)
+	if ((ctx->ps_eloop = eloop_new_with_signals(ctx->eloop)) == NULL)
 		return -1;
-	eloop_signal_set_cb(ctx->ps_eloop,
-	    dhcpcd_signals, dhcpcd_signals_len,
-	    dhcpcd_signal_cb, ctx);
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
@@ -751,7 +745,6 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 	if (eloop_timeout_add_sec(ctx->ps_eloop, PS_PROCESS_TIMEOUT,
 	    ps_process_timeout, ctx) == -1)
 		logerr("%s: eloop_timeout_add_sec", __func__);
-	eloop_enter(ctx->ps_eloop);
 
 #ifdef HAVE_CAPSICUM
 	struct ps_process *psp;
@@ -766,7 +759,7 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 	}
 #endif
 
-	error = eloop_start(ctx->ps_eloop, &ctx->sigset);
+	error = eloop_start(ctx->ps_eloop);
 	if (error != EXIT_SUCCESS)
 		logerr("%s: eloop_start", __func__);
 

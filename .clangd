@@ -1,4 +1,12 @@
 If:
+  PathMatch: src/dev/.*\.c
+CompileFlags:
+  Add: [-I.., -I../.., -I../../compat]
+---
+If:
   PathMatch: src/.*\.c
 CompileFlags:
-  Add: [-I., -I.., -I../compat]
+  Add: [-I.., -I../compat]
+---
+CompileFlags:
+  Add: [-DINET, -DARP, -DARPING, -DIPV4LL, -DINET6, -DDHCP6, -DPLUGIN_DEV, -DAUTH, -DPRIVSEP]
