@@ -1927,6 +1927,7 @@ ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 
 	/* Don't do anything if the user hasn't configured it. */
 	if (ifp->active != IF_ACTIVE_USER ||
+	    ifp->options->options & DHCPCD_STOPPING ||
 	    !(ifp->options->options & DHCPCD_IPV6))
 		return;
 
