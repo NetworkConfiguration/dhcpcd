@@ -108,7 +108,7 @@ runone(struct timespec *t)
 
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
 		err(EXIT_FAILURE, "clock_gettime");
-	result = eloop_start(e, NULL);
+	result = eloop_start(e);
 	if (clock_gettime(CLOCK_MONOTONIC, &te) == -1)
 		err(EXIT_FAILURE, "clock_gettime");
 
