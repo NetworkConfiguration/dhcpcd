@@ -71,6 +71,9 @@ struct psr_ctx {
 	struct psr_error psr_error;
 	size_t psr_datalen;
 	void *psr_data;
+	size_t psr_mdatalen;
+	void *psr_mdata;
+	bool psr_usemdata;
 };
 
 static void
@@ -81,14 +84,15 @@ ps_root_readerrorcb(void *arg, unsigned short events)
 	struct psr_error *psr_error = &psr_ctx->psr_error;
 	struct iovec iov[] = {
 		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
-		{ .iov_base = psr_ctx->psr_data,
-		  .iov_len = psr_ctx->psr_datalen },
+		{ .iov_base = NULL, .iov_len = 0 },
 	};
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
 
-	if (events & ELE_HANGUP)
+	if (events & ELE_HANGUP) {
+		logerrx("%s: hangup", __func__);
 		goto out;
+	}
 
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
@@ -100,10 +104,38 @@ ps_root_readerrorcb(void *arg, unsigned short events)
 		goto out;			\
 	} while (0 /* CONSTCOND */)
 
-	len = readv(PS_ROOT_FD(ctx), iov, __arraycount(iov));
+	len = recv(PS_ROOT_FD(ctx), psr_error, sizeof(*psr_error), MSG_PEEK);
 	if (len == -1)
 		PSR_ERROR(errno);
 	else if ((size_t)len < sizeof(*psr_error))
+		PSR_ERROR(EINVAL);
+
+	if (psr_error->psr_datalen > SSIZE_MAX)
+		PSR_ERROR(ENOBUFS);
+	if (psr_ctx->psr_usemdata &&
+	    psr_error->psr_datalen > psr_ctx->psr_mdatalen)
+	{
+		void *d = realloc(psr_ctx->psr_mdata, psr_error->psr_datalen);
+		if (d == NULL)
+			PSR_ERROR(errno);
+		psr_ctx->psr_mdata = d;
+		psr_ctx->psr_mdatalen = psr_error->psr_datalen;
+	}
+	if (psr_error->psr_datalen != 0) {
+		if (psr_ctx->psr_usemdata)
+			iov[1].iov_base = psr_ctx->psr_mdata;
+		else {
+			if (psr_error->psr_datalen > psr_ctx->psr_datalen)
+				PSR_ERROR(ENOBUFS);
+			iov[1].iov_base = psr_ctx->psr_data;
+		}
+		iov[1].iov_len = psr_error->psr_datalen;
+	}
+
+	len = readv(PS_ROOT_FD(ctx), iov, __arraycount(iov));
+	if (len == -1)
+		PSR_ERROR(errno);
+	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen)
 		PSR_ERROR(EINVAL);
 	exit_code = EXIT_SUCCESS;
 
@@ -119,6 +151,7 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 
 	pc->psr_data = data;
 	pc->psr_datalen = len;
+	pc->psr_usemdata = false;
 	err = eloop_start(ctx->ps_eloop);
 	if (err < 0)
 		return err;
@@ -127,73 +160,35 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 	return pc->psr_error.psr_result;
 }
 
-#ifdef PRIVSEP_GETIFADDRS
-static void
-ps_root_mreaderrorcb(void *arg, unsigned short events)
-{
-	struct psr_ctx *psr_ctx = arg;
-	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
-	struct psr_error *psr_error = &psr_ctx->psr_error;
-	struct iovec iov[] = {
-		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
-		{ .iov_base = NULL, .iov_len = 0 },
-	};
-	ssize_t len;
-	int exit_code = EXIT_FAILURE;
-
-	if (events != ELE_READ)
-		logerrx("%s: unexpected event 0x%04x", __func__, events);
-
-	len = recv(PS_ROOT_FD(ctx), psr_error, sizeof(*psr_error), MSG_PEEK);
-	if (len == -1)
-		PSR_ERROR(errno);
-	else if ((size_t)len < sizeof(*psr_error))
-		PSR_ERROR(EINVAL);
-
-	if (psr_error->psr_datalen > SSIZE_MAX)
-		PSR_ERROR(ENOBUFS);
-	else if (psr_error->psr_datalen != 0) {
-		psr_ctx->psr_data = malloc(psr_error->psr_datalen);
-		if (psr_ctx->psr_data == NULL)
-			PSR_ERROR(errno);
-		psr_ctx->psr_datalen = psr_error->psr_datalen;
-		iov[1].iov_base = psr_ctx->psr_data;
-		iov[1].iov_len = psr_ctx->psr_datalen;
-	}
-
-	len = readv(PS_ROOT_FD(ctx), iov, __arraycount(iov));
-	if (len == -1)
-		PSR_ERROR(errno);
-	else if ((size_t)len != sizeof(*psr_error) + psr_ctx->psr_datalen)
-		PSR_ERROR(EINVAL);
-	exit_code = EXIT_SUCCESS;
-
-out:
-	eloop_exit(ctx->ps_eloop, exit_code);
-}
-
 ssize_t
 ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 {
-	struct psr_ctx psr_ctx = {
-	    .psr_ctx = ctx,
-	};
-	int fd = PS_ROOT_FD(ctx), err;
+	struct psr_ctx *pc = ctx->ps_root->psp_data;
+	int err;
+	void *d;
 
-	if (eloop_event_add(ctx->ps_eloop, fd, ELE_READ,
-	    ps_root_mreaderrorcb, &psr_ctx) == -1)
-		return -1;
-
-	err = eloop_start(ctx->ps_eloop, &ctx->sigset);
+	pc->psr_usemdata = true;
+	err = eloop_start(ctx->ps_eloop);
 	if (err < 0)
 		return err;
 
-	errno = psr_ctx.psr_error.psr_errno;
-	*data = psr_ctx.psr_data;
-	*len = psr_ctx.psr_datalen;
-	return psr_ctx.psr_error.psr_result;
+	if (pc->psr_error.psr_datalen != 0) {
+		if (pc->psr_error.psr_datalen > pc->psr_mdatalen) {
+			errno = EINVAL;
+			return -1;
+		}
+		d = malloc(pc->psr_error.psr_datalen);
+		if (d == NULL)
+			return -1;
+		memcpy(d, pc->psr_mdata, pc->psr_error.psr_datalen);
+	} else
+		d = NULL;
+
+	errno = pc->psr_error.psr_errno;
+	*data = d;
+	*len = pc->psr_error.psr_datalen;
+	return pc->psr_error.psr_result;
 }
-#endif
 
 static ssize_t
 ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
@@ -863,6 +858,17 @@ ps_root_log(void *arg, unsigned short events)
 		logerr(__func__);
 }
 
+static void
+ps_root_freepsdata(void *arg)
+{
+	struct psr_ctx *pc = arg;
+
+	if (pc == NULL)
+		return;
+	free(pc->psr_mdata);
+	free(pc);
+}
+
 pid_t
 ps_root_start(struct dhcpcd_ctx *ctx)
 {
@@ -891,8 +897,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		return -1;
 #endif
 
-
-	pc = malloc(sizeof(*pc));
+	pc = calloc(1, sizeof(*pc));
 	if (pc == NULL)
 		return -1;
 	pc->psr_ctx = ctx;
@@ -903,6 +908,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		free(pc);
 		return -1;
 	}
+	psp->psp_freedata = ps_root_freepsdata;
 	strlcpy(psp->psp_name, "privileged proxy", sizeof(psp->psp_name));
 	pid = ps_startprocess(psp, ps_root_recvmsg, NULL,
 	    ps_root_startcb, PSF_ELOOP);
@@ -970,6 +976,7 @@ int
 ps_root_stop(struct dhcpcd_ctx *ctx)
 {
 	struct ps_process *psp = ctx->ps_root;
+	int err;
 
 	if (!(ctx->options & DHCPCD_PRIVSEP) ||
 	    ctx->eloop == NULL)
@@ -1001,7 +1008,9 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 			return -1;
 	} /* else the root process has already exited :( */
 
-	return ps_stopwait(ctx);
+	err = ps_stopwait(ctx);
+	ps_freeprocess(ctx->ps_root);
+	return err;
 }
 
 ssize_t

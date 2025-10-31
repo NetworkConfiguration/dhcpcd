@@ -185,6 +185,7 @@ struct ps_process {
 	uint16_t psp_proto;
 	const char *psp_protostr;
 	void *psp_data;
+	void (*psp_freedata)(void *);
 	bool psp_started;
 
 #ifdef INET
