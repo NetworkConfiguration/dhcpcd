@@ -12,6 +12,5 @@
 #define	TAILQ_FOREACH_SAFE	TAILQ_FOREACH_MUTABLE
 #endif
 #else
-#error
 #include "../vendor/queue.h"
 #endif

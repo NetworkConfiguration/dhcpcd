@@ -1220,6 +1220,12 @@ fi
 if [ "$RBTREE" = no ]; then
 	echo "RBTREE_CPPFLAGS=		-DRBLOCAL" >>$CONFIG_MK
 	echo "VENDOR_SRCS+=	vendor/rbtree.c" >>$CONFIG_MK
+	# Tell rbtree.c to #include "rbtree.h" rather than sys/rbtree.h
+	echo "RBTREE_CPPFLAGS+=	-DRBLOCAL" >>$CONFIG_MK
+	# Remove unused warning from compile
+	echo "RBTREE_CPPFLAGS+=	\"-D__unused=__attribute__((__unused__))\"" >>$CONFIG_MK
+	# Enjoy the same optimisation as NetBSD's libc
+	echo "RBTREE_CPPFLAGS+=	\"-D__predict_false(exp)=__builtin_expect((exp) ? 1 : 0, 0)\"" >>$CONFIG_MK
 else
 	echo "#define	HAVE_SYS_RBTREE_H" >>$CONFIG_H
 fi

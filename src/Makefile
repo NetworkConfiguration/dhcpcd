@@ -56,7 +56,7 @@ dev:
 	cd dev && ${MAKE}
 
 ../vendor/rbtree.o:
-	${CC} ${CFLAGS} ${CPPFLAGS} ${RBTREE_CFLAGS} ${RBTREE_CPPFLAGS} -c $< -o $@
+	${CC} ${CFLAGS} ${CPPFLAGS} ${RBTREE_CFLAGS} ${RBTREE_CPPFLAGS} -c ../vendor/rbtree.c -o $@
 
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
