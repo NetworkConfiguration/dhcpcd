@@ -5,7 +5,7 @@ include ${TOP}/config.mk
 CFLAGS?=	-O2
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
-CPPFLAGS+=	-I${TOP} -I${TOP}/src
+CPPFLAGS+=	-I${TOP} -I${TOP}/src -I${TOP}/vendor
 
 DEVDIR=		${LIBDIR}/dhcpcd/dev
 DSRC=		${DEV_PLUGINS:=.c}

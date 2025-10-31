@@ -27,6 +27,7 @@
 #endif
 
 #include <fcntl.h>
+#include <limits.h>
 #include <unistd.h>
 
 #if defined(__linux__) && defined(SYS_close_range)

@@ -1218,7 +1218,6 @@ EOF
 	rm -f _rbtree.c _rbtree
 fi
 if [ "$RBTREE" = no ]; then
-	echo "RBTREE_CPPFLAGS=		-DRBLOCAL" >>$CONFIG_MK
 	echo "VENDOR_SRCS+=	vendor/rbtree.c" >>$CONFIG_MK
 	# Tell rbtree.c to #include "rbtree.h" rather than sys/rbtree.h
 	echo "RBTREE_CPPFLAGS+=	-DRBLOCAL" >>$CONFIG_MK
