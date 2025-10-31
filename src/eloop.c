@@ -185,7 +185,7 @@ eloop_event_setup_fds(struct eloop *eloop)
 #endif
 
 	nfds += eloop->nevents;
-	if (eloop->nfds < nfds) {
+	if (nfds > eloop->nfds) {
 		pfd = eloop_realloca(eloop->fds, nfds, sizeof(*pfd));
 		if (pfd == NULL)
 			return -1;
@@ -870,6 +870,7 @@ eloop_free(struct eloop *eloop)
 	if (eloop->fd != -1)
 		close(eloop->fd);
 #endif
+	free(eloop->fds);
 	free(eloop);
 }
 
