@@ -50,8 +50,13 @@
 #define _kevent kevent
 #endif
 #elif defined(__linux__)
+#include <linux/version.h>
 #include <sys/epoll.h>
+#include <poll.h>
 #define USE_EPOLL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#define HAVE_EPOLL_PWAIT2
+#endif
 #else
 #include <poll.h>
 #define USE_PPOLL
@@ -925,24 +930,38 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 static int
 eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 {
-	int timeout, n, nn;
+	int n, nn;
 	struct epoll_event *epe;
 	struct eloop_event *e;
 	unsigned short events;
 
-	if (ts != NULL) {
-		if (ts->tv_sec > INT_MAX / 1000 ||
-		    (ts->tv_sec == INT_MAX / 1000 &&
-			((ts->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000)))
-			timeout = INT_MAX;
-		else
-			timeout = (int)(ts->tv_sec * 1000 +
-			    (ts->tv_nsec + 999999) / 1000000);
-	} else
-		timeout = -1;
+	/* epoll does not work with zero events */
+	if (eloop->nfds == 0)
+		n = ppoll(NULL, 0, ts, &eloop->sigset);
+	else
+#ifdef HAVE_EPOLL_PWAIT2
+		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds,
+		    ts, &eloop->sigset);
+#else
+	{
+		int timeout;
 
-	n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds, timeout,
-	    &eloop->sigset);
+		if (ts != NULL) {
+			if (ts->tv_sec > INT_MAX / 1000 ||
+			    (ts->tv_sec == INT_MAX / 1000 &&
+			    ((ts->tv_nsec + 999999) / 1000000 >
+			     INT_MAX % 1000000)))
+				timeout = INT_MAX;
+			else
+				timeout = (int)(ts->tv_sec * 1000 +
+				    (ts->tv_nsec + 999999) / 1000000);
+		} else
+			timeout = -1;
+
+		n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds,
+		    timeout, &eloop->sigset);
+	}
+#endif
 	if (n == -1)
 		return -1;
 
