@@ -747,8 +747,11 @@ eloop_signal_set_cb(struct eloop *eloop, const int *signals, size_t nsignals,
 		EV_SET(ke++, (uintptr_t)eloop->signals[i], EVFILT_SIGNAL,
 		    EV_ADD, 0, 0, NULL);
 	}
-	if (i != 0 && _kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
-		error = -1;
+	if (i != 0) {
+		if (_kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
+			error = -1;
+		eloop->events_need_setup = true;
+	}
 out:
 	free(kes);
 #endif
@@ -883,7 +886,7 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 	struct eloop_event *e;
 	unsigned short events;
 
-	n = _kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nevents, ts);
+	n = _kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nfds, ts);
 	if (n == -1)
 		return -1;
 
@@ -938,7 +941,7 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 	} else
 		timeout = -1;
 
-	n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nevents, timeout,
+	n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds, timeout,
 	    &eloop->sigset);
 	if (n == -1)
 		return -1;
@@ -973,7 +976,7 @@ eloop_run_ppoll(struct eloop *eloop, const struct timespec *ts)
 	struct pollfd *pfd;
 	unsigned short events;
 
-	n = ppoll(eloop->fds, (nfds_t)eloop->nevents, ts, &eloop->sigset);
+	n = ppoll(eloop->fds, (nfds_t)eloop->nfds, ts, &eloop->sigset);
 	if (n == -1 || n == 0)
 		return n;
 
