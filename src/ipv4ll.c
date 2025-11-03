@@ -452,7 +452,7 @@ ipv4ll_drop(struct interface *ifp)
 	ipv4ll_freearp(ifp);
 
 	if ((ifp->options->options & DHCPCD_NODROP) == DHCPCD_NODROP)
-		return;
+		goto free;
 
 	state = IPV4LL_STATE(ifp);
 	if (state) {
@@ -483,6 +483,7 @@ ipv4ll_drop(struct interface *ifp)
 		script_runreason(ifp, "IPV4LL");
 	}
 
+free:
 	ipv4ll_free(ifp);
 	dhcpcd_dropped(ifp);
 }
