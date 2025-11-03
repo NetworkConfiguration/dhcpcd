@@ -2110,12 +2110,10 @@ dhcp6_startrelease(struct interface *ifp)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
-	if (state->state != DH6S_BOUND)
+	if (state->state != DH6S_BOUND) {
+		dhcp6_finishrelease(ifp);
 		return;
-
-	/* RFC8415 18.2.7 says we must stop using the addresses before
-	 * we send the release message. */
-	dhcp6_freedrop_addrs(ifp, 0, IPV6_AF_DELEGATED, NULL);
+	}
 
 	state->state = DH6S_RELEASE;
 	state->RTC = 0;

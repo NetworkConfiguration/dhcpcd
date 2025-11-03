@@ -1187,9 +1187,6 @@ dhcpcd_handlelink(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ctx->options & DHCPCD_EXITING)
-		return;
-
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 

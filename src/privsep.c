@@ -1136,6 +1136,10 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = 1 };
 	bool stop = false;
 
+	if (events & ELE_HANGUP) {
+		len = 0;
+		goto stop;
+	}
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
@@ -1163,6 +1167,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	}
 
 	if (stop) {
+stop:
 		ctx->options |= DHCPCD_EXITING;
 #ifdef PRIVSEP_DEBUG
 		logdebugx("process %d stopping", getpid());
