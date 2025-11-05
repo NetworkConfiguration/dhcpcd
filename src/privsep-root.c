@@ -89,10 +89,8 @@ ps_root_readerrorcb(void *arg, unsigned short events)
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
 
-	if (events & ELE_HANGUP) {
-		logerrx("%s: hangup", __func__);
+	if (events & ELE_HANGUP)
 		goto out;
-	}
 
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
@@ -982,12 +980,20 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	    ctx->eloop == NULL)
 		return 0;
 
+
 	/* If we are the root process then remove the pidfile */
-	if (ctx->options & DHCPCD_PRIVSEPROOT &&
-	    !(ctx->options & DHCPCD_TEST))
-	{
-		if (unlink(ctx->pidfile) == -1)
+	if (ctx->options & DHCPCD_PRIVSEPROOT) {
+		if (!(ctx->options & DHCPCD_TEST) && unlink(ctx->pidfile) == -1)
 			logerr("%s: unlink: %s", __func__, ctx->pidfile);
+
+		/* drain the log */
+		if (ctx->ps_log_root_fd != -1) {
+			ssize_t loglen;
+
+			do {
+				loglen = logreadfd(ctx->ps_log_root_fd);
+			} while (loglen != 0 && loglen != -1);
+		}
 	}
 
 	/* Only the manager process gets past this point. */
