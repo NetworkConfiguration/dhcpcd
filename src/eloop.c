@@ -173,16 +173,9 @@ static int
 eloop_event_setup_fds(struct eloop *eloop)
 {
 	struct eloop_event *e, *ne;
-#if defined(USE_KQUEUE)
-	struct kevent *pfd;
-	size_t nfds = eloop->nsignals;
-#elif defined(USE_EPOLL)
-	struct epoll_event *pfd;
-	size_t nfds = 0;
-#elif defined(USE_PPOLL)
+#ifdef USE_PPOLL
 	struct pollfd *pfd;
 	size_t nfds = 0;
-#endif
 
 	nfds += eloop->nevents;
 	if (nfds > eloop->nfds) {
@@ -192,10 +185,9 @@ eloop_event_setup_fds(struct eloop *eloop)
 		eloop->fds = pfd;
 		eloop->nfds = nfds;
 	}
-
-#ifdef USE_PPOLL
 	pfd = eloop->fds;
 #endif
+
 	TAILQ_FOREACH_SAFE(e, &eloop->events, next, ne) {
 		if (e->fd == -1) {
 			TAILQ_REMOVE(&eloop->events, e, next);
@@ -218,6 +210,26 @@ eloop_event_setup_fds(struct eloop *eloop)
 	eloop->events_need_setup = false;
 	return 0;
 }
+
+#ifndef USE_PPOLL
+static int
+eloop_grow_events(struct eloop *eloop)
+{
+#if defined(USE_KQUEUE)
+	struct kevent *pfd;
+#elif defined(USE_EPOLL)
+	struct epoll_event *pfd;
+#endif
+	size_t nfds = eloop->nfds == 0 ? 4 : eloop->nfds * 2;
+
+	pfd = eloop_realloca(eloop->fds, nfds, sizeof(*pfd));
+	if (pfd == NULL)
+		return -1;
+	eloop->fds = pfd;
+	eloop->nfds = nfds;
+	return 0;
+}
+#endif
 
 size_t
 eloop_event_count(const struct eloop *eloop)
@@ -832,7 +844,7 @@ eloop_new(void)
 	eloop->exitcode = EXIT_FAILURE;
 
 #if defined(USE_KQUEUE) || defined(USE_EPOLL)
-	if (eloop_open(eloop) == -1) {
+	if (eloop_open(eloop) == -1 || eloop_grow_events(eloop) == -1) {
 		eloop_free(eloop);
 		return NULL;
 	}
@@ -917,6 +929,9 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 			events |= ELE_ERROR;
 		e->cb(e->cb_arg, events);
 	}
+
+	if ((size_t)n == eloop->nfds)
+		eloop_grow_events(eloop);
 	return n;
 }
 
@@ -963,6 +978,9 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 			events |= ELE_ERROR;
 		e->cb(e->cb_arg, events);
 	}
+
+	if ((size_t)n == eloop->nfds)
+		eloop_grow_events(eloop);
 	return n;
 }
 
