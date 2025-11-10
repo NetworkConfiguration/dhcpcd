@@ -97,6 +97,7 @@ struct eloop *eloop_new(void);
 struct eloop *eloop_new_with_signals(struct eloop *);
 void eloop_free(struct eloop *);
 void eloop_exit(struct eloop *, int);
+void eloop_exitall(int);
 int eloop_forked(struct eloop *, unsigned short);
 int eloop_start(struct eloop *);
 

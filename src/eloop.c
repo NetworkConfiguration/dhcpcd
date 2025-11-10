@@ -120,6 +120,7 @@ struct eloop_timeout {
 };
 
 struct eloop {
+	TAILQ_ENTRY(eloop) next;
 	TAILQ_HEAD(event_head, eloop_event) events;
 	size_t nevents;
 	struct event_head free_events;
@@ -151,6 +152,8 @@ struct eloop {
 	bool events_need_setup;
 	bool events_invalid;
 };
+
+TAILQ_HEAD(eloop_head, eloop) eloops = TAILQ_HEAD_INITIALIZER(eloops);
 
 #ifdef HAVE_REALLOCARRAY
 #define eloop_realloca reallocarray
@@ -572,6 +575,17 @@ eloop_exit(struct eloop *eloop, int code)
 	eloop->exitnow = true;
 }
 
+void
+eloop_exitall(int code)
+{
+	struct eloop *eloop;
+
+	TAILQ_FOREACH(eloop, &eloops, next) {
+		eloop->exitcode = code;
+		eloop->exitnow = true;
+	}
+}
+
 #if defined(USE_KQUEUE) || defined(USE_EPOLL)
 static int
 eloop_open(struct eloop *eloop)
@@ -580,6 +594,8 @@ eloop_open(struct eloop *eloop)
 
 #if defined(HAVE_KQUEUE1)
 	fd = kqueue1(O_CLOEXEC);
+#elif defined(KQUEUE_CLOEXEC)
+	fd = kqueuex(KQUEUE_CLOEXEC);
 #elif defined(USE_KQUEUE)
 	int flags;
 
@@ -850,6 +866,7 @@ eloop_new(void)
 	}
 #endif
 
+	TAILQ_INSERT_TAIL(&eloops, eloop, next);
 	return eloop;
 }
 
@@ -886,6 +903,7 @@ eloop_free(struct eloop *eloop)
 		close(eloop->fd);
 #endif
 	free(eloop->fds);
+	TAILQ_REMOVE(&eloops, eloop, next);
 	free(eloop);
 }
 

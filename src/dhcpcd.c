@@ -1523,7 +1523,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 	dhcpcd_exiting = true;
 	if (!(ctx->options & DHCPCD_TEST))
 		stop_all_interfaces(ctx, opts);
-	eloop_exit(ctx->eloop, exit_code);
+	eloop_exitall(exit_code);
 	dhcpcd_exiting = false;
 }
 #endif
