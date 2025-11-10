@@ -24,8 +24,12 @@
  * SUCH DAMAGE.
  */
 
-#include <inttypes.h>
+/* For BSD */
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
 
+#include <inttypes.h>
 #include <string.h>
 
 #ifdef __GLIBC__
