@@ -247,8 +247,13 @@ eloop_event_add(struct eloop *eloop, int fd, unsigned short events,
 	struct eloop_event *e;
 	bool added;
 #if defined(USE_KQUEUE)
-	struct kevent ke[2], *kep = &ke[0];
-	size_t n;
+#ifdef EVFILT_PROCDESC
+#define	NKE	3
+#else
+#define	NKE	2
+#endif
+	struct kevent ke[NKE], *kep = &ke[0];
+	size_t n = NKE;
 #elif defined(USE_EPOLL)
 	struct epoll_event epe;
 	int op;
@@ -286,7 +291,6 @@ eloop_event_add(struct eloop *eloop, int fd, unsigned short events,
 	e->cb_arg = cb_arg;
 
 #if defined(USE_KQUEUE)
-	n = 2;
 	if (events & ELE_READ && !(e->events & ELE_READ))
 		EV_SET(kep++, (uintptr_t)fd, EVFILT_READ, EV_ADD, 0, 0, e);
 	else if (!(events & ELE_READ) && e->events & ELE_READ)
