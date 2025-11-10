@@ -155,6 +155,9 @@ struct eloop {
 	bool exitnow;
 	bool events_need_setup;
 	bool events_invalid;
+#ifdef HAVE_EPOLL_PWAIT2
+	bool epoll_pwait2_nosys;
+#endif
 };
 
 #ifdef HAVE_REALLOCARRAY
@@ -936,14 +939,25 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 	unsigned short events;
 
 	/* epoll does not work with zero events */
-	if (eloop->nfds == 0)
+	if (eloop->nfds == 0) {
 		n = ppoll(NULL, 0, ts, &eloop->sigset);
-	else
 #ifdef HAVE_EPOLL_PWAIT2
+	} else if (!eloop->epoll_pwait2_nosys) {
+		/* Many linux distros are dumb in shipping newer
+		 * kernel headers than the target kernel they are using.
+		 * So we jump through this stupid hoop and have to write
+		 * more complex code. */
 		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds,
 		    ts, &eloop->sigset);
-#else
-	{
+		if (n == -1 && errno == ENOSYS) {
+			eloop->epoll_pwait2_nosys = true;
+			goto epoll_pwait2_nosys;
+		}
+#endif
+	} else {
+#ifdef HAVE_EPOLL_PWAIT2
+epoll_pwait2_nosys:
+#endif
 		int timeout;
 
 		if (ts != NULL) {
@@ -961,7 +975,6 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 		n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds,
 		    timeout, &eloop->sigset);
 	}
-#endif
 	if (n == -1)
 		return -1;
 
