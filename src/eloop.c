@@ -955,11 +955,11 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 		}
 #endif
 	} else {
+		int timeout;
+
 #ifdef HAVE_EPOLL_PWAIT2
 epoll_pwait2_nosys:
 #endif
-		int timeout;
-
 		if (ts != NULL) {
 			if (ts->tv_sec > INT_MAX / 1000 ||
 			    (ts->tv_sec == INT_MAX / 1000 &&
