@@ -46,8 +46,9 @@
 #define KEVENT_N int
 #endif
 #elif defined(__linux__)
-#include <linux/version.h>
 #include <sys/epoll.h>
+
+#include <linux/version.h>
 #include <poll.h>
 #define USE_EPOLL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
@@ -253,8 +254,8 @@ eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 	if (signals == NULL)
 		signals = eloop->signals;
 	for (i = 0; i < n; i++)
-		EV_SET(kep++, (uintptr_t)signals[i],
-		    EVFILT_SIGNAL, nsignals == 0 ? EV_DELETE : EV_ADD, 0, 0, NULL);
+		EV_SET(kep++, (uintptr_t)signals[i], EVFILT_SIGNAL,
+		    nsignals == 0 ? EV_DELETE : EV_ADD, 0, 0, NULL);
 
 	return kevent(eloop->fd, ke, (KEVENT_N)n, NULL, 0, NULL);
 }
@@ -264,9 +265,9 @@ eloop_event_kqueue(struct eloop *eloop, struct eloop_event *e,
     unsigned short events)
 {
 #ifdef EVFILT_PROCDESC
-#define	NKE	3
+#define NKE 3
 #else
-#define	NKE	2
+#define NKE 2
 #endif
 	struct kevent ke[NKE], *kep = ke;
 	int fd = e->fd;
@@ -284,8 +285,8 @@ eloop_event_kqueue(struct eloop *eloop, struct eloop_event *e,
 		EV_SET(kep++, (uintptr_t)fd, EVFILT_PROCDESC, EV_ADD, NOTE_EXIT,
 		    0, e);
 	else if (!(events & ELE_HANGUP) && e->events & ELE_HANGUP)
-		EV_SET(kep++, (uintptr_t)fd, EVFILT_PROCDESC, EV_DELETE, NOTE_EXIT,
-		    0, e);
+		EV_SET(kep++, (uintptr_t)fd, EVFILT_PROCDESC, EV_DELETE,
+		    NOTE_EXIT, 0, e);
 #endif
 	if (kep == ke)
 		return 0;
@@ -755,7 +756,6 @@ int
 eloop_signal_set_cb(struct eloop *eloop, const int *signals, size_t nsignals,
     void (*signal_cb)(int, void *), void *signal_cb_ctx)
 {
-
 #ifdef USE_KQUEUE
 	if (eloop_signal_kqueue(eloop, NULL, 0) == -1)
 		return -1;
@@ -959,8 +959,8 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 		 * kernel headers than the target kernel they are using.
 		 * So we jump through this stupid hoop and have to write
 		 * more complex code. */
-		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds,
-		    ts, &eloop->sigset);
+		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds, ts,
+		    &eloop->sigset);
 		if (n == -1 && errno == ENOSYS) {
 			eloop->epoll_pwait2_nosys = true;
 			goto epoll_pwait2_nosys;
@@ -970,13 +970,13 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 		int timeout;
 
 #ifdef HAVE_EPOLL_PWAIT2
-epoll_pwait2_nosys:
+	epoll_pwait2_nosys:
 #endif
 		if (ts != NULL) {
 			if (ts->tv_sec > INT_MAX / 1000 ||
 			    (ts->tv_sec == INT_MAX / 1000 &&
-			    ((ts->tv_nsec + 999999) / 1000000 >
-			     INT_MAX % 1000000)))
+				((ts->tv_nsec + 999999) / 1000000 >
+				    INT_MAX % 1000000)))
 				timeout = INT_MAX;
 			else
 				timeout = (int)(ts->tv_sec * 1000 +
