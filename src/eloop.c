@@ -39,14 +39,11 @@
 #ifdef BSD
 #include <sys/event.h>
 #define USE_KQUEUE
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 #define HAVE_KQUEUE1
-#endif
-#if defined(__DragonFly__) || defined(__FreeBSD__)
-#define _kevent(kq, cl, ncl, el, nel, t) \
-	kevent((kq), (cl), (int)(ncl), (el), (int)(nel), (t))
+#define KEVENT_N size_t
 #else
-#define _kevent kevent
+#define KEVENT_N int
 #endif
 #elif defined(__linux__)
 #include <sys/epoll.h>
@@ -251,7 +248,7 @@ eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 		EV_SET(kep++, (uintptr_t)signals[i],
 		    EVFILT_SIGNAL, nsignals == 0 ? EV_DELETE : EV_ADD, 0, 0, NULL);
 
-	return _kevent(eloop->fd, ke, n, NULL, 0, NULL);
+	return kevent(eloop->fd, ke, (KEVENT_N)n, NULL, 0, NULL);
 }
 
 static int
@@ -284,7 +281,7 @@ eloop_event_kqueue(struct eloop *eloop, struct eloop_event *e,
 #endif
 	if (kep == ke)
 		return 0;
-	if (_kevent(eloop->fd, ke, kep - ke, NULL, 0, NULL) == -1)
+	if (kevent(eloop->fd, ke, (KEVENT_N)(kep - ke), NULL, 0, NULL) == -1)
 		return -1;
 	return 1;
 }
@@ -404,7 +401,7 @@ eloop_event_delete(struct eloop *eloop, int fd)
 		EV_SET(kep++, (uintptr_t)fd, EVFILT_WRITE, EV_DELETE, 0, 0, e);
 		n++;
 	}
-	if (n != 0 && _kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1)
+	if (n != 0 && kevent(eloop->fd, ke, (KEVENT_N)n, NULL, 0, NULL) == -1)
 		return -1;
 #elif defined(USE_EPOLL)
 	if (epoll_ctl(eloop->fd, EPOLL_CTL_DEL, fd, NULL) == -1)
@@ -885,7 +882,7 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 	struct eloop_event *e;
 	unsigned short events;
 
-	n = _kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nfds, ts);
+	n = kevent(eloop->fd, NULL, 0, eloop->fds, (KEVENT_N)eloop->nfds, ts);
 	if (n == -1)
 		return -1;
 
