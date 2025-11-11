@@ -1173,7 +1173,7 @@ stop:
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
-		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
+		eloop_exitall(len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 	dlen -= sizeof(psm.psm_hdr);

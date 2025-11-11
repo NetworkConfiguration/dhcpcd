@@ -2794,7 +2794,7 @@ exit1:
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");
 #ifdef PRIVSEP
-	if (ctx.ps_root != NULL && ps_root_stop(&ctx) == -1)
+	if (ps_root_stop(&ctx) == -1)
 		i = EXIT_FAILURE;
 	eloop_free(ctx.ps_eloop);
 #endif
