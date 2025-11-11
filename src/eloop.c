@@ -296,6 +296,7 @@ eloop_event_epoll(struct eloop *eloop, struct eloop_event *e,
     unsigned short events)
 {
 	struct epoll_event epe;
+	int op;
 
 	memset(&epe, 0, sizeof(epe));
 	epe.data.ptr = e;
@@ -303,10 +304,10 @@ eloop_event_epoll(struct eloop *eloop, struct eloop_event *e,
 		epe.events |= EPOLLIN;
 	if (events & ELE_WRITE)
 		epe.events |= EPOLLOUT;
-	op = added ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
-	if (eve.events == 0)
+	op = e->events == 0 ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+	if (epe.events == 0)
 		return 0;
-	if (epoll_ctl(eloop->fd, op, fd, &epe) == -1)
+	if (epoll_ctl(eloop->fd, op, e->fd, &epe) == -1)
 		return -1;
 	return 1;
 }
