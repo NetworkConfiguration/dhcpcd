@@ -79,7 +79,7 @@ __printflike(2, 3) void logerrmessage(int pri, const char *fmt, ...);
 /* For logging in a chroot using SOCK_SEQPACKET */
 int loggetfd(void);
 void logsetfd(int);
-int logreadfd(int);
+ssize_t logreadfd(int);
 
 unsigned int loggetopts(void);
 void logsetopts(unsigned int);

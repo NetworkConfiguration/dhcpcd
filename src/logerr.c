@@ -395,11 +395,11 @@ logsetfd(int fd)
 #endif
 }
 
-int
+ssize_t
 logreadfd(int fd)
 {
 	struct logctx *ctx = &_logctx;
-	int len, pri;
+	int pri;
 	pid_t pid;
 	char buf[LOGERR_SYSLOGBUF] = { '\0' };
 	struct iovec iov[] = {
@@ -411,10 +411,11 @@ logreadfd(int fd)
 		.msg_iov = iov,
 		.msg_iovlen = sizeof(iov) / sizeof(iov[0])
 	};
+	ssize_t len;
 
-	len = (int)recvmsg(fd, &msg, MSG_WAITALL);
+	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1 || len == 0)
-		return -1;
+		return len;
 	/* Ensure we received the minimum and at least one character to log */
 	if ((size_t)len < sizeof(pri) + sizeof(pid) + 1 ||
 	    msg.msg_flags & MSG_TRUNC) {
