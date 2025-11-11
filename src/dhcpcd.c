@@ -1720,6 +1720,7 @@ dumperr:
 
 	if (opts & (DHCPCD_EXITING | DHCPCD_RELEASE)) {
 		if (oifind == argc && af == AF_UNSPEC) {
+			ctx->options |= DHCPCD_EXITING;
 			if (stop_all_interfaces(ctx, opts) == false)
 				eloop_exit(ctx->eloop, EXIT_SUCCESS);
 			/* We did stop an interface, it will notify us once
