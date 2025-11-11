@@ -46,8 +46,13 @@
 #define KEVENT_N int
 #endif
 #elif defined(__linux__)
+#include <linux/version.h>
 #include <sys/epoll.h>
+#include <poll.h>
 #define USE_EPOLL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#define HAVE_EPOLL_PWAIT2
+#endif
 #else
 #include <poll.h>
 #define USE_PPOLL
@@ -143,6 +148,9 @@ struct eloop {
 	bool exitnow;
 	bool events_need_setup;
 	bool events_invalid;
+#ifdef HAVE_EPOLL_PWAIT2
+	bool epoll_pwait2_nosys;
+#endif
 };
 
 TAILQ_HEAD(eloop_head, eloop) eloops = TAILQ_HEAD_INITIALIZER(eloops);
@@ -617,6 +625,19 @@ eloop_exitall(int code)
 	}
 }
 
+void
+eloop_exitallinners(int code)
+{
+	struct eloop *eloop;
+
+	TAILQ_FOREACH(eloop, &eloops, next) {
+		if (eloop == TAILQ_FIRST(&eloops))
+			continue;
+		eloop->exitcode = code;
+		eloop->exitnow = true;
+	}
+}
+
 #if defined(USE_KQUEUE) || defined(USE_EPOLL)
 static int
 eloop_open(struct eloop *eloop)
@@ -924,24 +945,48 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 static int
 eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 {
-	int timeout, n, nn;
+	int n, nn;
 	struct epoll_event *epe;
 	struct eloop_event *e;
 	unsigned short events;
 
-	if (ts != NULL) {
-		if (ts->tv_sec > INT_MAX / 1000 ||
-		    (ts->tv_sec == INT_MAX / 1000 &&
-			((ts->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000)))
-			timeout = INT_MAX;
-		else
-			timeout = (int)(ts->tv_sec * 1000 +
-			    (ts->tv_nsec + 999999) / 1000000);
-	} else
-		timeout = -1;
+	/* epoll does not work with zero events */
+	if (eloop->nfds == 0) {
+		n = ppoll(NULL, 0, ts, &eloop->sigset);
+#ifdef HAVE_EPOLL_PWAIT2
+	} else if (!eloop->epoll_pwait2_nosys) {
+		/* Many linux distros are dumb in shipping newer
+		 * kernel headers than the target kernel they are using.
+		 * So we jump through this stupid hoop and have to write
+		 * more complex code. */
+		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds,
+		    ts, &eloop->sigset);
+		if (n == -1 && errno == ENOSYS) {
+			eloop->epoll_pwait2_nosys = true;
+			goto epoll_pwait2_nosys;
+		}
+#endif
+	} else {
+		int timeout;
 
-	n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds, timeout,
-	    &eloop->sigset);
+#ifdef HAVE_EPOLL_PWAIT2
+epoll_pwait2_nosys:
+#endif
+		if (ts != NULL) {
+			if (ts->tv_sec > INT_MAX / 1000 ||
+			    (ts->tv_sec == INT_MAX / 1000 &&
+			    ((ts->tv_nsec + 999999) / 1000000 >
+			     INT_MAX % 1000000)))
+				timeout = INT_MAX;
+			else
+				timeout = (int)(ts->tv_sec * 1000 +
+				    (ts->tv_nsec + 999999) / 1000000);
+		} else
+			timeout = -1;
+
+		n = epoll_pwait(eloop->fd, eloop->fds, (int)eloop->nfds,
+		    timeout, &eloop->sigset);
+	}
 	if (n == -1)
 		return -1;
 

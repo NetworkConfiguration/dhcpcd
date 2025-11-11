@@ -2110,29 +2110,25 @@ dhcp6_startrelease(struct interface *ifp)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
-	if (state->state != DH6S_BOUND)
+	if (state->state != DH6S_BOUND) {
+		dhcp6_finishrelease(ifp);
 		return;
+	}
 
 	state->state = DH6S_RELEASE;
 	state->RTC = 0;
 	state->IMD = REL_MAX_DELAY;
 	state->IRT = REL_TIMEOUT;
 	state->MRT = REL_MAX_RT;
-	/* MRC of REL_MAX_RC is optional in RFC 3315 18.1.6 */
-#if 0
 	state->MRC = REL_MAX_RC;
 	state->MRCcallback = dhcp6_finishrelease;
-#else
-	state->MRC = 0;
-	state->MRCcallback = NULL;
-#endif
 
-	if (dhcp6_makemessage(ifp) == -1)
+	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
-	else {
-		dhcp6_sendrelease(ifp);
+		/* not much we can do apart from finish now */
 		dhcp6_finishrelease(ifp);
-	}
+	} else
+		dhcp6_sendrelease(ifp);
 }
 
 static int
@@ -3610,6 +3606,11 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			    ifp->name, sfrom);
 			dhcp6_fail(ifp, true);
 			return;
+		case DH6S_RELEASE:
+			loginfox("%s: %s acknowledged RELEASE6",
+			    ifp->name, sfrom);
+			dhcp6_finishrelease(ifp);
+			return;
 		default:
 			valid_op = false;
 			break;
@@ -4293,6 +4294,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		free(state);
 		ifp->if_data[IF_DATA_DHCP6] = NULL;
 	}
+	dhcpcd_dropped(ifp);
 
 	/* If we don't have any more DHCP6 enabled interfaces,
 	 * close the global socket and release resources */

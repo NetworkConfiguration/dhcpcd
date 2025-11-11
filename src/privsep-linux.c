@@ -325,6 +325,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_epoll_pwait
 	SECCOMP_ALLOW(__NR_epoll_pwait),
 #endif
+#ifdef __NR_epoll_pwait2
+	SECCOMP_ALLOW(__NR_epoll_pwait2),
+#endif
 #ifdef __NR_exit_group
 	SECCOMP_ALLOW(__NR_exit_group),
 #endif

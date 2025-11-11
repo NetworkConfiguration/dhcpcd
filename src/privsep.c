@@ -760,7 +760,7 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 #endif
 
 	error = eloop_start(ctx->ps_eloop);
-	if (error != EXIT_SUCCESS)
+	if (error < 0)
 		logerr("%s: eloop_start", __func__);
 
 	eloop_timeout_delete(ctx->ps_eloop, ps_process_timeout, ctx);
@@ -1136,6 +1136,10 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = 1 };
 	bool stop = false;
 
+	if (events & ELE_HANGUP) {
+		len = 0;
+		goto stop;
+	}
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
@@ -1163,12 +1167,13 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	}
 
 	if (stop) {
+stop:
 		ctx->options |= DHCPCD_EXITING;
 #ifdef PRIVSEP_DEBUG
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
-		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
+		eloop_exitall(len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 	dlen -= sizeof(psm.psm_hdr);
