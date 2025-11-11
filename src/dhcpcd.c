@@ -2241,9 +2241,13 @@ printpidfile:
 		signal(dhcpcd_signals_ignore[si], SIG_IGN);
 
 	/* Save signal mask, block and redirect signals to our handler */
-	eloop_signal_set_cb(ctx.eloop,
+	if (eloop_signal_set_cb(ctx.eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
-	    dhcpcd_signal_cb, &ctx);
+	    dhcpcd_signal_cb, &ctx) == -1)
+	{
+		logerr("%s: eloop_signal_set_cb", __func__);
+		goto exit_failure;
+	}
 	if (eloop_signal_mask(ctx.eloop) == -1) {
 		logerr("%s: eloop_signal_mask", __func__);
 		goto exit_failure;
