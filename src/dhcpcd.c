@@ -787,7 +787,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	if (ifp->options != NULL) {
 		if (ifp->options->options & DHCPCD_STOPPING)
 			return;
-	} else if (ifp->ctx->options & DHCPCD_STOPPING)
+	} else if (ifp->ctx->options & DHCPCD_EXITING)
 		return;
 
 	if (!if_is_link_up(ifp)) {
