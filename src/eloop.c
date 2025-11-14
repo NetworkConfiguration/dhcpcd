@@ -1029,17 +1029,7 @@ eloop_run_ppoll(struct eloop *eloop, const struct timespec *ts)
 			continue;
 		if (e->pollfd->revents) {
 			nn--;
-			events = 0;
-			if (pfd->revents & POLLIN)
-				events |= ELE_READ;
-			if (pfd->revents & POLLOUT)
-				events |= ELE_WRITE;
-			if (pfd->revents & POLLHUP)
-				events |= ELE_HANGUP;
-			if (pfd->revents & POLLERR)
-				events |= ELE_ERROR;
-			if (pfd->revents & POLLNVAL)
-				events |= ELE_NVAL;
+			events = eloop_pollevents(pfd);
 			if (events)
 				e->cb(e->cb_arg, events);
 		}
