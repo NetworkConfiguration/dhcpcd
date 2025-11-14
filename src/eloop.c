@@ -242,6 +242,9 @@ static int
 eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 {
 	unsigned int cmd = nsignals == 0 ? EV_DELETE : EV_ADD;
+	struct kevent *ke, *kep;
+	size_t i;
+	int err;
 
 	if (nsignals == 0) {
 		signals = eloop->signals;
@@ -250,14 +253,17 @@ eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 	if (nsignals == 0)
 		return 0;
 
-	struct kevent ke[nsignals], *kep = ke;
-	size_t i;
+	ke = kep = eloop_realloca(NULL, nsignals, sizeof(*ke));
+	if (ke == NULL)
+		return -1;
 
 	for (i = 0; i < nsignals; i++)
 		EV_SET(kep++, (uintptr_t)signals[i], EVFILT_SIGNAL, cmd, 0, 0,
 		    NULL);
 
-	return kevent(eloop->fd, ke, (KEVENT_N)nsignals, NULL, 0, NULL);
+	err = kevent(eloop->fd, ke, (KEVENT_N)nsignals, NULL, 0, NULL);
+	free(ke);
+	return err;
 }
 
 static int
