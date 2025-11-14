@@ -196,7 +196,6 @@ struct dhcpcd_ctx {
 	int ps_data_fd;		/* data returned from processes */
 	int ps_log_fd;		/* chroot logging */
 	int ps_log_root_fd;	/* outside chroot log reader */
-	struct eloop *ps_eloop;	/* eloop for polling root data */
 	struct fd_list *ps_control;		/* Queue for the above */
 	struct fd_list *ps_control_client;	/* Queue for the above */
 #endif
@@ -258,8 +257,6 @@ int dhcpcd_ifafwaiting(const struct interface *);
 int dhcpcd_afwaiting(const struct dhcpcd_ctx *);
 void dhcpcd_daemonised(struct dhcpcd_ctx *);
 void dhcpcd_daemonise(struct dhcpcd_ctx *);
-
-void dhcpcd_signal_cb(int, void *);
 
 void dhcpcd_linkoverflow(struct dhcpcd_ctx *);
 int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);

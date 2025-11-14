@@ -342,7 +342,7 @@ ps_processhangup(void *arg, unsigned short events)
 	if (!(ctx->options & DHCPCD_EXITING))
 		return;
 	if (!(ps_waitforprocs(ctx)))
-		eloop_exit(ctx->ps_eloop, EXIT_SUCCESS);
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
 }
 #endif
 
@@ -441,16 +441,6 @@ ps_startprocess(struct ps_process *psp,
 	if (eloop_forked(ctx->eloop, ELF_KEEP_SIGNALS) == -1) {
 		logerr("%s: eloop_forked", __func__);
 		goto errexit;
-	}
-	if (ctx->ps_eloop != NULL) {
-		if (eloop_forked(ctx->ps_eloop, ELF_KEEP_SIGNALS) == -1) {
-			logerr("%s: eloop_forked", __func__);
-			goto errexit;
-		}
-		if (!(flags & PSF_ELOOP)) {
-			eloop_free(ctx->ps_eloop);
-			ctx->ps_eloop = NULL;
-		}
 	}
 
 	pidfile_clean();
@@ -551,10 +541,6 @@ ps_start(struct dhcpcd_ctx *ctx)
 	pid_t pid;
 
 	TAILQ_INIT(&ctx->ps_processes);
-
-	/* We need an inner eloop to block with. */
-	if ((ctx->ps_eloop = eloop_new_with_signals(ctx->eloop)) == NULL)
-		return -1;
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
@@ -738,11 +724,11 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 {
 	int error = EXIT_SUCCESS;
 
-	if (ctx->ps_eloop == NULL || !ps_waitforprocs(ctx))
+	if (!ps_waitforprocs(ctx))
 		return 0;
 
 	ctx->options |= DHCPCD_EXITING;
-	if (eloop_timeout_add_sec(ctx->ps_eloop, PS_PROCESS_TIMEOUT,
+	if (eloop_timeout_add_sec(ctx->eloop, PS_PROCESS_TIMEOUT,
 	    ps_process_timeout, ctx) == -1)
 		logerr("%s: eloop_timeout_add_sec", __func__);
 
@@ -752,18 +738,18 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 	TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
 		if (psp->psp_pfd == -1)
 			continue;
-		if (eloop_event_add(ctx->ps_eloop, psp->psp_pfd,
+		if (eloop_event_add(ctx->eloop, psp->psp_pfd,
 		    ELE_HANGUP, ps_processhangup, psp) == -1)
 			logerr("%s: eloop_event_add pfd %d",
 			    __func__, psp->psp_pfd);
 	}
 #endif
 
-	error = eloop_start(ctx->ps_eloop);
+	error = eloop_start(ctx->eloop);
 	if (error < 0)
 		logerr("%s: eloop_start", __func__);
 
-	eloop_timeout_delete(ctx->ps_eloop, ps_process_timeout, ctx);
+	eloop_timeout_delete(ctx->eloop, ps_process_timeout, ctx);
 
 	return error;
 }
@@ -791,8 +777,6 @@ ps_freeprocess(struct ps_process *psp)
 #ifdef HAVE_CAPSICUM
 	if (psp->psp_pfd != -1) {
 		eloop_event_delete(ctx->eloop, psp->psp_pfd);
-		if (ctx->ps_eloop != NULL)
-			eloop_event_delete(ctx->ps_eloop, psp->psp_pfd);
 		close(psp->psp_pfd);
 	}
 #endif
@@ -1173,7 +1157,7 @@ stop:
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
-		eloop_exitall(len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
+		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 	dlen -= sizeof(psm.psm_hdr);

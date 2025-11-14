@@ -1489,7 +1489,7 @@ dhcpcd_renew(struct dhcpcd_ctx *ctx)
 
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
-void
+static void
 dhcpcd_signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
@@ -1576,11 +1576,10 @@ dhcpcd_signal_cb(int sig, void *arg)
 	    stop_all_interfaces(ctx, opts))
 	{
 		/* We stopped something, we will exit once that is done. */
-		eloop_exitallinners(exit_code);
 		return;
 	}
 
-	eloop_exitall(exit_code);
+	eloop_exit(ctx->eloop, exit_code);
 }
 #endif
 
@@ -2797,7 +2796,6 @@ exit1:
 #ifdef PRIVSEP
 	if (ps_root_stop(&ctx) == -1)
 		i = EXIT_FAILURE;
-	eloop_free(ctx.ps_eloop);
 #endif
 
 #ifdef USE_SIGNALS

@@ -76,33 +76,29 @@ struct psr_ctx {
 	bool psr_usemdata;
 };
 
-static void
-ps_root_readerrorcb(void *arg, unsigned short events)
+static ssize_t
+ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 {
-	struct psr_ctx *psr_ctx = arg;
 	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
+	int fd = PS_ROOT_FD(ctx);
 	struct psr_error *psr_error = &psr_ctx->psr_error;
 	struct iovec iov[] = {
 		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
 		{ .iov_base = NULL, .iov_len = 0 },
 	};
 	ssize_t len;
-	int exit_code = EXIT_FAILURE;
-
-	if (events & ELE_HANGUP)
-		goto out;
-
-	if (events != ELE_READ)
-		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 #define PSR_ERROR(e)				\
 	do {					\
 		psr_error->psr_result = -1;	\
 		psr_error->psr_errno = (e);	\
-		goto out;			\
+		return -1;			\
 	} while (0 /* CONSTCOND */)
 
-	len = recv(PS_ROOT_FD(ctx), psr_error, sizeof(*psr_error), MSG_PEEK);
+	if (eloop_waitfd(fd) == -1)
+		PSR_ERROR(errno);
+
+	len = recv(fd, psr_error, sizeof(*psr_error), MSG_PEEK);
 	if (len == -1)
 		PSR_ERROR(errno);
 	else if ((size_t)len < sizeof(*psr_error))
@@ -130,29 +126,23 @@ ps_root_readerrorcb(void *arg, unsigned short events)
 		iov[1].iov_len = psr_error->psr_datalen;
 	}
 
-	len = readv(PS_ROOT_FD(ctx), iov, __arraycount(iov));
+	len = readv(fd, iov, __arraycount(iov));
 	if (len == -1)
 		PSR_ERROR(errno);
 	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen)
 		PSR_ERROR(EINVAL);
-	exit_code = EXIT_SUCCESS;
-
-out:
-	eloop_exit(ctx->ps_eloop, exit_code);
+	return len;
 }
 
 ssize_t
 ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
 	struct psr_ctx *pc = ctx->ps_root->psp_data;
-	int err;
 
 	pc->psr_data = data;
 	pc->psr_datalen = len;
 	pc->psr_usemdata = false;
-	err = eloop_start(ctx->ps_eloop);
-	if (err < 0)
-		return err;
+	ps_root_readerrorcb(pc);
 
 	errno = pc->psr_error.psr_errno;
 	return pc->psr_error.psr_result;
@@ -162,13 +152,10 @@ ssize_t
 ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 {
 	struct psr_ctx *pc = ctx->ps_root->psp_data;
-	int err;
 	void *d;
 
 	pc->psr_usemdata = true;
-	err = eloop_start(ctx->ps_eloop);
-	if (err < 0)
-		return err;
+	ps_root_readerrorcb(pc);
 
 	if (pc->psr_error.psr_datalen != 0) {
 		if (pc->psr_error.psr_datalen > pc->psr_mdatalen) {
@@ -212,7 +199,7 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
 	err = sendmsg(fd, &msg, MSG_EOR);
 
 	/* Error sending the message? Try sending the error of sending. */
-	if (err == -1) {
+	if (err == -1 && errno != EPIPE) {
 		logerr("%s: result=%zd, data=%p, len=%zu",
 		    __func__, result, data, len);
 		psr.psr_result = err;
@@ -776,7 +763,7 @@ ps_root_signalcb(int sig, void *arg)
 	if (!(ctx->options & DHCPCD_EXITING))
 		return;
 	if (!(ps_waitforprocs(ctx)))
-		eloop_exit(ctx->ps_eloop, EXIT_SUCCESS);
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
 }
 
 int (*handle_interface)(void *, int, const char *);
@@ -888,6 +875,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 
 	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, datafd) == -1)
 		return -1;
+
 	if (ps_setbuf_fdpair(datafd) == -1)
 		return -1;
 #ifdef PRIVSEP_RIGHTS
@@ -916,9 +904,6 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	}
 
 	psp->psp_data = pc;
-	if (eloop_event_add(ctx->ps_eloop, psp->psp_fd, ELE_READ,
-	    ps_root_readerrorcb, pc) == -1)
-		return -1;
 
 	if (pid == 0) {
 		ctx->ps_log_fd = logfd[0]; /* Keep open to pass to processes */
@@ -976,10 +961,8 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	struct ps_process *psp = ctx->ps_root;
 	int err;
 
-	if (!(ctx->options & DHCPCD_PRIVSEP) ||
-	    ctx->eloop == NULL)
+	if (!(ctx->options & DHCPCD_PRIVSEP))
 		return 0;
-
 
 	/* If we are the root process then remove the pidfile */
 	if (ctx->options & DHCPCD_PRIVSEPROOT) {
@@ -990,10 +973,23 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		if (ctx->ps_log_root_fd != -1) {
 			ssize_t loglen;
 
+#ifdef __linux__
+			/* Seems to help to get the last parts,
+			 * sched_yield(2) does not. */
+			sleep(0);
+#endif
 			do {
 				loglen = logreadfd(ctx->ps_log_root_fd);
 			} while (loglen != 0 && loglen != -1);
+			close(ctx->ps_log_root_fd);
+			ctx->ps_log_root_fd = -1;
 		}
+	}
+
+	if (ctx->ps_data_fd != -1) {
+		eloop_event_delete(ctx->eloop, ctx->ps_data_fd);
+		close(ctx->ps_data_fd);
+		ctx->ps_data_fd = -1;
 	}
 
 	/* Only the manager process gets past this point. */
@@ -1015,7 +1011,8 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	} /* else the root process has already exited :( */
 
 	err = ps_stopwait(ctx);
-	ps_freeprocess(ctx->ps_root);
+	if (ctx->ps_root != NULL)
+		ps_freeprocess(ctx->ps_root);
 	return err;
 }
 
