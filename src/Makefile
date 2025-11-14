@@ -130,7 +130,7 @@ _import-src: ${SRCS} ${MAN5} ${MAN8}
 		exit 1; \
 	fi
 	${INSTALL} -d ${DESTDIR}/src
-	for x in defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5} ${MAN8}; do \
+	for x in defs.h ${SRCS} ${SRCS:.c=.h} queue.h dev.h ${MAN5} ${MAN8}; do \
 		[ ! -e "$$x" ] || cp $$x ${DESTDIR}/src; \
 	done
 	cp dhcpcd.conf ${DESTDIR}/src
