@@ -94,12 +94,10 @@ int eloop_signal_set_cb(struct eloop *, const int *, size_t,
 int eloop_signal_mask(struct eloop *);
 
 struct eloop *eloop_new(void);
-struct eloop *eloop_new_with_signals(struct eloop *);
 void eloop_free(struct eloop *);
 void eloop_exit(struct eloop *, int);
-void eloop_exitall(int);
-void eloop_exitallinners(int);
 int eloop_forked(struct eloop *, unsigned short);
+int eloop_waitfd(int);
 int eloop_start(struct eloop *);
 
 #endif
