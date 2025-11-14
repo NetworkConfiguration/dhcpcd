@@ -47,12 +47,9 @@
 #endif
 #elif defined(__linux__)
 #include <sys/epoll.h>
-
-#include <linux/version.h>
 #define USE_EPOLL
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
-#define HAVE_EPOLL_PWAIT2
-#endif
+/* musl does not support epoll_wait2 and some distros
+ * mismatch headers vs actual kernel so it's too problematic. */
 #else
 #define USE_PPOLL
 #endif
@@ -148,9 +145,6 @@ struct eloop {
 	bool exitnow;
 	bool events_need_setup;
 	bool events_invalid;
-#ifdef HAVE_EPOLL_PWAIT2
-	bool epoll_pwait2_nosys;
-#endif
 };
 
 #ifdef HAVE_REALLOCARRAY
@@ -944,36 +938,22 @@ eloop_run_epoll(struct eloop *eloop, const struct timespec *ts)
 	unsigned short events;
 
 	/* epoll does not work with zero events */
-	if (eloop->nfds == 0) {
+	if (eloop->nfds == 0)
 		n = ppoll(NULL, 0, ts, &eloop->sigset);
-#ifdef HAVE_EPOLL_PWAIT2
-	} else if (!eloop->epoll_pwait2_nosys) {
-		/* Many linux distros are dumb in shipping newer
-		 * kernel headers than the target kernel they are using.
-		 * So we jump through this stupid hoop and have to write
-		 * more complex code. */
-		n = epoll_pwait2(eloop->fd, eloop->fds, (int)eloop->nfds, ts,
-		    &eloop->sigset);
-		if (n == -1 && errno == ENOSYS) {
-			eloop->epoll_pwait2_nosys = true;
-			goto epoll_pwait2_nosys;
-		}
-#endif
-	} else {
+	else {
 		int timeout;
 
-#ifdef HAVE_EPOLL_PWAIT2
-	epoll_pwait2_nosys:
-#endif
 		if (ts != NULL) {
-			if (ts->tv_sec > INT_MAX / 1000 ||
-			    (ts->tv_sec == INT_MAX / 1000 &&
-				((ts->tv_nsec + 999999) / 1000000 >
-				    INT_MAX % 1000000)))
+			if (ts->tv_sec > INT_MAX / MSEC_PER_SEC ||
+			    (ts->tv_sec == INT_MAX / MSEC_PER_SEC &&
+				((ts->tv_nsec + (NSEC_PER_MSEC - 1)) /
+					NSEC_PER_MSEC >
+				    INT_MAX % NSEC_PER_MSEC)))
 				timeout = INT_MAX;
 			else
-				timeout = (int)(ts->tv_sec * 1000 +
-				    (ts->tv_nsec + 999999) / 1000000);
+				timeout = (int)(ts->tv_sec * MSEC_PER_SEC +
+				    (ts->tv_nsec + (NSEC_PER_MSEC - 1)) /
+					NSEC_PER_MSEC);
 		} else
 			timeout = -1;
 
