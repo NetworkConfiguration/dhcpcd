@@ -86,6 +86,7 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
 		{ .iov_base = NULL, .iov_len = 0 },
 	};
+	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = __arraycount(iov) };
 	ssize_t len;
 
 #define PSR_ERROR(e)				\
@@ -98,37 +99,40 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	if (eloop_waitfd(fd) == -1)
 		PSR_ERROR(errno);
 
-	len = recv(fd, psr_error, sizeof(*psr_error), MSG_PEEK);
+	len = recvmsg(fd, &msg, MSG_PEEK | MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
 	else if ((size_t)len < sizeof(*psr_error))
-		PSR_ERROR(EINVAL);
+		goto recv;
 
-	if (psr_error->psr_datalen > SSIZE_MAX)
-		PSR_ERROR(ENOBUFS);
 	if (psr_ctx->psr_usemdata &&
 	    psr_error->psr_datalen > psr_ctx->psr_mdatalen)
 	{
 		void *d = realloc(psr_ctx->psr_mdata, psr_error->psr_datalen);
-		if (d == NULL)
-			PSR_ERROR(errno);
-		psr_ctx->psr_mdata = d;
-		psr_ctx->psr_mdatalen = psr_error->psr_datalen;
+
+		if (d != NULL) {
+			psr_ctx->psr_mdata = d;
+			psr_ctx->psr_mdatalen = psr_error->psr_datalen;
+		}
 	}
 	if (psr_error->psr_datalen != 0) {
-		if (psr_ctx->psr_usemdata)
+		if (psr_ctx->psr_usemdata) {
 			iov[1].iov_base = psr_ctx->psr_mdata;
-		else {
-			if (psr_error->psr_datalen > psr_ctx->psr_datalen)
-				PSR_ERROR(ENOBUFS);
+			iov[1].iov_len = psr_ctx->psr_mdatalen;
+		} else {
 			iov[1].iov_base = psr_ctx->psr_data;
+			iov[1].iov_len = psr_ctx->psr_datalen;
 		}
-		iov[1].iov_len = psr_error->psr_datalen;
 	}
 
-	len = readv(fd, iov, __arraycount(iov));
+recv:
+	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
+	else if ((size_t)len < sizeof(*psr_error))
+		PSR_ERROR(EINVAL);
+	else if (msg.msg_flags & MSG_TRUNC)
+		PSR_ERROR(ENOBUFS);
 	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen)
 		PSR_ERROR(EINVAL);
 	return len;
