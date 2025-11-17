@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <net/bpf.h>
 
 #include <getopt.h>
 #include <limits.h>
@@ -190,6 +191,9 @@
 #define O_VSIO			O_BASE + 57
 #define O_VSIO6			O_BASE + 58
 #define O_NOSYSLOG		O_BASE + 59
+#ifdef BIOCSETVLANPCP
+#define O_VLANPCP		O_BASE + 60
+#endif
 
 extern const struct option cf_options[];
 
@@ -313,6 +317,10 @@ struct if_options {
 #endif
 
 	struct auth auth;
+
+#ifdef BIOCSETVLANPCP
+	int vlan_pcp;
+#endif
 };
 
 struct if_options *read_config(struct dhcpcd_ctx *,
