@@ -99,10 +99,15 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	if (eloop_waitfd(fd) == -1)
 		PSR_ERROR(errno);
 
+	/* We peek at the psr_error structure to tell us how much of a buffer
+	 * we need to read the whole packet. */
 	len = recvmsg(fd, &msg, MSG_PEEK | MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
-	else if ((size_t)len < sizeof(*psr_error))
+
+	/* After this point, we MUST do another recvmsg even on a failure
+	 * to remove the message after peeking. */
+	if ((size_t)len < sizeof(*psr_error))
 		goto recv;
 
 	if (psr_ctx->psr_usemdata &&
@@ -110,6 +115,11 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	{
 		void *d = realloc(psr_ctx->psr_mdata, psr_error->psr_datalen);
 
+		/* If we failed to malloc then psr_mdatalen will be smaller
+		 * than psr_datalen.
+		 * The following recvmsg will get MSG_TRUNC so the malloc error
+		 * will be reported there but more importantly the
+		 * message will be correctly discarded from the queue. */
 		if (d != NULL) {
 			psr_ctx->psr_mdata = d;
 			psr_ctx->psr_mdatalen = psr_error->psr_datalen;
@@ -118,7 +128,10 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	if (psr_error->psr_datalen != 0) {
 		if (psr_ctx->psr_usemdata) {
 			iov[1].iov_base = psr_ctx->psr_mdata;
-			iov[1].iov_len = psr_ctx->psr_mdatalen;
+			/* psr_mdatalen could be smaller then psr_datalen
+			 * if the above malloc failed. */
+			iov[1].iov_len =
+			    MIN(psr_ctx->psr_mdatalen, psr_ctx->psr_datalen);
 		} else {
 			iov[1].iov_base = psr_ctx->psr_data;
 			iov[1].iov_len = psr_ctx->psr_datalen;
