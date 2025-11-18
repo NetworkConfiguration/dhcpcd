@@ -131,14 +131,19 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 			/* psr_mdatalen could be smaller then psr_datalen
 			 * if the above malloc failed. */
 			iov[1].iov_len =
-			    MIN(psr_ctx->psr_mdatalen, psr_ctx->psr_datalen);
+			    MIN(psr_ctx->psr_mdatalen, psr_error->psr_datalen);
 		} else {
 			iov[1].iov_base = psr_ctx->psr_data;
-			iov[1].iov_len = psr_ctx->psr_datalen;
+			/* This should never be the case */
+			iov[1].iov_len =
+			    MIN(psr_ctx->psr_datalen, psr_error->psr_datalen);
 		}
 	}
 
 recv:
+	/* fd is SOCK_SEQPACKET and we mark the boundary with MSG_EOR
+	 * so this can never stall if the receive buffers are bigger
+	 * than the actual message. */
 	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
