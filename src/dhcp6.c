@@ -1818,8 +1818,9 @@ dhcp6_startinform(void *arg)
 	 * merely one facet of the lease as a whole.
 	 * This poor wording might explain the lack of similar text for INFORM
 	 * in 18.1.5 because there are no addresses in the INFORM message. */
-	eloop_timeout_add_sec(ifp->ctx->eloop,
-	    INF_MAX_RD, dhcp6_failinform, ifp);
+	if (!state->failed)
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    INF_MAX_RD, dhcp6_failinform, ifp);
 }
 
 static bool
