@@ -291,7 +291,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	int n;
 
 	state = D_CSTATE(ifp);
-	if (state == NULL || state->state != DHS_BOUND || !state->added)
+	if (state == NULL || !(state->added & STATE_ADDED))
 		return 0;
 
 	/* An address does have to exist. */
