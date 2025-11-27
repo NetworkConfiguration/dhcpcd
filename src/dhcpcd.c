@@ -535,7 +535,7 @@ configure_interface1(struct interface *ifp)
 
 	if (!(ifo->options & DHCPCD_IAID)) {
 		/*
-		 * An IAID is for identifying a unqiue interface within
+		 * An IAID is for identifying an unique interface within
 		 * the client. It is 4 bytes long. Working out a default
 		 * value is problematic.
 		 *

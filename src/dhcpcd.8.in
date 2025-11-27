@@ -655,7 +655,7 @@ of a randomly generated number.
 .It Fl J , Fl Fl broadcast
 Instructs the DHCP server to broadcast replies back to the client.
 Normally this is only set for non-Ethernet interfaces,
-such as FireWire and InfiniBand.
+such as FireWire and InfiniBand, and on Linux-based systems for ipvlan as well.
 In most instances,
 .Nm
 will set this automatically.
