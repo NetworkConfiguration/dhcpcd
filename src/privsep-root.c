@@ -107,8 +107,12 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 
 	/* After this point, we MUST do another recvmsg even on a failure
 	 * to remove the message after peeking. */
-	if ((size_t)len < sizeof(*psr_error))
-		goto recv;
+	if ((size_t)len < sizeof(*psr_error)) {
+		/* We can't use the header to work out buffers, so
+		 * remove the message and bail. */
+		(void)recvmsg(fd, &msg, MSG_WAITALL);
+		PSR_ERROR(EINVAL);
+	}
 
 	if (psr_ctx->psr_usemdata &&
 	    psr_error->psr_datalen > psr_ctx->psr_mdatalen)
@@ -139,7 +143,6 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 			iov[1].iov_len = psr_error->psr_datalen;
 	}
 
-recv:
 	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
