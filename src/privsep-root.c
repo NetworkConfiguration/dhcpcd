@@ -126,18 +126,17 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 		}
 	}
 	if (psr_error->psr_datalen != 0) {
+		/* Set our buffers */
 		if (psr_ctx->psr_usemdata) {
 			iov[1].iov_base = psr_ctx->psr_mdata;
-			/* psr_mdatalen could be smaller then psr_datalen
-			 * if the above malloc failed. */
-			iov[1].iov_len =
-			    MIN(psr_ctx->psr_mdatalen, psr_error->psr_datalen);
+			iov[1].iov_len = psr_ctx->psr_mdatalen;
 		} else {
 			iov[1].iov_base = psr_ctx->psr_data;
-			/* This should never be the case */
-			iov[1].iov_len =
-			    MIN(psr_ctx->psr_datalen, psr_error->psr_datalen);
+			iov[1].iov_len = psr_ctx->psr_datalen;
 		}
+		/* We might require less than the buffer size */
+		if (iov[1].iov_len > psr_error->psr_datalen)
+			iov[1].iov_len = psr_error->psr_datalen;
 	}
 
 recv:
@@ -151,8 +150,11 @@ recv:
 		PSR_ERROR(EINVAL);
 	else if (msg.msg_flags & MSG_TRUNC)
 		PSR_ERROR(ENOBUFS);
-	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen)
-		PSR_ERROR(EINVAL);
+	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen) {
+		logerrx("%s: recvmsg returned %zd, expecting %zu", __func__,
+		    len, sizeof(*psr_error) + psr_error->psr_datalen);
+		PSR_ERROR(EBADMSG);
+	}
 	return len;
 }
 
