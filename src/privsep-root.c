@@ -115,7 +115,7 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	{
 		void *d = realloc(psr_ctx->psr_mdata, psr_error->psr_datalen);
 
-		/* If we failed to malloc then psr_mdatalen will be smaller
+		/* If we failed to realloc then psr_mdatalen will be smaller
 		 * than psr_datalen.
 		 * The following recvmsg will get MSG_TRUNC so the malloc error
 		 * will be reported there but more importantly the
@@ -140,9 +140,6 @@ ps_root_readerrorcb(struct psr_ctx *psr_ctx)
 	}
 
 recv:
-	/* fd is SOCK_SEQPACKET and we mark the boundary with MSG_EOR
-	 * so this can never stall if the receive buffers are bigger
-	 * than the actual message. */
 	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
