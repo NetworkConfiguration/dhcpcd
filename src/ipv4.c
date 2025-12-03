@@ -359,6 +359,8 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 		rt->rt_mtu = mtu;
 		if (!(rt->rt_dflags & RTDF_STATIC))
 			rt->rt_dflags |= RTDF_DHCP;
+		if (state->added & STATE_FAKE)
+			rt->rt_dflags |= RTDF_FAKE;
 		sa_in_init(&rt->rt_ifa, &state->addr->addr);
 		if (rb_tree_insert_node(routes, rt) != rt) {
 			rt_free(rt);
