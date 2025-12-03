@@ -2546,7 +2546,7 @@ invalid_token:
 #ifdef INET
 	case O_FALLBACK_TIME:
 		ARG_REQUIRED;
-		ifo->request_time =
+		ifo->fallback_time =
 		    (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
 		if (e) {
 			logerrx("invalid fallback time: %s", arg);
