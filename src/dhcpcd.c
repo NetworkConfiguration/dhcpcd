@@ -730,7 +730,7 @@ dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 {
 
 	dhcpcd_initstate1(ifp,
-			  ifp->argc ? ifp->argc : ifp->ctx->argc,
+			  ifp->argv ? ifp->argc : ifp->ctx->argc,
 			  ifp->argv ? ifp->argv : ifp->ctx->argv,
 			  options);
 }
@@ -1429,8 +1429,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 			if (ifp->argv)
 				free_argv_copy(ifp->argv);
 			ifp->argv = copy_argv(argc, argv);
-			if (ifp->argv)
-				ifp->argc = argc;
+			ifp->argc = ifp->argv ? argc : 0;
 
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
