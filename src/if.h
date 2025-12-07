@@ -73,6 +73,8 @@ typedef unsigned long		ioctl_request_t;
 #include "ipv6.h"
 #include "route.h"
 
+#define VLAN_PCP_MAX			7
+
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
 

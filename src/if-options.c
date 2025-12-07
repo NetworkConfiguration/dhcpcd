@@ -30,6 +30,7 @@
 #include <sys/types.h>
 
 #include <arpa/inet.h>
+#include <net/bpf.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -176,6 +177,9 @@ const struct option cf_options[] = {
 	{"fallback_time",   required_argument, NULL, O_FALLBACK_TIME},
 	{"ipv4ll_time",     required_argument, NULL, O_IPV4LL_TIME},
 	{"nosyslog",        no_argument,       NULL, O_NOSYSLOG},
+#ifdef BIOCSETVLANPCP
+	{"vlan_pcp",        required_argument, NULL, O_VLANPCP},
+#endif
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2571,6 +2575,16 @@ invalid_token:
 			logsetopts(logopts);
 		}
 		break;
+#ifdef BIOCSETVLANPCP
+	case O_VLANPCP:
+		ARG_REQUIRED;
+		ifo->vlan_pcp =
+		    (int)strtoi(arg, NULL, 0, 0, VLAN_PCP_MAX, &e);
+		if (e) {
+			logerrx("invalid vlan-pcp: %s", arg);
+			return -1;
+		}
+#endif
 	default:
 		return 0;
 	}
@@ -2664,6 +2678,11 @@ default_config(struct dhcpcd_ctx *ctx)
 	rb_tree_init(&ifo->routes, &rt_compare_list_ops);
 #ifdef AUTH
 	TAILQ_INIT(&ifo->auth.tokens);
+#endif
+
+#ifdef BIOCSETVLANPCP
+	/* Disable PCP tagging */
+	ifo->vlan_pcp = -1;
 #endif
 
 	/* Inherit some global defaults */
