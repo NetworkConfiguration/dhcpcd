@@ -729,7 +729,10 @@ static void
 dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 {
 
-	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv, options);
+	dhcpcd_initstate1(ifp,
+			  ifp->argv ? ifp->argc : ifp->ctx->argc,
+			  ifp->argv ? ifp->argv : ifp->ctx->argv,
+			  options);
 }
 
 static void
@@ -1364,7 +1367,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	oldopts = ifp->options->options;
 #endif
 	script_runreason(ifp, "RECONFIGURE");
-	dhcpcd_initstate1(ifp, argc, argv, 0);
+	dhcpcd_initstate1(ifp, argc, argv, 0); // control or main argv
 #ifdef INET
 	if (ifp->options->options & DHCPCD_DHCP)
 		dhcp_reboot_newopts(ifp, oldopts);
@@ -1399,28 +1402,44 @@ reload_config(struct dhcpcd_ctx *ctx)
 }
 
 static void
-reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
+reconf_reboot(struct dhcpcd_ctx *ctx,
+    const int reboot_else_applyaddr,
+    const int argc, char **argv,
+    const int first_iface_arg)
 {
 	int i;
 	struct interface *ifp;
+	bool args_empty = argc == first_iface_arg;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		for (i = oi; i < argc; i++) {
+		// Find ifp in iface args
+		for (i = first_iface_arg; i < argc; i++) {
 			if (strcmp(ifp->name, argv[i]) == 0)
 				break;
 		}
-		if (oi != argc && i == argc)
-			continue;
+
+		bool iface_found = i != argc;
+
+		if (!args_empty && !iface_found)
+			continue; // try to find other ifaces
+		// Note: if args_empty affect all interfaces
+
 		if (ifp->active == IF_ACTIVE_USER) {
-			if (action)
+			if (reboot_else_applyaddr)
 				if_reboot(ifp, argc, argv);
 #ifdef INET
 			else
 				ipv4_applyaddr(ifp);
 #endif
-		} else if (i != argc) {
+		} else if (iface_found) {
 			ifp->active = IF_ACTIVE_USER;
-			dhcpcd_initstate1(ifp, argc, argv, 0);
+			dhcpcd_initstate1(ifp, argc, argv, 0); // control cmd args
+
+			if (ifp->argv)
+				free_argv_copy(ifp->argv);
+			ifp->argv = copy_argv(argc, argv);
+			ifp->argc = ifp->argv ? argc : 0;
+
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
 		}
@@ -1529,7 +1548,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
-		reconf_reboot(ctx, 1, ctx->argc, ctx->argv,
+		reconf_reboot(ctx, 1 /*1=if_reboot*/, ctx->argc, ctx->argv,
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
@@ -1773,7 +1792,7 @@ dumperr:
 	}
 
 	reload_config(ctx);
-	/* XXX: Respect initial commandline options? */
+	/* Respect control cmd options! */
 	reconf_reboot(ctx, do_reboot, argc, argv, oifind);
 	return 0;
 }
@@ -2680,7 +2699,7 @@ start_manager:
 
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
-			dhcpcd_initstate1(ifp, argc, argv, 0);
+			dhcpcd_initstate1(ifp, argc, argv, 0); // main argv
 	}
 	if_learnaddrs(&ctx, ctx.ifaces, &ifaddrs);
 	if_freeifaddrs(&ctx, &ifaddrs);
