@@ -1402,27 +1402,36 @@ reload_config(struct dhcpcd_ctx *ctx)
 }
 
 static void
-reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
+reconf_reboot(struct dhcpcd_ctx *ctx,
+    const int reboot_else_applyaddr,
+    const int argc, char **argv,
+    const int first_iface_arg)
 {
 	int i;
 	struct interface *ifp;
+	bool args_empty = argc == first_iface_arg;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		for (i = oi; i < argc; i++) {
+		// Find ifp in iface args
+		for (i = first_iface_arg; i < argc; i++) {
 			if (strcmp(ifp->name, argv[i]) == 0)
 				break;
 		}
-		if (oi != argc && i == argc)
-			continue;
+
+		bool iface_found = i != argc;
+
+		if (!args_empty && !iface_found)
+			continue; // try to find other ifaces
+		// Note: if args_empty affect all interfaces
+
 		if (ifp->active == IF_ACTIVE_USER) {
-			if (action)
+			if (reboot_else_applyaddr)
 				if_reboot(ifp, argc, argv);
 #ifdef INET
 			else
 				ipv4_applyaddr(ifp);
 #endif
-		} else if (i != argc) {
-			/* iface wasnt found above -> it's new. start it. */
+		} else if (iface_found) {
 			ifp->active = IF_ACTIVE_USER;
 			dhcpcd_initstate1(ifp, argc, argv, 0); // control cmd args
 
@@ -1539,7 +1548,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
-		reconf_reboot(ctx, 1, ctx->argc, ctx->argv,
+		reconf_reboot(ctx, 1 /*1=if_reboot*/, ctx->argc, ctx->argv,
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
