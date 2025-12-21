@@ -1882,7 +1882,7 @@ err_sla:
 			if (*edop) {
 				dop = &(*edop)->embopts;
 				dop_len = &(*edop)->embopts_len;
-			} else if (ldop) {
+			} else if (*ldop) {
 				dop = &(*ldop)->embopts;
 				dop_len = &(*ldop)->embopts_len;
 			} else {
