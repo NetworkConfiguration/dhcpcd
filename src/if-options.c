@@ -2130,6 +2130,10 @@ err_sla:
 		ndop->var = np;
 		if (bp) {
 			dl = strlen(bp);
+			if (dl > sizeof(ndop->bitflags)) {
+				logwarnx("bitflag string too long %s", bp);
+				dl = sizeof(ndop->bitflags);
+			}
 			memcpy(ndop->bitflags, bp, dl);
 			memset(ndop->bitflags + dl, 0,
 			    sizeof(ndop->bitflags) - dl);
