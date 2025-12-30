@@ -944,10 +944,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 
-		if (fp != NULL) {
+		if (fp != NULL)
 			fp = strskipwhite(fp);
+		if (fp != NULL)
 			p = strchr(fp, ',');
-		} else
+		else
 			p = NULL;
 		if (p == NULL || p[1] == '\0') {
 			logerrx("invalid vendor format: %s", arg);
