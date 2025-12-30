@@ -313,9 +313,9 @@ rt_headclear0(struct dhcpcd_ctx *ctx, rb_tree_t *rts, int af)
 
 	if (rts == NULL)
 		return;
-	assert(ctx != NULL);
 #ifdef RT_FREE_ROUTE_TABLE
-	assert(&ctx->froutes != rts);
+	if (ctx != NULL)
+		assert(&ctx->froutes != rts);
 #endif
 
 	RB_TREE_FOREACH_SAFE(rt, rts, rtn) {
@@ -335,7 +335,7 @@ rt_headclear(rb_tree_t *rts, int af)
 
 	if (rts == NULL || (rt = RB_TREE_MIN(rts)) == NULL)
 		return;
-	rt_headclear0(rt->rt_ifp->ctx, rts, af);
+	rt_headclear0(rt->rt_ifp ? rt->rt_ifp->ctx : NULL, rts, af);
 }
 
 static void
