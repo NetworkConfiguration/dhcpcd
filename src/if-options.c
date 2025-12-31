@@ -936,7 +936,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		return -1;
 #else
 		fp = strwhite(arg);
-		if (fp)
+		if (fp != NULL)
 			*fp++ = '\0';
 		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
 		if (e) {
@@ -944,9 +944,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 
-		fp = strskipwhite(fp);
-		p = strchr(fp, ',');
-		if (!p || !p[1]) {
+		if (fp != NULL)
+			fp = strskipwhite(fp);
+		if (fp != NULL)
+			p = strchr(fp, ',');
+		else
+			p = NULL;
+		if (p == NULL || p[1] == '\0') {
 			logerrx("invalid vendor format: %s", arg);
 			return -1;
 		}
