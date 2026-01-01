@@ -44,6 +44,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <assert.h>
 
 #include "config.h"
 #include "common.h"
@@ -2992,6 +2993,68 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname,
 
 	finish_config(ifo);
 	return r;
+}
+
+#define ARGV_COPY_MAGIC ((char *)0x5a54292d273f3d34)
+/*^ intentional truncation on 32bit arches */
+
+char **copy_argv(int argc, char **argv)
+{
+	int i;
+	size_t strslen = 0;
+
+	for (i = 0; i < argc; i++) {
+		strslen += strlen(argv[i]) + 1;
+	}
+	if (strslen == 0) // also handles argc < 0
+		return NULL;
+
+	unsigned nptrs = 1 + (unsigned)argc + 1;
+	size_t ptrslen =  nptrs * sizeof(char *);
+	void *buf = malloc(ptrslen + strslen);
+	char **ptrs = buf;
+
+	if (!buf)
+		return NULL;
+
+	ptrs[0] = ARGV_COPY_MAGIC;
+	ptrs[nptrs - 1] = NULL;
+
+	if (argc == 0)
+		goto out;
+
+	char *strsp = (char *)&ptrs[nptrs];
+
+	for (i = 0; i < argc; i++) {
+		size_t len = strlcpy(strsp, argv[i], strslen);
+		if (len >= strslen) // truncated
+			goto err;
+
+		ptrs[1 + i] = strsp;
+
+		strsp += len + 1;
+		if (strslen < len + 1)
+			goto err;
+		strslen -= len + 1;
+	}
+
+	assert(strslen == 0);
+	assert(ptrs[nptrs - 1] == NULL);
+out:
+	return &ptrs[1];
+
+err:
+	free(buf);
+	return NULL;
+}
+
+void free_argv_copy(char **argv)
+{
+	assert(argv[-1] == ARGV_COPY_MAGIC);
+	if (argv[-1] != ARGV_COPY_MAGIC) {
+		logerrx("%s: invalid argv", __func__);
+	} else
+		free(&argv[-1]);
 }
 
 void

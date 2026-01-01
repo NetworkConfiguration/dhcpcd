@@ -85,6 +85,9 @@ struct interface {
 	uint8_t ssid[IF_SSIDLEN];
 	unsigned int ssid_len;
 
+	int argc;
+	char **argv;
+
 	char profile[PROFILE_LEN];
 	struct if_options *options;
 	void *if_data[IF_DATA_MAX];
