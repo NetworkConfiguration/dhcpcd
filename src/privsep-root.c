@@ -89,9 +89,8 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 
 #define PSR_ERROR(e)				\
 	do {					\
-		psr_error->psr_result = -1;	\
 		psr_error->psr_errno = (e);	\
-		return -1;			\
+		goto error;			\
 	} while (0 /* CONSTCOND */)
 
 	if (eloop_waitfd(fd) == -1)
@@ -143,6 +142,14 @@ recv:
 		PSR_ERROR(EBADMSG);
 	}
 	return len;
+
+error:
+	psr_error->psr_result = -1;
+	if (pc->psr_mallocdata && pc->psr_data != NULL) {
+		free(pc->psr_data);
+		pc->psr_data = NULL;
+	}
+	return -1;
 }
 
 ssize_t
