@@ -136,8 +136,10 @@ recv:
 	else if (msg.msg_flags & MSG_TRUNC)
 		PSR_ERROR(ENOBUFS);
 	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen) {
+#ifdef PRIVSEP_DEBUG
 		logerrx("%s: recvmsg returned %zd, expecting %zu", __func__,
 		    len, sizeof(*psr_error) + psr_error->psr_datalen);
+#endif
 		PSR_ERROR(EBADMSG);
 	}
 	return len;
