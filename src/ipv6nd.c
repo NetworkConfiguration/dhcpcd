@@ -681,11 +681,14 @@ ipv6nd_iffindprefix(struct interface *ifp,
 static void
 ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 {
+	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 
-	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap->iface);
-	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
+	eloop_q_timeout_delete(ctx->eloop, ELOOP_IPV6RA_EXPIRE, NULL,
+	    rap->iface);
+	eloop_timeout_delete(ctx->eloop, NULL, rap->iface);
+	eloop_timeout_delete(ctx->eloop, NULL, rap);
 	if (remove_ra)
-		TAILQ_REMOVE(rap->iface->ctx->ra_routers, rap, next);
+		TAILQ_REMOVE(ctx->ra_routers, rap, next);
 	ipv6_freedrop_addrs(&rap->addrs, drop_ra, 0, NULL);
 	routeinfohead_free(&rap->rinfos);
 	free(rap->data);
