@@ -98,8 +98,8 @@
 __CTASSERT(sizeof(struct ip)		== 20);
 __CTASSERT(sizeof(struct udphdr)	== 8);
 __CTASSERT(sizeof(struct bootp)		== 300);
-#define IP_UDP_SIZE	sizeof(struct ip) + sizeof(struct udphdr)
-#define BOOTP_MIN_MTU	IP_UDP_SIZE + sizeof(struct bootp)
+#define IP_UDP_SIZE	(sizeof(struct ip) + sizeof(struct udphdr))
+#define BOOTP_MIN_MTU	(IP_UDP_SIZE + sizeof(struct bootp))
 
 struct dhcp_op {
 	uint8_t value;
