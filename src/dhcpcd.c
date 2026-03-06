@@ -729,7 +729,10 @@ static void
 dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 {
 
-	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv, options);
+	dhcpcd_initstate1(ifp,
+			  ifp->argv ? ifp->argc : ifp->ctx->argc,
+			  ifp->argv ? ifp->argv : ifp->ctx->argv,
+			  options);
 }
 
 static void
@@ -1399,28 +1402,48 @@ reload_config(struct dhcpcd_ctx *ctx)
 }
 
 static void
-reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
+reconf_reboot(struct dhcpcd_ctx *ctx, const bool reboot,
+    const int argc, char **argv, const int oi)
 {
 	int i;
 	struct interface *ifp;
+	bool all_interfaces = argc == oi, iface_found;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		for (i = oi; i < argc; i++) {
 			if (strcmp(ifp->name, argv[i]) == 0)
 				break;
 		}
-		if (oi != argc && i == argc)
+
+		iface_found = i != argc;
+		if (!all_interfaces && !iface_found)
 			continue;
+
 		if (ifp->active == IF_ACTIVE_USER) {
-			if (action)
+			if (reboot)
 				if_reboot(ifp, argc, argv);
 #ifdef INET
 			else
 				ipv4_applyaddr(ifp);
 #endif
-		} else if (i != argc) {
+		} else if (iface_found) {
 			ifp->active = IF_ACTIVE_USER;
 			dhcpcd_initstate1(ifp, argc, argv, 0);
+
+			free(ifp->argv);
+			if (argc > 0) {
+				ifp->argv = alloc_args(argc, argv);
+				if (ifp->argv == NULL) {
+					logerr("alloc_args");
+					goto alloc_args_err;
+				}
+				ifp->argc = argc;
+			} else {
+alloc_args_err:
+				ifp->argv = NULL;
+				ifp->argc = 0;
+			}
+
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
 		}
@@ -1529,7 +1552,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
-		reconf_reboot(ctx, 1, ctx->argc, ctx->argv,
+		reconf_reboot(ctx, true, ctx->argc, ctx->argv,
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
@@ -1590,7 +1613,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	struct interface *ifp;
 	struct if_options *ifo;
 	unsigned long long opts, orig_opts;
-	int opt, oi, oifind, do_reboot, do_renew, af = AF_UNSPEC;
+	int opt, oi, oifind, af = AF_UNSPEC;
+	bool do_reboot, do_renew;
 	size_t len, l, nifaces;
 	char *tmp, *p;
 
@@ -1635,7 +1659,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	optind = 0;
 	oi = 0;
 	opts = 0;
-	do_reboot = do_renew = 0;
+	do_reboot = do_renew = false;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
@@ -1646,7 +1670,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			opts |= DHCPCD_RELEASE;
 			break;
 		case 'n':
-			do_reboot = 1;
+			do_reboot = true;
 			break;
 		case 'p':
 			opts |= DHCPCD_PERSISTENT;
@@ -1655,7 +1679,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			opts |= DHCPCD_EXITING;
 			break;
 		case 'N':
-			do_renew = 1;
+			do_renew = true;
 			break;
 		case 'U':
 			opts |= DHCPCD_DUMPLEASE;
@@ -1773,7 +1797,6 @@ dumperr:
 	}
 
 	reload_config(ctx);
-	/* XXX: Respect initial commandline options? */
 	reconf_reboot(ctx, do_reboot, argc, argv, oifind);
 	return 0;
 }

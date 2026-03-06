@@ -44,6 +44,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <assert.h>
 
 #include "config.h"
 #include "common.h"
@@ -2992,6 +2993,48 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname,
 
 	finish_config(ifo);
 	return r;
+}
+
+char
+**alloc_args(int argc, char **argv)
+{
+	int i;
+	size_t strslen = 0, len;
+	size_t nptrs = (size_t)argc;
+	size_t ptrslen =  nptrs * sizeof(char *);
+	void *buf;
+	char **ptrs, *strsp;
+
+	for (i = 0; i < argc; i++) {
+		strslen += strlen(argv[i]) + 1;
+	}
+	if (strslen == 0)
+		return NULL;
+
+	buf = malloc(ptrslen + strslen);
+	if (!buf)
+		return NULL;
+
+	ptrs = buf;
+	strsp = (char *)&ptrs[nptrs];
+
+	for (i = 0; i < argc; i++) {
+		len = strlcpy(strsp, argv[i], strslen);
+		if (len >= strslen) /* truncated */
+			goto err;
+
+		ptrs[i] = strsp;
+		strsp += len + 1;
+		assert(strslen >= len + 1);
+		strslen -= len + 1;
+	}
+
+	assert(strslen == 0);
+	return ptrs;
+
+err:
+	free(buf);
+	return NULL;
 }
 
 void
