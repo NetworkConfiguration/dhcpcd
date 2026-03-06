@@ -914,7 +914,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 
 	len = sendmsg(fd, &m, MSG_EOR);
 
-	if (len == -1) {
+	if (len == -1 && ctx != NULL) {
 		if (ctx->options & DHCPCD_FORKED &&
 		    !(ctx->options & DHCPCD_PRIVSEPROOT))
 			eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -998,57 +998,13 @@ ps_sendcmd(struct dhcpcd_ctx *ctx, int fd, uint16_t cmd, unsigned long flags,
 	return ps_sendpsmmsg(ctx, fd, &psm, &msg);
 }
 
-static ssize_t
-ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
+ssize_t
+ps_sendcmdmsg(struct dhcpcd_ctx *ctx, int fd, uint16_t cmd,
+    unsigned long flags, const struct msghdr *msg)
 {
-	struct ps_msghdr psm = { .ps_cmd = cmd };
-	uint8_t data[PS_BUFLEN], *p = data;
-	struct iovec iov[] = {
-		{ .iov_base = &psm, .iov_len = sizeof(psm) },
-		{ .iov_base = data, .iov_len = 0 },
-	};
-	struct msghdr m = { .msg_iov = iov, .msg_iovlen = __arraycount(iov) };
-	size_t dl = sizeof(data);
-	socklen_t cmsg_padlen =
-	    CALC_CMSG_PADLEN(msg->msg_controllen, msg->msg_namelen);
+	struct ps_msghdr psm = { .ps_cmd = cmd, .ps_flags = flags };
 
-	if (msg->msg_namelen != 0) {
-		if (msg->msg_namelen > dl)
-			goto nobufs;
-		psm.ps_namelen = msg->msg_namelen;
-		memcpy(p, msg->msg_name, msg->msg_namelen);
-		p += msg->msg_namelen;
-		dl -= msg->msg_namelen;
-	}
-
-	if (msg->msg_controllen != 0) {
-		if (msg->msg_controllen + cmsg_padlen > dl)
-			goto nobufs;
-		if (cmsg_padlen != 0) {
-			memset(p, 0, cmsg_padlen);
-			p += cmsg_padlen;
-			dl -= cmsg_padlen;
-		}
-		psm.ps_controllen = (socklen_t)msg->msg_controllen;
-		memcpy(p, msg->msg_control, msg->msg_controllen);
-		p += msg->msg_controllen;
-		dl -= msg->msg_controllen;
-	}
-
-	psm.ps_datalen = msg->msg_iov[0].iov_len;
-	if (psm.ps_datalen > dl)
-		goto nobufs;
-
-	iov[1].iov_len =
-	    psm.ps_namelen + psm.ps_controllen + psm.ps_datalen + cmsg_padlen;
-	if (psm.ps_datalen != 0)
-		memcpy(p, msg->msg_iov[0].iov_base, psm.ps_datalen);
-
-	return sendmsg(fd, &m, MSG_EOR);
-
-nobufs:
-	errno = ENOBUFS;
-	return -1;
+	return ps_sendpsmmsg(ctx, fd, &psm, msg);
 }
 
 ssize_t
@@ -1077,7 +1033,7 @@ ps_recvmsg(int rfd, unsigned short events, uint16_t cmd, int wfd)
 	}
 
 	iov[0].iov_len = (size_t)len;
-	len = ps_sendcmdmsg(wfd, cmd, &msg);
+	len = ps_sendcmdmsg(NULL, wfd, cmd, 0, &msg);
 	if (len == -1)
 		logerr("%s: ps_sendcmdmsg", __func__);
 	return len;
