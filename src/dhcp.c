@@ -2896,8 +2896,8 @@ dhcp_deconfigure(void *arg)
 	else {
 		state->addr = NULL;
 		state->added = 0;
+		script_runreason(ifp, reason);
 	}
-	script_runreason(ifp, reason);
 	free(state->old);
 	state->old = NULL;
 	state->old_len = 0;
