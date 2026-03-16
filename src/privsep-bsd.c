@@ -158,8 +158,9 @@ ps_root_doindirectioctl(struct dhcpcd_ctx *ctx,
 		return -1;
 	}
 	memcpy(&ifnamelen, p, sizeof(ifnamelen));
+	len -= sizeof(ifnamelen);
 
-	if (len < ifnamelen || len > sizeof(ifr.ifr_name)) {
+	if (len < ifnamelen || ifnamelen > sizeof(ifr.ifr_name)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -167,9 +168,11 @@ ps_root_doindirectioctl(struct dhcpcd_ctx *ctx,
 	memcpy(ifr.ifr_name, p, ifnamelen);
 	len -= ifnamelen;
 
-	/* Ensure data is now aligned */
-	memmove(data, p + ifnamelen, len);
-	ifr.ifr_data = data;
+	if (len != 0) {
+		/* Ensure data is now aligned */
+		memmove(data, p + ifnamelen, len);
+		ifr.ifr_data = data;
+	}
 
 	return ps_root_doioctldom(ctx, PF_INET, req, &ifr, sizeof(ifr));
 }
