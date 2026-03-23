@@ -2921,6 +2921,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	 * but we do have a timeout, so punt it. */
 	if (state == NULL || state->state == DHS_NONE) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		dhcp_free(ifp);
 		dhcpcd_dropped(ifp);
 		return;
 	}
