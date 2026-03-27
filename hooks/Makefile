@@ -52,8 +52,10 @@ proginstall: ${PROG} ${SCRIPTS}
 	rm -f ${DESTDIR}${SCRIPTSDIR}/10-mtu
 
 eginstall: ${FILES}
-	${INSTALL} -d ${DESTDIR}${FILESDIR}
-	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}
+	@if [ "${INSTALL_DATADIR_HOOKS}" = yes ]; then \
+		${INSTALL} -d ${DESTDIR}${FILESDIR}; \
+		${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}; \
+	fi
 
 maninstall: ${MAN8}
 	${INSTALL} -d ${DESTDIR}${MANDIR}/man8
@@ -64,12 +66,16 @@ install: proginstall eginstall maninstall
 import: ${SCRIPTS} ${FILES}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
-	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
+	@if [ "${INSTALL_DATADIR_HOOKS}" = yes ]; then \
+		${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks; \
+	fi
 
 _import-src: all
 	${INSTALL} -d ${DESTDIR}/hooks
 	${INSTALL} -m ${NONBINMODE} ${PROG} ${MAN8} ${DESTDIR}/hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}/hooks
-	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}/hooks
+	@if [ "${INSTALL_DATADIR_HOOKS}" = yes ]; then \
+		${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}/hooks; \
+	fi
 
 include ${TOP}/Makefile.inc

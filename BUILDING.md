@@ -176,13 +176,15 @@ Example: `make DESTDIR=/usr/src/contrib/dhcpcd import-src`
 
 ## Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
-By default we install `01-test`, `20-resolv.conf`and `30-hostname`.
-The other hooks, `10-wpa_supplicant`, `15-timezone` and `29-lookup-hostname`
-are installed to `$(datadir)/dhcpcd/hooks` by default and need to be
-copied to `$(libexecdir)/dhcpcd-hooks` for use.
+By default we install `01-test`, `20-resolv.conf` and `30-hostname`.
+The other hooks, `10-wpa_supplicant`, `15-timezone` and `29-lookup-hostname`,
+plus any example hooks configure resolves (such as YP-related hooks when opted in),
+are installed to `$(datadir)/dhcpcd/hooks` only when you pass `--with-eghook` or
+`--with-eghooks` and at least one such hook is found; copy them from there to
+`$(libexecdir)/dhcpcd-hooks` for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
-`./configure -with-hook=ntp.conf`
+`./configure --with-hook=ntp.conf`
 
 If using resolvconf, the `20-resolv.conf` hook now requires a version with the
 `-C` and `-c` options to deprecate and activate interfaces to support wireless
