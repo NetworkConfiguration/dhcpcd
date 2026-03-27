@@ -162,6 +162,9 @@ bpf_open(const struct interface *ifp,
 #ifdef BIOCIMMEDIATE
 	unsigned int flags;
 #endif
+#ifdef BIOCSETVLANPCP
+	unsigned int vlan_pcp;
+#endif
 #ifndef O_CLOEXEC
 	int fd_opts;
 #endif
@@ -206,6 +209,14 @@ bpf_open(const struct interface *ifp,
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	if (ioctl(bpf->bpf_fd, BIOCSETIF, &ifr) == -1)
 		goto eexit;
+
+#ifdef BIOCSETVLANPCP
+	if (ifp->options->vlan_pcp != -1) {
+		vlan_pcp = (u_int)ifp->options->vlan_pcp;
+		if (ioctl(bpf->bpf_fd, BIOCSETVLANPCP, &vlan_pcp) == -1)
+			goto eexit;
+	}
+#endif
 
 #ifdef BIOCIMMEDIATE
 	flags = 1;
