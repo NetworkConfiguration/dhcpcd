@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2017 Roy Marples <roy@marples.name> -->
+
 # eloop-bench
 
 eloop is a portable event loop designed to be dropped into the code of a

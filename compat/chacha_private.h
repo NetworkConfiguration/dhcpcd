@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: CC0-1.0 */
+
 /*
 chacha-merged.c version 20080118
 D. J. Bernstein

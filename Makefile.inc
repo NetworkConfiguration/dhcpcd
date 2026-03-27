@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2009-2025 Roy Marples <roy@marples.name>
+
 # System definitions
 
 PICFLAG?=	-fPIC

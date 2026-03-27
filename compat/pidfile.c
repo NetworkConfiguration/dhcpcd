@@ -1,6 +1,7 @@
 /*	$NetBSD: pidfile.c,v 1.16 2021/08/01 15:29:29 andvar Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 1999, 2016 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

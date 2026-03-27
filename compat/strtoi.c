@@ -1,6 +1,7 @@
 /*	$NetBSD: strtoi.c,v 1.3 2019/11/28 12:33:23 roy Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2005 The DragonFly Project.  All rights reserved.
  * Copyright (c) 2003 Citrus Project,
  * All rights reserved.

@@ -1,4 +1,5 @@
 /*
+ * SPDX-License-Identifier: ISC
  * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any

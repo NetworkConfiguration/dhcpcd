@@ -1,6 +1,7 @@
 /*	$OpenBSD: arc4random_uniform.c,v 1.3 2019/01/20 02:59:07 bcook Exp $	*/
 
 /*
+ * SPDX-License-Identifier: ISC
  * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any

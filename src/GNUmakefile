@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2017 Roy Marples <roy@marples.name>
+
 # GNU Make does not automagically include .depend
 # Luckily it does read GNUmakefile over Makefile so we can work around it
 

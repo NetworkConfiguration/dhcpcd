@@ -1,5 +1,6 @@
 /*
  * Arc4 random number generator for OpenBSD.
+ * SPDX-License-Identifier: ISC
  * Copyright 1996 David Mazieres <dm@lcs.mit.edu>.
  *
  * Modification and redistribution in source and binary forms is

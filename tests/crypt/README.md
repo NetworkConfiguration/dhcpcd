@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2017 Roy Marples <roy@marples.name> -->
+
 # dhcpcd Test Suite
 
 Currently this just tests the RFC2202 MD5 implementation in dhcpcd.

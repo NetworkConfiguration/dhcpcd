@@ -1,6 +1,7 @@
 /* $NetBSD: reallocarr.c,v 1.4 2015/08/20 20:08:04 joerg Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2015 Joerg Sonnenberger <joerg@NetBSD.org>.
  * All rights reserved.
  *

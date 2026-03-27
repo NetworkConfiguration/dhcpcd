@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2025 Roy Marples <roy@marples.name> -->
+
 This area is for 3rd party software we include directly.
 All imports should be made on a branch vendor/NAME (initially orphaned) and
 merged into the master branch.
