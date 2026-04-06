@@ -40,7 +40,6 @@ SANITIZE=no
 STATUSARG=
 OPENSSL=
 NTPD=
-CHRONYD=
 TIMESYNCD=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
@@ -1701,13 +1700,14 @@ if [ -z "$STATUSARG" ]; then
 fi
 echo "STATUSARG=	$STATUSARG" >>config.mk
 
+if [ "$NTPD" = "yes" ] && [ "$TIMESYNCD" = "yes" ]; then
+	echo "Warning: --enable-ntpd and --enable-timesyncd are both set" >&2
+	exit 1
+fi
+
 HOOKS=
 if ! $HOOKSET; then
     if ! [ "$NTP" = "no" ]; then
-	    if [ "$NTPD" = "yes" ] && [ "$TIMESYNCD" = "yes" ]; then
-			echo "Warning: --enable-ntpd and --enable-timesyncd are both set" >&2
-			exit 1
-		fi
 		printf "Checking for ntpd ... "
 		NTPD_PATH=$(_which ntpd)
 		if [ -n "$NTPD_PATH" ]; then
@@ -1746,6 +1746,11 @@ if ! $HOOKSET; then
 			echo "$TIMESYNCD_PATH (Selecting 50-timesyncd.conf)"
 		else
 			echo "not found"
+		fi
+
+		 # Warn if both ntpd/chronyd and timesyncd are detected
+		if [ "$NTPD" = "yes" ] && [ -n "$TIMESYNCD_PATH" ]; then
+			echo "Both ntpd/chronyd and timesyncd detected; NTP will default to ntpd"
 		fi
 
 		# Choose hook based on enabled time service
