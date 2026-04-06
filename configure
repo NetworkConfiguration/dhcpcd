@@ -40,6 +40,7 @@ SANITIZE=no
 STATUSARG=
 OPENSSL=
 NTPD=
+CHRONYD=
 TIMESYNCD=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
@@ -79,7 +80,9 @@ for x do
 	--enable-seccomp) SECCOMP=yes;;
 	--disable-ntp) NTP=no;;
 	--enable-ntp) NTP=yes;;
+	--disable-ntpd) NTPD=no;;
 	--enable-ntpd) NTPD=yes; NTP=yes;;
+	--disable-timesyncd) TIMESYNCD=no;;
 	--enable-timesyncd) TIMESYNCD=yes; NTP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
@@ -1708,47 +1711,57 @@ fi
 HOOKS=
 if ! $HOOKSET; then
     if ! [ "$NTP" = "no" ]; then
-		printf "Checking for ntpd ... "
-		NTPD_PATH=$(_which ntpd)
-		if [ -n "$NTPD_PATH" ]; then
-			NTPD=yes
-			NTP=yes
-			echo "$NTPD_PATH (Selecting 50-ntp.conf)"
-		else
-			echo "not found"
-		fi
-		printf "Checking for chronyd ... "
-		CHRONYD_PATH=$(_which chronyd)
-		if [ -n "$CHRONYD_PATH" ]; then
-			NTPD=yes
-			NTP=yes
-			echo "$CHRONYD_PATH (Selecting 50-ntp.conf)"
-		else
-			echo "not found"
-		fi
-		
-		# Warn if both are detected
-		if [ -n "$NTPD_PATH" ] && [ -n "$CHRONYD_PATH" ]; then
-			echo "NTP will default to $NTPD_PATH"
+	    printf "Checking for ntpd ... "
+	    if [ -z "$NTPD" ]; then
+		    # if not explicitly set enable/disable, try to autodetect
+			
+			NTPD_PATH=$(_which ntpd)
+			if [ -n "$NTPD_PATH" ]; then
+				NTPD=yes
+				NTP=yes
+				echo "$NTPD_PATH (Selecting 50-ntp.conf)"
+			else
+				echo "not found"
+			fi
+			printf "Checking for chronyd ... "
+			CHRONYD_PATH=$(_which chronyd)
+			if [ -n "$CHRONYD_PATH" ]; then
+				NTPD=yes
+				NTP=yes
+				echo "$CHRONYD_PATH (Selecting 50-ntp.conf)"
+			else
+				echo "not found"
+			fi
+			
+			# Warn if both are detected
+			if [ -n "$NTPD_PATH" ] && [ -n "$CHRONYD_PATH" ]; then
+				echo "NTP will default to $NTPD_PATH"
+			fi
+		elif [ "$NTPD" = "no" ]; then
+			echo "skipped"
 		fi
 
 		printf "Checking for timesyncd ... "
-		TIMESYNCD_PATH=
-		for x in /usr/lib/systemd/systemd-timesyncd; do
-			if [ -x "$x" ]; then
-				TIMESYNCD=yes
-				TIMESYNCD_PATH=$x
-				NTP=yes
-				break
+		if [ -z "$TIMESYNCD" ]; then
+			TIMESYNCD_PATH=
+			for x in /usr/lib/systemd/systemd-timesyncd; do
+				if [ -x "$x" ]; then
+					TIMESYNCD=yes
+					TIMESYNCD_PATH=$x
+					NTP=yes
+					break
+				fi
+			done
+			if [ "$TIMESYNCD" = "yes" ]; then
+				echo "$TIMESYNCD_PATH (Selecting 50-timesyncd.conf)"
+			else
+				echo "not found"
 			fi
-		done
-		if [ "$TIMESYNCD" = "yes" ]; then
-			echo "$TIMESYNCD_PATH (Selecting 50-timesyncd.conf)"
-		else
-			echo "not found"
+		elif [ "$TIMESYNCD" = "no" ]; then
+			echo "skipped"
 		fi
 
-		 # Warn if both ntpd/chronyd and timesyncd are detected
+		# Warn if both ntpd/chronyd and timesyncd are detected
 		if [ "$NTPD" = "yes" ] && [ -n "$TIMESYNCD_PATH" ]; then
 			echo "Both ntpd/chronyd and timesyncd detected; NTP will default to ntpd"
 		fi
