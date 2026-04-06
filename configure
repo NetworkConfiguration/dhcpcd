@@ -1711,6 +1711,14 @@ fi
 HOOKS=
 if ! $HOOKSET; then
     if ! [ "$NTP" = "no" ]; then
+		# Explicit service selection should disable autodetect of the other service.
+		if [ "$TIMESYNCD" = "yes" ] && [ -z "$NTPD" ]; then
+			NTPD=no
+		fi
+		if [ "$NTPD" = "yes" ] && [ -z "$TIMESYNCD" ]; then
+			TIMESYNCD=no
+		fi
+
 	    printf "Checking for ntpd ... "
 	    if [ -z "$NTPD" ]; then
 		    # if not explicitly set enable/disable, try to autodetect
