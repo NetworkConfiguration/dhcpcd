@@ -1842,6 +1842,8 @@ if [ "$NTP" = "yes" ]; then
 		echo "ntpd"
 	elif [ "$TIMESYNCD" = "yes" ]; then
 		echo "timesyncd"
+	else
+		echo "user defined time service via HOOKSCRIPTS"
 	fi
 	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 else
