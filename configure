@@ -1703,22 +1703,9 @@ if [ -z "$STATUSARG" ]; then
 fi
 echo "STATUSARG=	$STATUSARG" >>config.mk
 
-if [ "$NTPD" = "yes" ] && [ "$TIMESYNCD" = "yes" ]; then
-	echo "Warning: --enable-ntpd and --enable-timesyncd are both set" >&2
-	exit 1
-fi
-
 HOOKS=
 if ! $HOOKSET; then
     if ! [ "$NTP" = "no" ]; then
-		# Explicit service selection should disable autodetect of the other service.
-		if [ "$TIMESYNCD" = "yes" ] && [ -z "$NTPD" ]; then
-			NTPD=no
-		fi
-		if [ "$NTPD" = "yes" ] && [ -z "$TIMESYNCD" ]; then
-			TIMESYNCD=no
-		fi
-
 	    printf "Checking for ntpd ... "
 	    if [ -z "$NTPD" ]; then
 		    # if not explicitly set enable/disable, try to autodetect
@@ -1747,6 +1734,8 @@ if ! $HOOKSET; then
 			fi
 		elif [ "$NTPD" = "no" ]; then
 			echo "skipped"
+		else
+			echo "selected via --enable-ntpd (Selecting 50-ntp.conf)"
 		fi
 
 		printf "Checking for timesyncd ... "
@@ -1767,17 +1756,15 @@ if ! $HOOKSET; then
 			fi
 		elif [ "$TIMESYNCD" = "no" ]; then
 			echo "skipped"
-		fi
-
-		# Warn if both ntpd/chronyd and timesyncd are detected
-		if [ "$NTPD" = "yes" ] && [ -n "$TIMESYNCD_PATH" ]; then
-			echo "Both ntpd/chronyd and timesyncd detected; NTP will default to ntpd"
+		else
+			echo "selected via --enable-timesyncd (Selecting 50-timesyncd.conf)"
 		fi
 
 		# Choose hook based on enabled time service
 		if [ "$NTPD" = "yes" ]; then
 			HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
-		elif [ "$TIMESYNCD" = "yes" ]; then
+		fi
+		if [ "$TIMESYNCD" = "yes" ]; then
 			HOOKS="$HOOKS${HOOKS:+ }50-timesyncd.conf"
 		fi
 	fi
@@ -1845,14 +1832,7 @@ if [ -z "$NTP" ]; then
 fi
 if [ "$NTP" = "yes" ]; then 
 	# --enable-ntp or ntp/timesyncd service was autodetected
-	printf "Enabling NTP support for ... "
-	if [ "$NTPD" = "yes" ]; then
-		echo "ntpd"
-	elif [ "$TIMESYNCD" = "yes" ]; then
-		echo "timesyncd"
-	else
-		echo "user defined time service via HOOKSCRIPTS"
-	fi
+	echo "Enabling NTP support"
 	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 else
 	# --disable-ntp
