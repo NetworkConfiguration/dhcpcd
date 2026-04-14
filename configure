@@ -1741,7 +1741,8 @@ if ! $HOOKSET; then
 		printf "Checking for timesyncd ... "
 		if [ -z "$TIMESYNCD" ]; then
 			TIMESYNCD_PATH=
-			for x in /usr/lib/systemd/systemd-timesyncd; do
+			for x in /lib/systemd/systemd-timesyncd \
+                /usr/lib/systemd/systemd-timesyncd; do
 				if [ -x "$x" ]; then
 					TIMESYNCD=yes
 					TIMESYNCD_PATH=$x
