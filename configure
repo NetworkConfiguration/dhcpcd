@@ -40,7 +40,6 @@ SANITIZE=no
 STATUSARG=
 OPENSSL=
 NTPD=
-CHRONYD=
 TIMESYNCD=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
@@ -1709,7 +1708,6 @@ if ! $HOOKSET; then
 	    printf "Checking for ntpd ... "
 	    if [ -z "$NTPD" ]; then
 		    # if not explicitly set enable/disable, try to autodetect
-			
 			NTPD_PATH=$(_which ntpd)
 			if [ -n "$NTPD_PATH" ]; then
 				NTPD=yes
@@ -1835,9 +1833,12 @@ if [ "$NTP" = "yes" ]; then
 	# --enable-ntp or ntp/timesyncd service was autodetected
 	echo "Enabling NTP support"
 	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
-else
+elif [ "$NTP" = "no" ]; then
 	# --disable-ntp
 	echo "NTP support is disabled"
+else
+	# No NTP daemon detected
+	echo "NTP support not enabled (no daemon detected)"
 fi
 
 echo >>$CONFIG_H
