@@ -1829,12 +1829,6 @@ if ! $HOOKSET; then
 	fi
 fi
 
-if [ -z "$NTP" ]; then
-	if [ "$NTPD" = "yes" ] || [ "$TIMESYNCD" = "yes" ]; then
-		NTP=yes
-	fi
-fi
-
 echo >>$CONFIG_H
 echo "#endif /*CONFIG_H*/">>$CONFIG_H
 
