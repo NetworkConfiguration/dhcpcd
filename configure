@@ -558,6 +558,11 @@ if [ -z "$INET6" ] || [ "$INET6" = yes ]; then
 		echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
 	fi
 fi
+if [ "$NTP" = "yes" ]; then
+	# NTP enabled: --enable-ntp, or implied by --enable-ntpd / --enable-timesyncd
+	echo "Enabling NTP support"
+	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
+fi
 if [ -z "$AUTH" ] || [ "$AUTH" = yes ]; then
 	echo "Enabling Authentication"
 	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
@@ -1704,7 +1709,7 @@ echo "STATUSARG=	$STATUSARG" >>config.mk
 
 HOOKS=
 if ! $HOOKSET; then
-    if ! [ "$NTP" = "no" ]; then
+    if [ "$NTP" = "yes" ]; then
 	    printf "Checking for ntpd ... "
 	    if [ -z "$NTPD" ]; then
 		    # if not explicitly set enable/disable, try to autodetect
@@ -1828,17 +1833,6 @@ if [ -z "$NTP" ]; then
 	if [ "$NTPD" = "yes" ] || [ "$TIMESYNCD" = "yes" ]; then
 		NTP=yes
 	fi
-fi
-if [ "$NTP" = "yes" ]; then 
-	# --enable-ntp or ntp/timesyncd service was autodetected
-	echo "Enabling NTP support"
-	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
-elif [ "$NTP" = "no" ]; then
-	# --disable-ntp
-	echo "NTP support is disabled"
-else
-	# No NTP daemon detected
-	echo "NTP support not enabled (no daemon detected)"
 fi
 
 echo >>$CONFIG_H
