@@ -1,8 +1,7 @@
-/* SPDX-License-Identifier: CC0-1.0 */
-
 /*
  * This code implements the MD5 message-digest algorithm.
  * The algorithm is due to Ron Rivest.	This code was
+ * SPDX-License-Identifier: CC0-1.0
  * written by Colin Plumb in 1993, no copyright is claimed.
  * This code is in the public domain; do with it what you wish.
  *

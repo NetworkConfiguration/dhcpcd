@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
 /*
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2023 Canonical Ltd.
  *
  * Redistribution and use in source and binary forms, with or without

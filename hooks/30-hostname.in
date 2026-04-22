@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: BSD-2-Clause
 # Copyright (c) 2020-2024 Roy Marples <roy@marples.name>
 
 # Set the hostname from DHCP data if required

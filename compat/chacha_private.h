@@ -1,10 +1,10 @@
-/* SPDX-License-Identifier: CC0-1.0 */
-
 /*
-chacha-merged.c version 20080118
-D. J. Bernstein
-Public domain.
-*/
+ * SPDX-License-Identifier: CC0-1.0
+ *
+ * chacha-merged.c version 20080118
+ * D. J. Bernstein
+ * Public domain.
+ */
 
 /* $OpenBSD: chacha_private.h,v 1.3 2022/02/28 21:56:29 dtucker Exp $ */
 

@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Solaris interface driver for dhcpcd
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2016-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 

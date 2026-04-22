@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- SPDX-License-Identifier: BSD-2-Clause -->
 <!-- Copyright (c) 2025 Roy Marples <roy@marples.name> -->
 
 This area is for 3rd party software we include directly.
