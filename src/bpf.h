@@ -29,9 +29,9 @@
 #ifndef BPF_HEADER
 #define BPF_HEADER
 
-#define	BPF_EOF			0x01U
-#define	BPF_PARTIALCSUM		0x02U
-#define	BPF_BCAST		0x04U
+#define BPF_EOF		0x01U
+#define BPF_PARTIALCSUM 0x02U
+#define BPF_BCAST	0x04U
 
 /*
  * Even though we program the BPF filter should we trust it?
@@ -50,7 +50,7 @@
  * If you want to be notified of any packet failing the BPF filter,
  * define BPF_DEBUG below.
  */
-//#define	BPF_DEBUG
+// #define	BPF_DEBUG
 
 #include "dhcpcd.h"
 
@@ -69,7 +69,7 @@ size_t bpf_frame_header_len(const struct interface *);
 void *bpf_frame_header_src(const struct interface *, void *, size_t *);
 void *bpf_frame_header_dst(const struct interface *, void *, size_t *);
 int bpf_frame_bcast(const struct interface *, const void *);
-struct bpf * bpf_open(const struct interface *,
+struct bpf *bpf_open(const struct interface *,
     int (*)(const struct bpf *, const struct in_addr *),
     const struct in_addr *);
 void bpf_close(struct bpf *);

@@ -30,8 +30,8 @@
 #include <sys/time.h>
 
 #include <errno.h>
-#include <stdbool.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,8 +41,8 @@
 
 #include "logerr.h"
 
-#ifndef	LOGERR_SYSLOG_FACILITY
-#define	LOGERR_SYSLOG_FACILITY	LOG_DAEMON
+#ifndef LOGERR_SYSLOG_FACILITY
+#define LOGERR_SYSLOG_FACILITY LOG_DAEMON
 #endif
 
 #ifdef SMALL
@@ -50,19 +50,19 @@
 #endif
 
 /* syslog protocol is 1k message max, RFC 3164 section 4.1 */
-#define LOGERR_SYSLOGBUF	1024 + sizeof(int) + sizeof(pid_t)
+#define LOGERR_SYSLOGBUF 1024 + sizeof(int) + sizeof(pid_t)
 
-#define UNUSED(a)		(void)(a)
+#define UNUSED(a)	 (void)(a)
 
 struct logctx {
-	char		 log_buf[BUFSIZ];
-	unsigned int	 log_opts;
-	int		 log_fd;
-	pid_t		 log_pid;
+	char log_buf[BUFSIZ];
+	unsigned int log_opts;
+	int log_fd;
+	pid_t log_pid;
 #ifndef SMALL
-	FILE		*log_file;
+	FILE *log_file;
 #ifdef LOGERR_TAG
-	const char	*log_tag;
+	const char *log_tag;
 #endif
 #endif
 };
@@ -125,8 +125,8 @@ logprintdate(FILE *stream)
 }
 #endif
 
-__printflike(3, 0) static int
-vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
+__printflike(3, 0) static int vlogprintf_r(struct logctx *ctx, FILE *stream,
+    const char *fmt, va_list args)
 {
 	int len = 0, e;
 	va_list a;
@@ -137,8 +137,7 @@ vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 #endif
 
 	if ((stream == stderr && ctx->log_opts & LOGERR_ERR_DATE) ||
-	    (stream != stderr && ctx->log_opts & LOGERR_LOG_DATE))
-	{
+	    (stream != stderr && ctx->log_opts & LOGERR_LOG_DATE)) {
 		if ((e = logprintdate(stream)) == -1)
 			return -1;
 		len += e;
@@ -210,8 +209,8 @@ vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-format-attribute"
 #endif
-__printflike(2, 0) static int
-vlogmessage(int pri, const char *fmt, va_list args)
+__printflike(2, 0) static int vlogmessage(int pri, const char *fmt,
+    va_list args)
 {
 	struct logctx *ctx = &_logctx;
 	int len = 0;
@@ -241,8 +240,8 @@ vlogmessage(int pri, const char *fmt, va_list args)
 
 	if (ctx->log_opts & LOGERR_ERR &&
 	    (pri <= LOG_ERR ||
-	    (!(ctx->log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
-	    (ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG)))
+		(!(ctx->log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
+		(ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG)))
 		len = vlogprintf_r(ctx, stderr, fmt, args);
 
 #ifndef SMALL
@@ -260,8 +259,7 @@ vlogmessage(int pri, const char *fmt, va_list args)
 #pragma GCC diagnostic pop
 #endif
 
-__printflike(2, 3) void
-logmessage(int pri, const char *fmt, ...)
+__printflike(2, 3) void logmessage(int pri, const char *fmt, ...)
 {
 	va_list args;
 
@@ -270,8 +268,8 @@ logmessage(int pri, const char *fmt, ...)
 	va_end(args);
 }
 
-__printflike(2, 0) static void
-vlogerrmessage(int pri, const char *fmt, va_list args)
+__printflike(2, 0) static void vlogerrmessage(int pri, const char *fmt,
+    va_list args)
 {
 	int _errno = errno;
 	char buf[1024];
@@ -281,8 +279,7 @@ vlogerrmessage(int pri, const char *fmt, va_list args)
 	errno = _errno;
 }
 
-__printflike(2, 3) void
-logerrmessage(int pri, const char *fmt, ...)
+__printflike(2, 3) void logerrmessage(int pri, const char *fmt, ...)
 {
 	va_list args;
 
@@ -405,12 +402,10 @@ logreadfd(int fd)
 	struct iovec iov[] = {
 		{ .iov_base = &pri, .iov_len = sizeof(pri) },
 		{ .iov_base = &pid, .iov_len = sizeof(pid) },
-		{ .iov_base = buf,  .iov_len = sizeof(buf) },
+		{ .iov_base = buf, .iov_len = sizeof(buf) },
 	};
-	struct msghdr msg = {
-		.msg_iov = iov,
-		.msg_iovlen = sizeof(iov) / sizeof(iov[0])
-	};
+	struct msghdr msg = { .msg_iov = iov,
+		.msg_iovlen = sizeof(iov) / sizeof(iov[0]) };
 	ssize_t len;
 
 	len = recvmsg(fd, &msg, MSG_WAITALL);

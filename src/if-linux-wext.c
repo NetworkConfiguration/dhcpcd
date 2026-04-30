@@ -42,14 +42,14 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
-#include <linux/types.h>
 #include <linux/rtnetlink.h>
+#include <linux/types.h>
 /* Support older kernels */
 #ifdef IFLA_WIRELESS
-# include <linux/if.h>
-# include <linux/wireless.h>
+#include <linux/if.h>
+#include <linux/wireless.h>
 #else
-# define IFLA_WIRELESS (IFLA_MASTER + 1)
+#define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
 #include <string.h>

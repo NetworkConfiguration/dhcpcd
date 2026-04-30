@@ -31,20 +31,19 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 
+#include <errno.h>
+#include <fcntl.h>
 #include <linux/audit.h>
 #include <linux/filter.h>
 #include <linux/net.h>
 #include <linux/seccomp.h>
 #include <linux/sockios.h>
-
-#include <errno.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h>	/* For TCGETS */
+#include <termios.h> /* For TCGETS */
 #include <unistd.h>
 
 #include "common.h"
@@ -58,7 +57,7 @@
  * the failing syscall into the __NR_name define we need to use below.
  * DO NOT ENABLE THIS FOR PRODUCTION BUILDS!
  */
-//#define SECCOMP_FILTER_DEBUG
+// #define SECCOMP_FILTER_DEBUG
 
 static ssize_t
 ps_root_dosendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
@@ -71,7 +70,7 @@ ps_root_dosendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 		.iov_len = sizeof(buf),
 	};
 
-	switch(protocol) {
+	switch (protocol) {
 	case NETLINK_GENERIC:
 		s = priv->generic_fd;
 		break;
@@ -93,7 +92,6 @@ ssize_t
 ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
     __unused void **rdata, __unused size_t *rlen, __unused bool *free_data)
 {
-
 	switch (psm->ps_cmd) {
 	case PS_ROUTE:
 		return ps_root_dosendnetlink(ctx, (int)psm->ps_flags, msg);
@@ -106,9 +104,8 @@ ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
 ssize_t
 ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 {
-
-	if (ps_sendmsg(ctx, PS_ROOT_FD(ctx), PS_ROUTE,
-	    (unsigned long)protocol, msg) == -1)
+	if (ps_sendmsg(ctx, PS_ROOT_FD(ctx), PS_ROUTE, (unsigned long)protocol,
+		msg) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
@@ -118,177 +115,174 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #else
 
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-# define SECCOMP_ARG_LO	0
-# define SECCOMP_ARG_HI	sizeof(uint32_t)
+#define SECCOMP_ARG_LO 0
+#define SECCOMP_ARG_HI sizeof(uint32_t)
 #elif (BYTE_ORDER == BIG_ENDIAN)
-# define SECCOMP_ARG_LO	sizeof(uint32_t)
-# define SECCOMP_ARG_HI	0
+#define SECCOMP_ARG_LO sizeof(uint32_t)
+#define SECCOMP_ARG_HI 0
 #else
-# error "Uknown endian"
+#error "Uknown endian"
 #endif
 
-#define SECCOMP_ALLOW(_nr)						    \
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (_nr), 0, 1),		    \
-	BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW)
+#define SECCOMP_ALLOW(_nr)                                \
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (_nr), 0, 1), \
+	    BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW)
 
-#define SECCOMP_ALLOW_ARG(_nr, _arg, _val)				    \
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (_nr), 0, 6),		    \
-	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,				    \
-	    offsetof(struct seccomp_data, args[(_arg)]) + SECCOMP_ARG_LO),  \
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,				    \
-	    ((_val) & 0xffffffff), 0, 3),				    \
-	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,				    \
-	    offsetof(struct seccomp_data, args[(_arg)]) + SECCOMP_ARG_HI),  \
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,				    \
-	    (((uint32_t)((uint64_t)(_val) >> 32)) & 0xffffffff), 0, 1),	    \
-	BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),			\
-	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,				\
+#define SECCOMP_ALLOW_ARG(_nr, _arg, _val)                                     \
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (_nr), 0, 6),                      \
+	    BPF_STMT(BPF_LD + BPF_W + BPF_ABS,                                 \
+		offsetof(struct seccomp_data, args[(_arg)]) + SECCOMP_ARG_LO), \
+	    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ((_val) & 0xffffffff), 0, 3),  \
+	    BPF_STMT(BPF_LD + BPF_W + BPF_ABS,                                 \
+		offsetof(struct seccomp_data, args[(_arg)]) + SECCOMP_ARG_HI), \
+	    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,                                \
+		(((uint32_t)((uint64_t)(_val) >> 32)) & 0xffffffff), 0, 1),    \
+	    BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),                      \
+	    BPF_STMT(BPF_LD + BPF_W + BPF_ABS,                                 \
 		offsetof(struct seccomp_data, nr))
 
 #ifdef SECCOMP_FILTER_DEBUG
-#define SECCOMP_FILTER_FAIL	SECCOMP_RET_TRAP
+#define SECCOMP_FILTER_FAIL SECCOMP_RET_TRAP
 #else
-#define SECCOMP_FILTER_FAIL	SECCOMP_RET_KILL
+#define SECCOMP_FILTER_FAIL SECCOMP_RET_KILL
 #endif
 
 /* I personally find this quite nutty.
  * Why can a system header not define a default for this? */
 #if defined(__i386__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_I386
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_I386
 #elif defined(__x86_64__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_X86_64
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_X86_64
 #elif defined(__arc__)
-#  if defined(__A7__)
-#    if (BYTE_ORDER == LITTLE_ENDIAN)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACT
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACTBE
-#    endif
-#  elif defined(__HS__)
-#    if (BYTE_ORDER == LITTLE_ENDIAN)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2BE
-#    endif
-#  else
-#    error "Platform does not support seccomp filter yet"
-#  endif
-#elif defined(__ARCV3__)
-#  if defined(__ARC64__)
-#    if (BYTE_ORDER == LITTLE_ENDIAN)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV3
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV3BE
-#    endif
-#  else
-#    error "Platform does not support seccomp filter yet"
-#  endif
-#elif defined(__arm__)
-#  ifndef EM_ARM
-#    define EM_ARM 40
-#  endif
-#  if (BYTE_ORDER == LITTLE_ENDIAN)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARM
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARMEB
-#  endif
-#elif defined(__aarch64__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_AARCH64
-#elif defined(__alpha__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ALPHA
-#elif defined(__hppa__)
-#  if defined(__LP64__)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC64
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC
-#  endif
-#elif defined(__ia64__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_IA64
-#elif defined(__loongarch__)
-#  if defined(__LP64__)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH64
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH32
-#  endif
-#elif defined(__microblaze__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MICROBLAZE
-#elif defined(__m68k__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_M68K
-#elif defined(__mips__)
-#  if defined(__MIPSEL__)
-#    if defined(__LP64__)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPSEL64
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPSEL
-#    endif
-#  elif defined(__LP64__)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPS64
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPS
-#  endif
-#elif defined(__nds32__)
-#  if (BYTE_ORDER == LITTLE_ENDIAN)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32
+#if defined(__A7__)
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACT
 #else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32BE
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACTBE
+#endif
+#elif defined(__HS__)
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2BE
+#endif
+#else
+#error "Platform does not support seccomp filter yet"
+#endif
+#elif defined(__ARCV3__)
+#if defined(__ARC64__)
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV3
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV3BE
+#endif
+#else
+#error "Platform does not support seccomp filter yet"
+#endif
+#elif defined(__arm__)
+#ifndef EM_ARM
+#define EM_ARM 40
+#endif
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARM
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARMEB
+#endif
+#elif defined(__aarch64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_AARCH64
+#elif defined(__alpha__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ALPHA
+#elif defined(__hppa__)
+#if defined(__LP64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC
+#endif
+#elif defined(__ia64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_IA64
+#elif defined(__loongarch__)
+#if defined(__LP64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH32
+#endif
+#elif defined(__microblaze__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MICROBLAZE
+#elif defined(__m68k__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_M68K
+#elif defined(__mips__)
+#if defined(__MIPSEL__)
+#if defined(__LP64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPSEL64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPSEL
+#endif
+#elif defined(__LP64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPS64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MIPS
+#endif
+#elif defined(__nds32__)
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32BE
 #endif
 #elif defined(__nios2__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NIOS2
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NIOS2
 #elif defined(__or1k__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_OPENRISC
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_OPENRISC
 #elif defined(__powerpc64__)
-#  if (BYTE_ORDER == LITTLE_ENDIAN)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64LE
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
-#  endif
-#elif defined(__powerpc__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC
-#elif defined(__riscv)
-#  if defined(__LP64__)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV64
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV32
-#  endif
-#elif defined(__s390x__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390X
-#elif defined(__s390__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390
-#elif defined(__sh__)
-#  if defined(__LP64__)
-#    if (BYTE_ORDER == LITTLE_ENDIAN)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL64
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH64
-#    endif
-#  else
-#    if (BYTE_ORDER == LITTLE_ENDIAN)
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL
-#    else
-#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH
-#    endif
-#  endif
-#elif defined(__sparc__)
-#  if defined(__arch64__)
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC64
-#  else
-#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC
-#  endif
-#elif defined(__xtensa__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_XTENSA
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64LE
 #else
-#  error "Platform does not support seccomp filter yet"
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
+#endif
+#elif defined(__powerpc__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC
+#elif defined(__riscv)
+#if defined(__LP64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV32
+#endif
+#elif defined(__s390x__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390X
+#elif defined(__s390__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390
+#elif defined(__sh__)
+#if defined(__LP64__)
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH64
+#endif
+#else
+#if (BYTE_ORDER == LITTLE_ENDIAN)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH
+#endif
+#endif
+#elif defined(__sparc__)
+#if defined(__arch64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC64
+#else
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC
+#endif
+#elif defined(__xtensa__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_XTENSA
+#else
+#error "Platform does not support seccomp filter yet"
 #endif
 
 static struct sock_filter ps_seccomp_filter[] = {
 	/* Check syscall arch */
-	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
-	    offsetof(struct seccomp_data, arch)),
+	BPF_STMT(BPF_LD + BPF_W + BPF_ABS, offsetof(struct seccomp_data, arch)),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SECCOMP_AUDIT_ARCH, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, SECCOMP_FILTER_FAIL),
 	/* Allow syscalls */
-	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
-		offsetof(struct seccomp_data, nr)),
+	BPF_STMT(BPF_LD + BPF_W + BPF_ABS, offsetof(struct seccomp_data, nr)),
 #ifdef __NR_accept
 	SECCOMP_ALLOW(__NR_accept),
 #endif
@@ -367,8 +361,8 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS),
 	/* dumping leases on musl requires this */
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TIOCGWINSZ),
-	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
-	 * which lives in the impossible to include linux/wireless.h header */
+/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
+ * which lives in the impossible to include linux/wireless.h header */
 #endif
 #ifdef __NR_madvise /* needed for musl */
 	SECCOMP_ALLOW(__NR_madvise),
@@ -435,7 +429,7 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_ACCEPT),
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_ACCEPT4),
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_LISTEN),
-	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_GETSOCKOPT),	/* overflow */
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_GETSOCKOPT), /* overflow */
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECV),
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECVFROM),
 	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECVMSG),
@@ -533,9 +527,8 @@ static struct sock_fprog ps_seccomp_prog = {
 static void
 ps_seccomp_violation(__unused int signum, siginfo_t *si, __unused void *context)
 {
-
-	logerrx("%s: unexpected syscall %d (arch=0x%x)",
-	    __func__, si->si_syscall, si->si_arch);
+	logerrx("%s: unexpected syscall %d (arch=0x%x)", __func__,
+	    si->si_syscall, si->si_arch);
 	_exit(EXIT_FAILURE);
 }
 
@@ -568,8 +561,8 @@ ps_seccomp_enter(void)
 #endif
 
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1 ||
-	    prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &ps_seccomp_prog) == -1)
-	{
+	    prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &ps_seccomp_prog) ==
+		-1) {
 		if (errno == EINVAL)
 			errno = ENOSYS;
 		return -1;

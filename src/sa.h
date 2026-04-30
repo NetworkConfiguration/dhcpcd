@@ -30,12 +30,13 @@
 #define SA_H
 
 #include <sys/socket.h>
+
 #include <netinet/in.h>
 
 union sa_ss {
-	struct sockaddr		sa;
-	struct sockaddr_in	sin;
-	struct sockaddr_in6	sin6;
+	struct sockaddr sa;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 };
 
 #ifdef BSD
@@ -43,21 +44,21 @@ union sa_ss {
 #endif
 
 /* Allow for a sockaddr_dl being printed too. */
-#define INET_MAX_ADDRSTRLEN	(20 * 3)
+#define INET_MAX_ADDRSTRLEN (20 * 3)
 
 #ifdef INET
-#define satosin(sa) ((struct sockaddr_in *)(void *)(sa))
+#define satosin(sa)  ((struct sockaddr_in *)(void *)(sa))
 #define satocsin(sa) ((const struct sockaddr_in *)(const void *)(sa))
 #endif
 #ifdef INET6
-#define satosin6(sa) ((struct sockaddr_in6 *)(void *)(sa))
+#define satosin6(sa)  ((struct sockaddr_in6 *)(void *)(sa))
 #define satocsin6(sa) ((const struct sockaddr_in6 *)(const void *)(sa))
 #endif
 
 socklen_t sa_addroffset(const struct sockaddr *sa);
 socklen_t sa_addrlen(const struct sockaddr *sa);
 #ifdef HAVE_SA_LEN
-#define	sa_len(sa)	((sa)->sa_len)
+#define sa_len(sa) ((sa)->sa_len)
 #else
 socklen_t sa_len(const struct sockaddr *sa);
 #endif

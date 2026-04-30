@@ -26,15 +26,15 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
-#include <arpa/inet.h>
 #include <net/if.h>
 #include <net/route.h>
-#include <netinet/if_ether.h>
 #include <netinet/in.h>
+#include <netinet/if_ether.h>
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -44,20 +44,20 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "arp.h"
 #include "common.h"
-#include "dhcpcd.h"
+#include "config.h"
 #include "dhcp.h"
+#include "dhcpcd.h"
 #include "eloop.h"
-#include "if.h"
 #include "if-options.h"
+#include "if.h"
 #include "ipv4.h"
 #include "ipv4ll.h"
 #include "logerr.h"
 #include "route.h"
-#include "script.h"
 #include "sa.h"
+#include "script.h"
 
 #define IPV4_LOOPBACK_ROUTE
 #if defined(__linux__) || defined(__sun) || (defined(BSD) && defined(RTF_LOCAL))
@@ -120,8 +120,8 @@ ipv4_getnetmask(uint32_t addr)
 }
 
 struct ipv4_addr *
-ipv4_iffindaddr(struct interface *ifp,
-    const struct in_addr *addr, const struct in_addr *mask)
+ipv4_iffindaddr(struct interface *ifp, const struct in_addr *addr,
+    const struct in_addr *mask)
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
@@ -161,7 +161,7 @@ ipv4_iffindmaskaddr(struct interface *ifp, const struct in_addr *addr)
 
 	state = IPV4_STATE(ifp);
 	if (state) {
-		TAILQ_FOREACH (ap, &state->addrs, next) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if ((ap->addr.s_addr & ap->mask.s_addr) ==
 			    (addr->s_addr & ap->mask.s_addr))
 				return ap;
@@ -178,7 +178,7 @@ ipv4_iffindmaskbrd(struct interface *ifp, const struct in_addr *addr)
 
 	state = IPV4_STATE(ifp);
 	if (state) {
-		TAILQ_FOREACH (ap, &state->addrs, next) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if ((ap->brd.s_addr & ap->mask.s_addr) ==
 			    (addr->s_addr & ap->mask.s_addr))
 				return ap;
@@ -240,9 +240,7 @@ ipv4_hasaddr(const struct interface *ifp)
 #endif
 
 	dstate = D_CSTATE(ifp);
-	return (dstate &&
-	    dstate->added == STATE_ADDED &&
-	    dstate->addr != NULL);
+	return (dstate && dstate->added == STATE_ADDED && dstate->addr != NULL);
 }
 
 /* Interface comparer for working out ordering. */
@@ -313,15 +311,16 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 		sa_in_init(&rt->rt_dest, &in);
 		in.s_addr = state->addr->mask.s_addr;
 		sa_in_init(&rt->rt_netmask, &in);
-		//in.s_addr = INADDR_ANY;
-		//sa_in_init(&rt->rt_gateway, &in);
+		// in.s_addr = INADDR_ANY;
+		// sa_in_init(&rt->rt_gateway, &in);
 		rt->rt_gateway.sa_family = AF_UNSPEC;
 		rt_proto_add(&nroutes, rt);
 	}
 
 	/* If any set routes, grab them, otherwise DHCP routes. */
 	if (RB_TREE_MIN(&ifp->options->routes)) {
-		RB_TREE_FOREACH(r, &ifp->options->routes) {
+		RB_TREE_FOREACH(r, &ifp->options->routes)
+		{
 			if (sa_is_unspecified(&r->rt_gateway))
 				break;
 			if ((rt = rt_new0(ifp->ctx)) == NULL)
@@ -339,8 +338,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	/* If configured, install a gateway to the desintion
 	 * for P2P interfaces. */
 	if (ifp->flags & IFF_POINTOPOINT &&
-	    has_option_mask(ifp->options->dstmask, DHO_ROUTER))
-	{
+	    has_option_mask(ifp->options->dstmask, DHO_ROUTER)) {
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
 		in.s_addr = INADDR_ANY;
@@ -393,7 +391,8 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 
 	rb_tree_init(&troutes, &rt_compare_proto_ops);
 
-	RB_TREE_FOREACH(rt, routes) {
+	RB_TREE_FOREACH(rt, routes)
+	{
 		if (rt->rt_dest.sa_family != AF_INET)
 			continue;
 		if (!sa_is_unspecified(&rt->rt_dest) ||
@@ -401,7 +400,8 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 			continue;
 		gateway = satosin(&rt->rt_gateway);
 		/* Scan for a route to match */
-		RB_TREE_FOREACH(rth, routes) {
+		RB_TREE_FOREACH(rth, routes)
+		{
 			if (rth == rt)
 				break;
 			/* match host */
@@ -429,23 +429,21 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 		ifo = ifp->options;
 		if (ifp->flags & IFF_NOARP) {
 			if (!(ifo->options & DHCPCD_ROUTER_HOST_ROUTE_WARNED) &&
-			    !(state->added & STATE_FAKE))
-			{
+			    !(state->added & STATE_FAKE)) {
 				char buf[INET_MAX_ADDRSTRLEN];
 
 				ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
 				logwarnx("%s: forcing router %s through "
-				    "interface",
+					 "interface",
 				    ifp->name,
-				    sa_addrtop(&rt->rt_gateway,
-				    buf, sizeof(buf)));
+				    sa_addrtop(&rt->rt_gateway, buf,
+					sizeof(buf)));
 			}
 			gateway->sin_addr.s_addr = INADDR_ANY;
 			continue;
 		}
 		if (!(ifo->options & DHCPCD_ROUTER_HOST_ROUTE_WARNED) &&
-		    !(state->added & STATE_FAKE))
-		{
+		    !(state->added & STATE_FAKE)) {
 			char buf[INET_MAX_ADDRSTRLEN];
 
 			ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
@@ -510,8 +508,7 @@ inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 		return true;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (ifp->active &&
-		    ipv4ll_defaultroute(routes, ifp) == 1)
+		if (ifp->active && ipv4ll_defaultroute(routes, ifp) == 1)
 			break;
 	}
 #endif
@@ -527,12 +524,10 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	struct ipv4_addr *ap;
 
 	assert(addr != NULL);
-	logdebugx("%s: deleting IP address %s",
-	    addr->iface->name, addr->saddr);
+	logdebugx("%s: deleting IP address %s", addr->iface->name, addr->saddr);
 
 	r = if_address(RTM_DELADDR, addr);
-	if (r == -1 &&
-	    errno != EADDRNOTAVAIL && errno != ESRCH &&
+	if (r == -1 && errno != EADDRNOTAVAIL && errno != ESRCH &&
 	    errno != ENXIO && errno != ENODEV)
 		logerr("%s: %s", addr->iface->name, __func__);
 
@@ -570,7 +565,7 @@ ipv4_getstate(struct interface *ifp)
 
 	state = IPV4_STATE(ifp);
 	if (state == NULL) {
-	        ifp->if_data[IF_DATA_IPV4] = malloc(sizeof(*state));
+		ifp->if_data[IF_DATA_IPV4] = malloc(sizeof(*state));
 		state = IPV4_STATE(ifp);
 		if (state == NULL) {
 			logerr(__func__);
@@ -598,8 +593,7 @@ ipv4_aliasaddr(struct ipv4_addr *ia, struct ipv4_addr **repl)
 	state = IPV4_STATE(ia->iface);
 find_lun:
 	if (if_makealias(alias, IF_NAMESIZE, ia->iface->name, lun) >=
-	    IF_NAMESIZE)
-	{
+	    IF_NAMESIZE) {
 		errno = ENOMEM;
 		return -1;
 	}
@@ -631,8 +625,8 @@ find_lun:
 
 struct ipv4_addr *
 ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
-    const struct in_addr *mask, const struct in_addr *bcast,
-    uint32_t vltime, uint32_t pltime)
+    const struct in_addr *mask, const struct in_addr *bcast, uint32_t vltime,
+    uint32_t pltime)
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
@@ -684,8 +678,8 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	UNUSED(vltime);
 	UNUSED(pltime);
 #endif
-	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
-	    inet_ntoa(*addr), inet_ntocidr(*mask));
+	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", inet_ntoa(*addr),
+	    inet_ntocidr(*mask));
 
 #ifdef ALIAS_ADDR
 	blank = (ia->alias[0] == '\0');
@@ -698,14 +692,12 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		logdebugx("%s: aliased %s", ia->alias, ia->saddr);
 #endif
 
-	logdebugx("%s: adding IP address %s %s %s",
-	    ifp->name, ia->saddr,
+	logdebugx("%s: adding IP address %s %s %s", ifp->name, ia->saddr,
 	    ifp->flags & IFF_POINTOPOINT ? "destination" : "broadcast",
 	    inet_ntoa(*bcast));
 	if (if_address(RTM_NEWADDR, ia) == -1) {
 		if (errno != EEXIST)
-			logerr("%s: if_addaddress",
-			    __func__);
+			logerr("%s: if_addaddress", __func__);
 		if (ia->flags & IPV4_AF_NEW)
 			free(ia);
 		return NULL;
@@ -760,8 +752,7 @@ ipv4_applyaddr(void *arg)
 	lease = &state->lease;
 	if (state->new == NULL) {
 		if ((ifo->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
-		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
-		{
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) {
 			if (state->added) {
 				/* Someone might have deleted our address */
 				if (state->addr != NULL)
@@ -782,13 +773,11 @@ ipv4_applyaddr(void *arg)
 	 * If IP addresses do not have lifetimes, there is a very real chance
 	 * that re-adding them will scrub the subnet route temporarily
 	 * which is a bad thing, so avoid it. */
-	if (ia != NULL &&
-	    ia->mask.s_addr == lease->mask.s_addr &&
-	    ia->brd.s_addr == lease->brd.s_addr)
-	{
+	if (ia != NULL && ia->mask.s_addr == lease->mask.s_addr &&
+	    ia->brd.s_addr == lease->brd.s_addr) {
 #ifndef IP_LIFETIME
-		logdebugx("%s: IP address %s already exists",
-		    ifp->name, ia->saddr);
+		logdebugx("%s: IP address %s already exists", ifp->name,
+		    ia->saddr);
 #endif
 	} else {
 #ifdef __linux__
@@ -862,16 +851,14 @@ ipv4_deletestaleaddrs(struct interface *ifp)
 	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
 		if (!(ia->flags & IPV4_AF_STALE))
 			continue;
-		ipv4_handleifa(ifp->ctx, RTM_DELADDR,
-		    ifp->ctx->ifaces, ifp->name,
-		    &ia->addr, &ia->mask, &ia->brd, 0, getpid());
+		ipv4_handleifa(ifp->ctx, RTM_DELADDR, ifp->ctx->ifaces,
+		    ifp->name, &ia->addr, &ia->mask, &ia->brd, 0, getpid());
 	}
 }
 
 void
-ipv4_handleifa(struct dhcpcd_ctx *ctx,
-    int cmd, struct if_head *ifs, const char *ifname,
-    const struct in_addr *addr, const struct in_addr *mask,
+ipv4_handleifa(struct dhcpcd_ctx *ctx, int cmd, struct if_head *ifs,
+    const char *ifname, const struct in_addr *addr, const struct in_addr *mask,
     const struct in_addr *brd, int addrflags, pid_t pid)
 {
 	struct interface *ifp;
@@ -928,8 +915,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		/* Mask could have changed */
 		if (ia_is_new ||
 		    (mask->s_addr != INADDR_ANY &&
-		    mask->s_addr != ia->mask.s_addr))
-		{
+			mask->s_addr != ia->mask.s_addr)) {
 			ia->mask = *mask;
 			snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
 			    inet_ntoa(*addr), inet_ntocidr(*mask));

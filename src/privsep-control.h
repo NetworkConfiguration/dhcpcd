@@ -30,7 +30,7 @@
 #define PRIVSEP_CTL_H
 
 #define IN_PRIVSEP_CONTROLLER(ctx) \
-    (IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
+	(IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
 
 pid_t ps_ctl_start(struct dhcpcd_ctx *);
 int ps_ctl_stop(struct dhcpcd_ctx *);

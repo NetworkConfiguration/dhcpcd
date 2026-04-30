@@ -26,49 +26,47 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/socket.h>
 #include <sys/types.h>
-
-#include <arpa/inet.h>
+#include <sys/socket.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 
+#include <arpa/inet.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE	ELOOP_ARP
-#include "config.h"
+#define ELOOP_QUEUE ELOOP_ARP
 #include "arp.h"
 #include "bpf.h"
-#include "ipv4.h"
 #include "common.h"
+#include "config.h"
 #include "dhcpcd.h"
 #include "eloop.h"
-#include "if.h"
 #include "if-options.h"
+#include "if.h"
+#include "ipv4.h"
 #include "ipv4ll.h"
 #include "logerr.h"
 #include "privsep.h"
 
 #if defined(ARP)
-#define ARP_LEN								\
-	(FRAMEHDRLEN_MAX +						\
-	 sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
+#define ARP_LEN                                                             \
+	(FRAMEHDRLEN_MAX + sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + \
+	    (2 * HWADDR_LEN))
 
 /* ARP debugging can be quite noisy. Enable this for more noise! */
-//#define	ARP_DEBUG
+// #define	ARP_DEBUG
 
 /* Assert the correct structure size for on wire */
 __CTASSERT(sizeof(struct arphdr) == 8);
 
 static ssize_t
-arp_request(const struct arp_state *astate,
-    const struct in_addr *sip)
+arp_request(const struct arp_state *astate, const struct in_addr *sip)
 {
 	const struct interface *ifp = astate->iface;
 	const struct in_addr *tip = &astate->addr;
@@ -86,16 +84,16 @@ arp_request(const struct arp_state *astate,
 	p = arp_buffer;
 	len = 0;
 
-#define CHECK(fun, b, l)						\
-	do {								\
-		if (len + (l) > sizeof(arp_buffer))			\
-			goto eexit;					\
-		fun(p, (b), (l));					\
-		p += (l);						\
-		len += (l);						\
+#define CHECK(fun, b, l)                            \
+	do {                                        \
+		if (len + (l) > sizeof(arp_buffer)) \
+			goto eexit;                 \
+		fun(p, (b), (l));                   \
+		p += (l);                           \
+		len += (l);                         \
 	} while (/* CONSTCOND */ 0)
-#define APPEND(b, l)	CHECK(memcpy, b, l)
-#define ZERO(l)		CHECK(memset, 0, l)
+#define APPEND(b, l) CHECK(memcpy, b, l)
+#define ZERO(l)	     CHECK(memset, 0, l)
 
 	APPEND(&ar, sizeof(ar));
 	APPEND(ifp->hwaddr, ifp->hwlen);
@@ -127,20 +125,19 @@ arp_report_conflicted(const struct arp_state *astate,
 	char fbuf[HWADDR_LEN * 3];
 
 	if (amsg == NULL) {
-		logerrx("%s: DAD detected %s",
-		    astate->iface->name, inet_ntoa(astate->addr));
+		logerrx("%s: DAD detected %s", astate->iface->name,
+		    inet_ntoa(astate->addr));
 		return;
 	}
 
 	hwaddr_ntoa(amsg->sha, astate->iface->hwlen, abuf, sizeof(abuf));
 	if (bpf_frame_header_len(astate->iface) == 0) {
-		logwarnx("%s: %s claims %s",
-		    astate->iface->name, abuf, inet_ntoa(astate->addr));
+		logwarnx("%s: %s claims %s", astate->iface->name, abuf,
+		    inet_ntoa(astate->addr));
 		return;
 	}
 
-	logwarnx("%s: %s(%s) claims %s",
-	    astate->iface->name, abuf,
+	logwarnx("%s: %s(%s) claims %s", astate->iface->name, abuf,
 	    hwaddr_ntoa(amsg->fsha, astate->iface->hwlen, fbuf, sizeof(fbuf)),
 	    inet_ntoa(astate->addr));
 }
@@ -184,18 +181,17 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	 * ignored. */
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (timespecisset(&astate->defend) &&
-	    eloop_timespec_diff(&now, &astate->defend, NULL) < DEFEND_INTERVAL)
-	{
-		logwarnx("%s: %d second defence failed for %s",
-		    ifp->name, DEFEND_INTERVAL, inet_ntoa(astate->addr));
+	    eloop_timespec_diff(&now, &astate->defend, NULL) <
+		DEFEND_INTERVAL) {
+		logwarnx("%s: %d second defence failed for %s", ifp->name,
+		    DEFEND_INTERVAL, inet_ntoa(astate->addr));
 		if (ifp->options->options & DHCPCD_ARP_PERSISTDEFENCE)
 			return;
-	}
-	else if (arp_request(astate, &astate->addr) == -1)
+	} else if (arp_request(astate, &astate->addr) == -1)
 		logerr(__func__);
 	else {
-		logdebugx("%s: defended address %s",
-		    ifp->name, inet_ntoa(astate->addr));
+		logdebugx("%s: defended address %s", ifp->name,
+		    inet_ntoa(astate->addr));
 		astate->defend = now;
 		return;
 	}
@@ -208,7 +204,6 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 static bool
 arp_validate(const struct interface *ifp, struct arphdr *arp)
 {
-
 	/* Address type must match */
 	if (arp->ar_hrd != htons(ifp->hwtype))
 		return false;
@@ -282,8 +277,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 		return;
 	/* Ignore messages from ourself */
 	if (ar.ar_hln == ifp->hwlen &&
-	    memcmp(hw_s, ifp->hwaddr, ifp->hwlen) == 0)
-	{
+	    memcmp(hw_s, ifp->hwaddr, ifp->hwlen) == 0) {
 #ifdef ARP_DEBUG
 		logdebugx("%s: ignoring ARP from self", ifp->name);
 #endif
@@ -296,17 +290,18 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
 
 #ifndef KERNEL_RFC5227
-	/* During ARP probe the 'sender hardware address' MUST contain the hardware
-	 * address of the interface sending the packet. RFC5227, 1.1 */
-	is_probe = ar.ar_op == htons(ARPOP_REQUEST) && IN_IS_ADDR_UNSPECIFIED(&arm.sip) &&
-	    bpf_flags & BPF_BCAST;
-	if (is_probe && falen > 0 && (falen != ar.ar_hln ||
-	    memcmp(&arm.sha, &arm.fsha, ar.ar_hln))) {
+	/* During ARP probe the 'sender hardware address' MUST contain the
+	 * hardware address of the interface sending the packet. RFC5227, 1.1 */
+	is_probe = ar.ar_op == htons(ARPOP_REQUEST) &&
+	    IN_IS_ADDR_UNSPECIFIED(&arm.sip) && bpf_flags & BPF_BCAST;
+	if (is_probe && falen > 0 &&
+	    (falen != ar.ar_hln || memcmp(&arm.sha, &arm.fsha, ar.ar_hln))) {
 		char abuf[HWADDR_LEN * 3];
 		char fbuf[HWADDR_LEN * 3];
 		hwaddr_ntoa(&arm.sha, ar.ar_hln, abuf, sizeof(abuf));
 		hwaddr_ntoa(&arm.fsha, falen, fbuf, sizeof(fbuf));
-		logwarnx("%s: invalid ARP probe, sender hw address mismatch (%s, %s)",
+		logwarnx(
+		    "%s: invalid ARP probe, sender hw address mismatch (%s, %s)",
 		    ifp->name, abuf, fbuf);
 		return;
 	}
@@ -320,8 +315,8 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
 		if (IN_ARE_ADDR_EQUAL(&arm.sip, &astate->addr) ||
 		    (IN_IS_ADDR_UNSPECIFIED(&arm.sip) &&
-		    IN_ARE_ADDR_EQUAL(&arm.tip, &astate->addr) &&
-		    bpf_flags & BPF_BCAST))
+			IN_ARE_ADDR_EQUAL(&arm.tip, &astate->addr) &&
+			bpf_flags & BPF_BCAST))
 			arp_found(astate, &arm);
 	}
 }
@@ -378,11 +373,13 @@ arp_probe1(void *arg)
 	if (++astate->probes < PROBE_NUM) {
 		delay = (PROBE_MIN * MSEC_PER_SEC) +
 		    (arc4random_uniform(
-		    (PROBE_MAX - PROBE_MIN) * MSEC_PER_SEC));
-		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probe1, astate);
+			(PROBE_MAX - PROBE_MIN) * MSEC_PER_SEC));
+		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probe1,
+		    astate);
 	} else {
-		delay = ANNOUNCE_WAIT *	MSEC_PER_SEC;
-		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probed, astate);
+		delay = ANNOUNCE_WAIT * MSEC_PER_SEC;
+		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probed,
+		    astate);
 	}
 	logdebugx("%s: ARP probing %s (%d of %d), next in %0.1f seconds",
 	    ifp->name, inet_ntoa(astate->addr),
@@ -395,13 +392,12 @@ arp_probe1(void *arg)
 void
 arp_probe(struct arp_state *astate)
 {
-
 	astate->probes = 0;
-	logdebugx("%s: probing for %s",
-	    astate->iface->name, inet_ntoa(astate->addr));
+	logdebugx("%s: probing for %s", astate->iface->name,
+	    inet_ntoa(astate->addr));
 	arp_probe1(astate);
 }
-#endif	/* ARP */
+#endif /* ARP */
 
 struct arp_state *
 arp_find(struct interface *ifp, const struct in_addr *addr)
@@ -443,13 +439,12 @@ arp_announce1(void *arg)
 
 	if (++astate->claims < ANNOUNCE_NUM)
 		logdebugx("%s: ARP announcing %s (%d of %d), "
-		    "next in %d.0 seconds",
-		    ifp->name, inet_ntoa(astate->addr),
-		    astate->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
+			  "next in %d.0 seconds",
+		    ifp->name, inet_ntoa(astate->addr), astate->claims,
+		    ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
-		logdebugx("%s: ARP announcing %s (%d of %d)",
-		    ifp->name, inet_ntoa(astate->addr),
-		    astate->claims, ANNOUNCE_NUM);
+		logdebugx("%s: ARP announcing %s (%d of %d)", ifp->name,
+		    inet_ntoa(astate->addr), astate->claims, ANNOUNCE_NUM);
 
 	/* The kernel will send a Gratuitous ARP for newly added addresses.
 	 * So we can avoid sending the same.
@@ -493,16 +488,15 @@ arp_announce(struct arp_state *astate)
 			    a2->addr.s_addr != astate->addr.s_addr)
 				continue;
 			r = eloop_timeout_delete(a2->iface->ctx->eloop,
-			    a2->claims < ANNOUNCE_NUM
-			    ? arp_announce1 : arp_announced,
+			    a2->claims < ANNOUNCE_NUM ? arp_announce1 :
+							arp_announced,
 			    a2);
 			if (r == -1)
 				logerr(__func__);
 			else if (r != 0) {
 				logdebugx("%s: ARP announcement "
-				    "of %s cancelled",
-				    a2->iface->name,
-				    inet_ntoa(a2->addr));
+					  "of %s cancelled",
+				    a2->iface->name, inet_ntoa(a2->addr));
 				arp_announced(a2);
 			}
 		}
@@ -574,11 +568,10 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 			free(astate);
 			return NULL;
 		}
-		if (eloop_event_add(ifp->ctx->eloop, astate->bpf->bpf_fd, ELE_READ,
-		    arp_read, astate) == -1)
+		if (eloop_event_add(ifp->ctx->eloop, astate->bpf->bpf_fd,
+			ELE_READ, arp_read, astate) == -1)
 			logerr("%s: eloop_event_add", __func__);
 	}
-
 
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
@@ -599,7 +592,7 @@ arp_free(struct arp_state *astate)
 	ctx = ifp->ctx;
 	eloop_timeout_delete(ctx->eloop, NULL, astate);
 
-	state =	ARP_STATE(ifp);
+	state = ARP_STATE(ifp);
 	TAILQ_REMOVE(&state->arp_states, astate, next);
 	if (astate->free_cb)
 		astate->free_cb(astate);

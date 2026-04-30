@@ -1,0 +1,5 @@
+# Disable DeprecatedOrUnsafeBufferHandling - our use of these is fine
+# and musl does not support the the _s variants.
+# Disable valist due to clang-tidy bug fixed in v19?
+Checks: "cert-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-valist.Uninitialized"
+HeaderFilterRegex: ".*"

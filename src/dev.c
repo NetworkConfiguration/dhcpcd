@@ -34,14 +34,13 @@
 #define _INDEV
 #include "common.h"
 #include "dev.h"
-#include "eloop.h"
 #include "dhcpcd.h"
+#include "eloop.h"
 #include "logerr.h"
 
 int
 dev_initialised(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
@@ -56,7 +55,6 @@ dev_initialised(struct dhcpcd_ctx *ctx, const char *ifname)
 int
 dev_listening(struct dhcpcd_ctx *ctx)
 {
-
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
@@ -71,7 +69,6 @@ dev_listening(struct dhcpcd_ctx *ctx)
 static void
 dev_stop1(struct dhcpcd_ctx *ctx, int stop)
 {
-
 	if (ctx->dev) {
 		if (stop)
 			logdebugx("dev: unloaded %s", ctx->dev->name);
@@ -90,7 +87,6 @@ dev_stop1(struct dhcpcd_ctx *ctx, int stop)
 void
 dev_stop(struct dhcpcd_ctx *ctx)
 {
-
 	dev_stop1(ctx, !(ctx->options & DHCPCD_FORKED));
 }
 
@@ -121,7 +117,7 @@ dev_start2(struct dhcpcd_ctx *ctx, const struct dev_dhcpcd *dev_dhcpcd,
 		return -1;
 	}
 	fptr(ctx->dev, dev_dhcpcd);
-	if (ctx->dev->start  == NULL || (r = ctx->dev->start()) == -1) {
+	if (ctx->dev->start == NULL || (r = ctx->dev->start()) == -1) {
 		free(ctx->dev);
 		ctx->dev = NULL;
 		dlclose(h);
@@ -195,8 +191,7 @@ dev_start(struct dhcpcd_ctx *ctx, int (*handler)(void *, int, const char *))
 	ctx->dev_fd = dev_start1(ctx, &dev_dhcpcd);
 	if (ctx->dev_fd != -1) {
 		if (eloop_event_add(ctx->eloop, ctx->dev_fd, ELE_READ,
-		    dev_handle_data, ctx) == -1)
-		{
+			dev_handle_data, ctx) == -1) {
 			logerr(__func__);
 			dev_stop1(ctx, 1);
 			return -1;

@@ -26,30 +26,31 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/sysctl.h>
 
 /* Need these for filtering the ioctls */
-#include <arpa/inet.h>
 #include <net/if.h>
-#include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
-#ifdef __NetBSD__
 #include <netinet/if_ether.h>
+
+#include <arpa/inet.h>
+#ifdef __NetBSD__
 #include <net/if_vlanvar.h> /* Needs netinet/if_ether.h */
+#include <netinet/if_ether.h>
 #elif defined(__DragonFly__)
 #include <net/vlan/if_vlan_var.h>
 #else
 #include <net/if_vlan_var.h>
 #endif
 #ifdef __DragonFly__
-#  include <netproto/802_11/ieee80211_ioctl.h>
+#include <netproto/802_11/ieee80211_ioctl.h>
 #else
-#  include <net80211/ieee80211.h>
-#  include <net80211/ieee80211_ioctl.h>
+#include <net80211/ieee80211.h>
+#include <net80211/ieee80211_ioctl.h>
 #endif
 
 #include <errno.h>
@@ -63,14 +64,15 @@
 #include "privsep.h"
 
 static ssize_t
-ps_root_doioctldom(struct dhcpcd_ctx *ctx, int domain, unsigned long req, void *data, size_t len)
+ps_root_doioctldom(struct dhcpcd_ctx *ctx, int domain, unsigned long req,
+    void *data, size_t len)
 {
 #if defined(INET6) || (defined(SIOCALIFADDR) && defined(IFLR_ACTIVE))
 	struct priv *priv = (struct priv *)ctx->priv;
 #endif
 	int s;
 
-	switch(domain) {
+	switch (domain) {
 #ifdef INET
 	case PF_INET:
 		s = ctx->pf_inet_fd;
@@ -92,39 +94,39 @@ ps_root_doioctldom(struct dhcpcd_ctx *ctx, int domain, unsigned long req, void *
 	}
 
 	/* Only allow these ioctls */
-	switch(req) {
+	switch (req) {
 #ifdef SIOCGIFDATA
-	case SIOCGIFDATA:	/* FALLTHROUGH */
+	case SIOCGIFDATA: /* FALLTHROUGH */
 #endif
 #ifdef SIOCG80211NWID
-	case SIOCG80211NWID:	/* FALLTHROUGH */
+	case SIOCG80211NWID: /* FALLTHROUGH */
 #endif
 #ifdef SIOCGETVLAN
-	case SIOCGETVLAN:	/* FALLTHROUGH */
+	case SIOCGETVLAN: /* FALLTHROUGH */
 #endif
 #ifdef SIOCIFAFATTACH
-	case SIOCIFAFATTACH:	/* FALLTHROUGH */
+	case SIOCIFAFATTACH: /* FALLTHROUGH */
 #endif
 #ifdef SIOCSIFXFLAGS
-	case SIOCSIFXFLAGS:	/* FALLTHROUGH */
+	case SIOCSIFXFLAGS: /* FALLTHROUGH */
 #endif
 #ifdef SIOCSIFINFO_FLAGS
-	case SIOCSIFINFO_FLAGS:	/* FALLTHROUGH */
+	case SIOCSIFINFO_FLAGS: /* FALLTHROUGH */
 #endif
 #ifdef SIOCSRTRFLUSH_IN6
-	case SIOCSRTRFLUSH_IN6:	/* FALLTHROUGH */
+	case SIOCSRTRFLUSH_IN6: /* FALLTHROUGH */
 	case SIOCSPFXFLUSH_IN6: /* FALLTHROUGH */
 #endif
 #if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE)
-	case SIOCALIFADDR:	/* FALLTHROUGH */
-	case SIOCDLIFADDR:	/* FALLTHROUGH */
+	case SIOCALIFADDR: /* FALLTHROUGH */
+	case SIOCDLIFADDR: /* FALLTHROUGH */
 #else
-	case SIOCSIFLLADDR:	/* FALLTHROUGH */
+	case SIOCSIFLLADDR: /* FALLTHROUGH */
 #endif
 #ifdef SIOCSIFINFO_IN6
-	case SIOCSIFINFO_IN6:	/* FALLTHROUGH */
+	case SIOCSIFINFO_IN6: /* FALLTHROUGH */
 #endif
-	case SIOCAIFADDR_IN6:	/* FALLTHROUGH */
+	case SIOCAIFADDR_IN6: /* FALLTHROUGH */
 	case SIOCDIFADDR_IN6:
 		break;
 	default:
@@ -138,14 +140,13 @@ ps_root_doioctldom(struct dhcpcd_ctx *ctx, int domain, unsigned long req, void *
 static ssize_t
 ps_root_doroute(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-
 	return write(ctx->link_fd, data, len);
 }
 
 #if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
 static ssize_t
-ps_root_doindirectioctl(struct dhcpcd_ctx *ctx,
-    unsigned long req, void *data, size_t len)
+ps_root_doindirectioctl(struct dhcpcd_ctx *ctx, unsigned long req, void *data,
+    size_t len)
 {
 	char *p = data;
 	struct ifreq ifr = { .ifr_flags = 0 };
@@ -182,7 +183,6 @@ ps_root_doindirectioctl(struct dhcpcd_ctx *ctx,
 static ssize_t
 ps_root_doifignoregroup(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-
 	if (len == 0 || ((const char *)data)[len - 1] != '\0') {
 		errno = EINVAL;
 		return -1;
@@ -194,8 +194,8 @@ ps_root_doifignoregroup(struct dhcpcd_ctx *ctx, void *data, size_t len)
 
 #ifdef HAVE_CAPSICUM
 static ssize_t
-ps_root_dosysctl(unsigned long flags,
-    void *data, size_t len, void **rdata, size_t *rlen)
+ps_root_dosysctl(unsigned long flags, void *data, size_t len, void **rdata,
+    size_t *rlen)
 {
 	char *p = data, *e = p + len;
 	int name[10];
@@ -273,10 +273,12 @@ ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
 
 	switch (psm->ps_cmd) {
 	case PS_IOCTLLINK:
-		err = ps_root_doioctldom(ctx, PF_LINK, psm->ps_flags, data, len);
+		err = ps_root_doioctldom(ctx, PF_LINK, psm->ps_flags, data,
+		    len);
 		break;
 	case PS_IOCTL6:
-		err = ps_root_doioctldom(ctx, PF_INET6, psm->ps_flags, data, len);
+		err = ps_root_doioctldom(ctx, PF_INET6, psm->ps_flags, data,
+		    len);
 		break;
 	case PS_ROUTE:
 		return ps_root_doroute(ctx, data, len);
@@ -294,7 +296,7 @@ ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
 		*free_rdata = true;
 		return ps_root_dosysctl(psm->ps_flags, data, len, rdata, rlen);
 #else
-	UNUSED(free_rdata);
+		UNUSED(free_rdata);
 #endif
 	default:
 		errno = ENOTSUP;
@@ -312,33 +314,28 @@ static ssize_t
 ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint16_t domain, unsigned long request,
     void *data, size_t len)
 {
-
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), domain,
-	    request, data, len) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), domain, request, data, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }
 
 ssize_t
-ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request,
-    void *data, size_t len)
+ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request, void *data,
+    size_t len)
 {
-
 	return ps_root_ioctldom(ctx, PS_IOCTLLINK, request, data, len);
 }
 
 ssize_t
-ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request,
-    void *data, size_t len)
+ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data,
+    size_t len)
 {
-
 	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
 }
 
 ssize_t
 ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_ROUTE, 0, data, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
@@ -351,27 +348,25 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 {
 	size_t ifnamelen = strlen(ifname + 1);
 
-	struct iovec iov[] = {
+	struct iovec iov[] = { {
+				   .iov_base = &ifnamelen,
+				   .iov_len = sizeof(ifnamelen),
+			       },
 		{
-			.iov_base = &ifnamelen,
-			.iov_len = sizeof(ifnamelen),
+		    .iov_base = UNCONST(ifname),
+		    .iov_len = ifnamelen,
 		},
 		{
-			.iov_base = UNCONST(ifname),
-			.iov_len = ifnamelen,
-		},
-		{
-			.iov_base = data,
-			.iov_len = len,
-		}
-	};
+		    .iov_base = data,
+		    .iov_len = len,
+		} };
 	struct msghdr msg = {
 		.msg_iov = iov,
 		.msg_iovlen = __arraycount(iov),
 	};
 
-	if (ps_sendcmdmsg(ctx, PS_ROOT_FD(ctx), PS_IOCTLINDIRECT,
-	    request, &msg) == -1)
+	if (ps_sendcmdmsg(ctx, PS_ROOT_FD(ctx), PS_IOCTLINDIRECT, request,
+		&msg) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }
@@ -381,9 +376,8 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 ssize_t
 ps_root_ifignoregroup(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IFIGNOREGRP, 0,
-	    ifname, strlen(ifname) + 1) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IFIGNOREGRP, 0, ifname,
+		strlen(ifname) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
@@ -391,18 +385,16 @@ ps_root_ifignoregroup(struct dhcpcd_ctx *ctx, const char *ifname)
 
 #ifdef HAVE_CAPSICUM
 ssize_t
-ps_root_sysctl(struct dhcpcd_ctx *ctx,
-    const int *name, unsigned int namelen,
+ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
     void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
 {
 	char buf[PS_BUFLEN], *p = buf;
 	unsigned long flags = 0;
 	size_t olen = (oldp && oldlenp) ? *oldlenp : 0, nolen;
 
-	if (sizeof(namelen) + (sizeof(*name) * namelen) +
-	    sizeof(oldlenp) +
-	    sizeof(newlen) + newlen > sizeof(buf))
-	{
+	if (sizeof(namelen) + (sizeof(*name) * namelen) + sizeof(oldlenp) +
+		sizeof(newlen) + newlen >
+	    sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
 	}
@@ -424,8 +416,8 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx,
 		p += newlen;
 	}
 
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_SYSCTL,
-	    flags, buf, (size_t)(p - buf)) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_SYSCTL, flags, buf,
+		(size_t)(p - buf)) == -1)
 		return -1;
 
 	if (ps_root_readerror(ctx, buf, sizeof(buf)) == -1)
