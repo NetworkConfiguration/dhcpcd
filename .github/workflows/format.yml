@@ -8,4 +8,5 @@ jobs:
         # This is pinned to clang-format v19
       - uses: RafikFarhad/clang-format-github-action@v5
         with:
+          style: "file"
           sources: "src/**/*.h,src/**/*.c"
