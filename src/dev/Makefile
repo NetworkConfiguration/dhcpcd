@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2017-2025 Roy Marples <roy@marples.name>
+
 TOP=	../../
 include ${TOP}/Makefile.inc
 include ${TOP}/config.mk

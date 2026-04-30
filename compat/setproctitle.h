@@ -1,4 +1,5 @@
 /*
+ * SPDX-License-Identifier: MIT
  * Copyright © 2010 William Ahern
  * Copyright © 2012-2013 Guillem Jover <guillem@hadrons.org>
  *

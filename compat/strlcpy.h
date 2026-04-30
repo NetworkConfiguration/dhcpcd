@@ -1,6 +1,7 @@
 /*	$OpenBSD: strlcpy.c,v 1.15 2016/10/16 17:37:39 dtucker Exp $	*/
 
 /*
+ * SPDX-License-Identifier: ISC
  * Copyright (c) 1998, 2015 Todd C. Miller <Todd.Miller@courtesan.com>
  *
  * Permission to use, copy, modify, and distribute this software for any

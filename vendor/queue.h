@@ -1,6 +1,7 @@
 /*	$NetBSD: queue.h,v 1.77 2024/05/12 10:34:56 rillig Exp $	*/
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

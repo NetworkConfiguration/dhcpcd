@@ -1,6 +1,7 @@
 /*	$NetBSD: hmac.c,v 1.5 2017/10/05 09:59:04 roy Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2016 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

@@ -1,6 +1,7 @@
 /*	$NetBSD: _strtoi.h,v 1.1 2015/01/22 02:15:59 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

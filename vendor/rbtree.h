@@ -1,6 +1,7 @@
 /*	$NetBSD: rbtree.h,v 1.14 2025/10/29 08:08:44 roy Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

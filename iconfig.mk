@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2014-2019 Roy Marples <roy@marples.name>
+
 # Nasty hack so that make clean works without configure being run
 TOP?=		.
 _CONFIG_MK!=	test -e ${TOP}/config.mk && \

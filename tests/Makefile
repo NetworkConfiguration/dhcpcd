@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2017-2019 Roy Marples <roy@marples.name>
+
 SUBDIRS=	crypt eloop-bench
 
 all: 

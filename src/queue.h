@@ -1,4 +1,9 @@
 /*
+ * SPDX-License-Identifier: BSD-2-Clause
+ * Copyright (c) 2025 Roy Marples <roy@marples.name>
+ */
+
+/*
  * This stub exists becuase we know a modern BSD supports all TAILQ
  * and glibc, musl et all, don't.
  */

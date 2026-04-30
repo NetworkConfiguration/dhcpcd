@@ -1,6 +1,7 @@
 /*	$NetBSD: bitops.h,v 1.11 2012/12/07 02:27:58 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2007, 2010 The NetBSD Foundation, Inc.
  * All rights reserved.
  *

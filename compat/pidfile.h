@@ -1,4 +1,5 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 1999, 2016 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
