@@ -29,9 +29,10 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
+#include <sys/socket.h>
+
 #include <stdbool.h>
 
-#include "dhcpcd.h"
 #include "queue.h"
 
 #if !defined(CTL_FREE_LIST)
