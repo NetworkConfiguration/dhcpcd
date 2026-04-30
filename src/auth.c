@@ -39,8 +39,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "auth.h"
+#include "config.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd.h"
@@ -57,28 +57,29 @@
 
 #ifndef htonll
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-#define	htonll(x)	((uint64_t)htonl((uint32_t)((x) >> 32)) | \
-			 (uint64_t)htonl((uint32_t)((x) & 0x00000000ffffffffULL)) << 32)
-#else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
-#define	htonll(x)	(x)
+#define htonll(x)                                 \
+	((uint64_t)htonl((uint32_t)((x) >> 32)) | \
+	    (uint64_t)htonl((uint32_t)((x) & 0x00000000ffffffffULL)) << 32)
+#else /* (BYTE_ORDER == LITTLE_ENDIAN) */
+#define htonll(x) (x)
 #endif
-#endif  /* htonll */
+#endif /* htonll */
 
 #ifndef ntohll
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-#define	ntohll(x)	((uint64_t)ntohl((uint32_t)((x) >> 32)) | \
-			 (uint64_t)ntohl((uint32_t)((x) & 0x00000000ffffffffULL)) << 32)
-#else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
-#define	ntohll(x)	(x)
+#define ntohll(x)                                 \
+	((uint64_t)ntohl((uint32_t)((x) >> 32)) | \
+	    (uint64_t)ntohl((uint32_t)((x) & 0x00000000ffffffffULL)) << 32)
+#else /* (BYTE_ORDER == LITTLE_ENDIAN) */
+#define ntohll(x) (x)
 #endif
-#endif  /* ntohll */
+#endif /* ntohll */
 
-#define HMAC_LENGTH	16
+#define HMAC_LENGTH 16
 
 void
 dhcp_auth_reset(struct authstate *state)
 {
-
 	state->replay = 0;
 	if (state->token) {
 		free(state->token->key);
@@ -102,8 +103,7 @@ dhcp_auth_reset(struct authstate *state)
  */
 const struct token *
 dhcp_auth_validate(struct authstate *state, const struct auth *auth,
-    const void *vm, size_t mlen, int mp,  int mt,
-    const void *vdata, size_t dlen)
+    const void *vm, size_t mlen, int mp, int mt, const void *vdata, size_t dlen)
 {
 	const uint8_t *m, *data;
 	uint8_t protocol, algorithm, rdm, *mm, type;
@@ -143,15 +143,12 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			errno = EINVAL;
 			return NULL;
 		}
-	} else if (protocol != auth->protocol ||
-		    algorithm != auth->algorithm ||
-		    rdm != auth->rdm)
-	{
+	} else if (protocol != auth->protocol || algorithm != auth->algorithm ||
+	    rdm != auth->rdm) {
 		/* As we don't require authentication, we should still
 		 * accept a reconfigure key */
 		if (protocol != AUTH_PROTO_RECONFKEY ||
-		    auth->options & DHCPCD_AUTH_REQUIRE)
-		{
+		    auth->options & DHCPCD_AUTH_REQUIRE) {
 			errno = EPERM;
 			return NULL;
 		}
@@ -190,7 +187,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			return NULL;
 		}
 	}
-	d+= sizeof(replay);
+	d += sizeof(replay);
 	dlen -= sizeof(replay);
 
 	realm = NULL;
@@ -238,11 +235,10 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 		switch (type) {
 		case 1:
 			if ((mp == 4 && mt == DHCP_ACK) ||
-			    (mp == 6 && mt == DHCP6_REPLY))
-			{
+			    (mp == 6 && mt == DHCP6_REPLY)) {
 				if (state->reconf == NULL) {
-					state->reconf =
-					    malloc(sizeof(*state->reconf));
+					state->reconf = malloc(
+					    sizeof(*state->reconf));
 					if (state->reconf == NULL)
 						return NULL;
 					state->reconf->key = malloc(16);
@@ -273,8 +269,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			return state->reconf;
 		case 2:
 			if (!((mp == 4 && mt == DHCP_FORCERENEW) ||
-			    (mp == 6 && mt == DHCP6_RECONFIGURE)))
-			{
+				(mp == 6 && mt == DHCP6_RECONFIGURE))) {
 				errno = EINVAL;
 				return NULL;
 			}
@@ -295,10 +290,9 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 
 	/* Find a token for the realm and secret */
 	TAILQ_FOREACH(t, &auth->tokens, next) {
-		if (t->secretid == secretid &&
-		    t->realm_len == realm_len &&
+		if (t->secretid == secretid && t->realm_len == realm_len &&
 		    (t->realm_len == 0 ||
-		    memcmp(t->realm, realm, t->realm_len) == 0))
+			memcmp(t->realm, realm, t->realm_len) == 0))
 			break;
 	}
 	if (t == NULL) {
@@ -318,9 +312,8 @@ gottoken:
 	/* First message from the server */
 	if (state->token &&
 	    (state->token->secretid != t->secretid ||
-	    state->token->realm_len != t->realm_len ||
-	    memcmp(state->token->realm, t->realm, t->realm_len)))
-	{
+		state->token->realm_len != t->realm_len ||
+		memcmp(state->token->realm, t->realm, t->realm_len))) {
 		errno = EPERM;
 		return NULL;
 	}
@@ -353,8 +346,8 @@ gottoken:
 	memset(hmac_code, 0, sizeof(hmac_code));
 	switch (algorithm) {
 	case AUTH_ALG_HMAC_MD5:
-		hmac("md5", t->key, t->key_len, mm, mlen,
-		     hmac_code, sizeof(hmac_code));
+		hmac("md5", t->key, t->key_len, mm, mlen, hmac_code,
+		    sizeof(hmac_code));
 		break;
 	default:
 		errno = ENOSYS;
@@ -447,10 +440,8 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 	}
 
 	(*rdm)++;
-	if (fseek(fp, 0, SEEK_SET) == -1 ||
-	    ftruncate(fileno(fp), 0) == -1 ||
-	    fprintf(fp, "0x%016" PRIu64 "\n", *rdm) != 19 ||
-	    fflush(fp) == EOF)
+	if (fseek(fp, 0, SEEK_SET) == -1 || ftruncate(fileno(fp), 0) == -1 ||
+	    fprintf(fp, "0x%016" PRIu64 "\n", *rdm) != 19 || fflush(fp) == EOF)
 		err = -1;
 	else
 		err = 0;
@@ -462,8 +453,8 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 	return err;
 }
 
-#define	NTP_EPOCH	2208988800U	/* 1970 - 1900 in seconds */
-#define	NTP_SCALE_FRAC	4294967295.0	/* max value of the fractional part */
+#define NTP_EPOCH      2208988800U  /* 1970 - 1900 in seconds */
+#define NTP_SCALE_FRAC 4294967295.0 /* max value of the fractional part */
 static uint64_t
 get_next_rdm_monotonic_clock(struct auth *auth)
 {
@@ -493,7 +484,6 @@ get_next_rdm_monotonic(struct dhcpcd_ctx *ctx, struct auth *auth)
 
 #ifdef PRIVSEP
 		if (IN_PRIVSEP(ctx)) {
-
 			err = ps_root_getauthrdm(ctx, &rdm);
 		} else
 #endif
@@ -519,9 +509,8 @@ get_next_rdm_monotonic(struct dhcpcd_ctx *ctx, struct auth *auth)
  */
 ssize_t
 dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
-    const struct token *t,
-    void *vm, size_t mlen, int mp, int mt,
-    void *vdata, size_t dlen)
+    const struct token *t, void *vm, size_t mlen, int mp, int mt, void *vdata,
+    size_t dlen)
 {
 	uint64_t rdm;
 	uint8_t hmac_code[HMAC_LENGTH];
@@ -551,7 +540,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 		}
 	}
 
-	switch(auth->protocol) {
+	switch (auth->protocol) {
 	case AUTH_PROTO_TOKEN:
 	case AUTH_PROTO_DELAYED:
 	case AUTH_PROTO_DELAYEDREALM:
@@ -562,7 +551,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 		return -1;
 	}
 
-	switch(auth->algorithm) {
+	switch (auth->algorithm) {
 	case AUTH_ALG_NONE:
 	case AUTH_ALG_HMAC_MD5:
 		break;
@@ -571,7 +560,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 		return -1;
 	}
 
-	switch(auth->rdm) {
+	switch (auth->rdm) {
 	case AUTH_RDM_MONOTONIC:
 		break;
 	default:
@@ -590,7 +579,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 	 * We only need to do this for DISCOVER messages */
 	if (vdata == NULL) {
 		dlen = 1 + 1 + 1 + 8;
-		switch(auth->protocol) {
+		switch (auth->protocol) {
 		case AUTH_PROTO_TOKEN:
 			dlen += t->key_len;
 			break;
@@ -630,8 +619,8 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 	 * which is probably a good idea because both states start from zero.
 	 */
 	if (auth_info ||
-	    !(auth->protocol & (AUTH_PROTO_DELAYED | AUTH_PROTO_DELAYEDREALM)))
-	{
+	    !(auth->protocol &
+		(AUTH_PROTO_DELAYED | AUTH_PROTO_DELAYEDREALM))) {
 		*data++ = auth->rdm;
 		switch (auth->rdm) {
 		case AUTH_RDM_MONOTONIC:
@@ -645,8 +634,8 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 		rdm = htonll(rdm);
 		memcpy(data, &rdm, 8);
 	} else {
-		*data++ = 0;		/* rdm */
-		memset(data, 0, 8);	/* replay detection data */
+		*data++ = 0;	    /* rdm */
+		memset(data, 0, 8); /* replay detection data */
 	}
 	data += 8;
 	dlen -= 1 + 1 + 1 + 8;
@@ -659,7 +648,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 			return -1;
 		}
 		if (dlen < t->key_len) {
-			errno =	ENOBUFS;
+			errno = ENOBUFS;
 			return -1;
 		}
 		memcpy(data, t->key, t->key_len);
@@ -687,8 +676,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 
 	/* Write out the SecretID */
 	if (auth->protocol == AUTH_PROTO_DELAYED ||
-	    auth->protocol == AUTH_PROTO_DELAYEDREALM)
-	{
+	    auth->protocol == AUTH_PROTO_DELAYEDREALM) {
 		if (dlen < sizeof(t->secretid)) {
 			errno = ENOBUFS;
 			return -1;
@@ -717,10 +705,10 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 	}
 
 	/* Create our hash and write it out */
-	switch(auth->algorithm) {
+	switch (auth->algorithm) {
 	case AUTH_ALG_HMAC_MD5:
-		hmac("md5", t->key, t->key_len, m, mlen,
-		     hmac_code, sizeof(hmac_code));
+		hmac("md5", t->key, t->key_len, m, mlen, hmac_code,
+		    sizeof(hmac_code));
 		memcpy(data, hmac_code, sizeof(hmac_code));
 		break;
 	}

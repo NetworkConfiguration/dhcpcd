@@ -171,4 +171,4 @@ _import-src: ${SRCS} ${MAN5} ${MAN8}
 	# DragonFlyBSD builds base version with private crypto
 	if [ `uname` = DragonFly ]; then rm ${DESTDIR}/compat/crypt/md5* ${DESTDIR}/compat/crypt/sha256*; fi
 
-include ${TOP}/Makefile.inc
+include Makefile.inc

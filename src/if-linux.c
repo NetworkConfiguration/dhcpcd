@@ -26,30 +26,29 @@
  * SUCH DAMAGE.
  */
 
-#include <asm/types.h> /* Needed for 2.4 kernels */
-
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+
+#include <arpa/inet.h>
+#include <asm/types.h> /* Needed for 2.4 kernels */
+#include <linux/filter.h>
 #include <linux/icmpv6.h>
 #include <linux/if_addr.h>
 #include <linux/if_link.h>
 #include <linux/if_packet.h>
 #include <linux/if_tun.h>
 #include <linux/if_vlan.h>
-#include <linux/filter.h>
 #include <linux/netlink.h>
-#include <linux/sockios.h>
 #include <linux/rtnetlink.h>
-
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/in_systm.h>
-#include <netinet/in.h>
-#include <net/route.h>
+#include <linux/sockios.h>
 
 /* musl has its own definition of struct ethhdr, so only include
  * netinet/if_ether.h on systems with GLIBC.  For the ARPHRD constants,
@@ -60,10 +59,10 @@
 #include <linux/if_arp.h>
 #endif
 
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -72,9 +71,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "bpf.h"
 #include "common.h"
+#include "config.h"
 #include "dev.h"
 #include "dhcp.h"
 #include "if.h"
@@ -101,7 +100,7 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 
 /* Buggy CentOS and RedHat */
 #ifndef SOL_NETLINK
-#define	SOL_NETLINK	270
+#define SOL_NETLINK 270
 #endif
 
 /*
@@ -112,10 +111,10 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
  */
 #ifdef IFLA_LINKINFO
 #ifndef IFF_LOWER_UP
-#define IFF_LOWER_UP	0x10000
+#define IFF_LOWER_UP 0x10000
 #endif
 #ifndef IFF_DORMANT
-#define IFF_DORMANT	0x20000
+#define IFF_DORMANT 0x20000
 #endif
 #endif
 
@@ -134,26 +133,30 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #undef NLA_ALIGNTO
 #undef NLA_ALIGN
 #undef NLA_HDRLEN
-#define NLA_ALIGNTO		4U
-#define NLA_ALIGN(len)		(((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
-#define NLA_HDRLEN		((int) NLA_ALIGN(sizeof(struct nlattr)))
+#define NLA_ALIGNTO    4U
+#define NLA_ALIGN(len) (((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
+#define NLA_HDRLEN     ((int)NLA_ALIGN(sizeof(struct nlattr)))
 
 #undef IFA_RTA
-#define IFA_RTA(r)  ((struct rtattr *)(void *)(((char *)(r)) \
-	+ NLMSG_ALIGN(sizeof(struct ifaddrmsg))))
+#define IFA_RTA(r)                                 \
+	((struct rtattr *)(void *)(((char *)(r)) + \
+	    NLMSG_ALIGN(sizeof(struct ifaddrmsg))))
 #undef IFLA_RTA
-#define IFLA_RTA(r)  ((struct rtattr *)(void *)(((char *)(r)) \
-	+ NLMSG_ALIGN(sizeof(struct ifinfomsg))))
+#define IFLA_RTA(r)                                \
+	((struct rtattr *)(void *)(((char *)(r)) + \
+	    NLMSG_ALIGN(sizeof(struct ifinfomsg))))
 #undef NLMSG_NEXT
-#define NLMSG_NEXT(nlh, len)	 ((len) -= NLMSG_ALIGN((nlh)->nlmsg_len), \
-	(struct nlmsghdr *)(void *)(((char *)(nlh)) \
-	+ NLMSG_ALIGN((nlh)->nlmsg_len)))
+#define NLMSG_NEXT(nlh, len)                              \
+	((len) -= NLMSG_ALIGN((nlh)->nlmsg_len),          \
+	    (struct nlmsghdr *)(void *)(((char *)(nlh)) + \
+		NLMSG_ALIGN((nlh)->nlmsg_len)))
 #undef RTM_RTA
 #define RTM_RTA(r) (void *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct rtmsg)))
 #undef RTA_NEXT
-#define RTA_NEXT(rta, attrlen)	((attrlen) -= RTA_ALIGN((rta)->rta_len), \
-	(struct rtattr *)(void *)(((char *)(rta)) \
-	+ RTA_ALIGN((rta)->rta_len)))
+#define RTA_NEXT(rta, attrlen)                          \
+	((attrlen) -= RTA_ALIGN((rta)->rta_len),        \
+	    (struct rtattr *)(void *)(((char *)(rta)) + \
+		RTA_ALIGN((rta)->rta_len)))
 
 /* We need this to send a broadcast for InfiniBand.
  * Our old code used sendto, but our new code writes to a raw BPF socket.
@@ -169,59 +172,58 @@ static const uint8_t ipv4_bcast_addr[] = {
 
 static int if_addressexists(struct interface *, struct in_addr *);
 
-#define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
-#define SYS_BRIDGE	"/sys/class/net/%s/bridge/bridge_id"
-#define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
-#define SYS_TUNTAP	"/sys/class/net/%s/tun_flags"
+#define PROC_PROMOTE "/proc/sys/net/ipv4/conf/%s/promote_secondaries"
+#define SYS_BRIDGE   "/sys/class/net/%s/bridge/bridge_id"
+#define SYS_LAYER2   "/sys/class/net/%s/device/layer2"
+#define SYS_TUNTAP   "/sys/class/net/%s/tun_flags"
 
 #if defined(__aarch64__)
 static const char *mproc = "AArch64";
 int
 if_machinearch(char *str, size_t len)
 {
-
 	return snprintf(str, len, "%s", mproc);
 }
 #else
 static const char *mproc =
 #if defined(__alpha__)
-	"system type"
+    "system type"
 #elif defined(__arm__)
-	"Hardware"
+    "Hardware"
 #elif defined(__avr32__)
-	"cpu family"
+    "cpu family"
 #elif defined(__bfin__)
-	"BOARD Name"
+    "BOARD Name"
 #elif defined(__cris__)
-	"cpu model"
+    "cpu model"
 #elif defined(__frv__)
-	"System"
+    "System"
 #elif defined(__hppa__)
-	"model"
+    "model"
 #elif defined(__i386__) || defined(__x86_64__)
-	"vendor_id"
+    "vendor_id"
 #elif defined(__ia64__)
-	"vendor"
+    "vendor"
 #elif defined(__m68k__)
-	"MMU"
+    "MMU"
 #elif defined(__mips__)
-	"system type"
+    "system type"
 #elif defined(__powerpc__) || defined(__powerpc64__)
-	"machine"
+    "machine"
 #elif defined(__riscv)
-	"uarch"
+    "uarch"
 #elif defined(__s390__) || defined(__s390x__)
-	"Manufacturer"
+    "Manufacturer"
 #elif defined(__sh__)
-	"machine"
+    "machine"
 #elif defined(sparc) || defined(__sparc__)
-	"cpu"
+    "cpu"
 #elif defined(__vax__)
-	"cpu"
+    "cpu"
 #else
-	NULL
+    NULL
 #endif
-	;
+    ;
 
 int
 if_machinearch(char *str, size_t len)
@@ -240,8 +242,7 @@ if_machinearch(char *str, size_t len)
 
 	while (fscanf(fp, "%255s : ", buf) != EOF) {
 		if (strncmp(buf, mproc, strlen(mproc)) == 0 &&
-		    fscanf(fp, "%255s", buf) == 1)
-		{
+		    fscanf(fp, "%255s", buf) == 1) {
 			fclose(fp);
 			return snprintf(str, len, "%s", buf);
 		}
@@ -360,7 +361,6 @@ if_tap(struct dhcpcd_ctx *ctx, const char *ifname)
 bool
 if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-
 	if (if_tap(ctx, ifname) || if_bridge(ctx, ifname))
 		return true;
 	return false;
@@ -370,7 +370,6 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 int
 if_vimaster(__unused struct dhcpcd_ctx *ctx, __unused const char *ifname)
 {
-
 	return 0;
 }
 
@@ -479,8 +478,8 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	if (ctx->link_fd == -1)
 		return -1;
 #ifdef NETLINK_BROADCAST_ERROR
-	if (setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR,
-	    &on, sizeof(on)) == -1)
+	if (setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR, &on,
+		sizeof(on)) == -1)
 		logerr("%s: NETLINK_BROADCAST_ERROR", __func__);
 #endif
 
@@ -546,12 +545,12 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 	return if_ioctl(ifp->ctx, SIOCSIFHWADDR, &ifr, sizeof(ifr));
 }
 
-static int if_carrier_from_flags(unsigned int flags)
+static int
+if_carrier_from_flags(unsigned int flags)
 {
-
 #ifdef IFF_LOWER_UP
 	return ((flags & (IFF_LOWER_UP | IFF_RUNNING)) ==
-		(IFF_LOWER_UP | IFF_RUNNING))
+		   (IFF_LOWER_UP | IFF_RUNNING))
 #ifdef IFF_DORMANT
 		/*
 		 * IFF_DORMANT means L1 is up but waiting for an external
@@ -561,7 +560,9 @@ static int if_carrier_from_flags(unsigned int flags)
 		 */
 		&& !(flags & IFF_DORMANT)
 #endif
-		? LINK_UP : LINK_DOWN;
+	    ?
+	    LINK_UP :
+	    LINK_DOWN;
 #else
 	return flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
 #endif
@@ -573,25 +574,23 @@ if_carrier(struct interface *ifp, __unused const void *ifadata)
 	return if_carrier_from_flags(ifp->flags);
 }
 
-
 bool
 if_roaming(struct interface *ifp)
 {
-
 	return
 #ifdef IFF_DORMANT
-	   ifp->flags & IFF_DORMANT ||
+	    ifp->flags & IFF_DORMANT ||
 #endif
 #ifdef IFF_LOWER_UP
-	   /*
-	    * IFF_DORMANT only occurs for supplicant initiated roaming.
-	    * For firmware initiated roaming we don't get IFF_DORMANT.
-	    * Seems weird that the driver can't set it though.
-	    * We can check that IFF_RUNNING is not set but UP and L1 are
-	    * to get the same effect.
-	    */
-	   (ifp->flags & (IFF_UP | IFF_LOWER_UP | IFF_RUNNING)) ==
-	       (IFF_UP | IFF_LOWER_UP) ||
+	    /*
+	     * IFF_DORMANT only occurs for supplicant initiated roaming.
+	     * For firmware initiated roaming we don't get IFF_DORMANT.
+	     * Seems weird that the driver can't set it though.
+	     * We can check that IFF_RUNNING is not set but UP and L1 are
+	     * to get the same effect.
+	     */
+	    (ifp->flags & (IFF_UP | IFF_LOWER_UP | IFF_RUNNING)) ==
+	    (IFF_UP | IFF_LOWER_UP) ||
 #endif
 	    false;
 }
@@ -602,8 +601,10 @@ if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov, int fd, int flags,
 {
 	struct sockaddr_nl nladdr = { .nl_pid = 0 };
 	struct msghdr msg = {
-	    .msg_name = &nladdr, .msg_namelen = sizeof(nladdr),
-	    .msg_iov = iov, .msg_iovlen = 1,
+		.msg_name = &nladdr,
+		.msg_namelen = sizeof(nladdr),
+		.msg_iov = iov,
+		.msg_iovlen = 1,
 	};
 	size_t len;
 	struct nlmsghdr *nlm;
@@ -628,10 +629,8 @@ recv_again:
 
 	again = 0;
 	terminated = false;
-	for (nlm = iov->iov_base;
-	     nlm && NLMSG_OK(nlm, len);
-	     nlm = NLMSG_NEXT(nlm, len))
-	{
+	for (nlm = iov->iov_base; nlm && NLMSG_OK(nlm, len);
+	    nlm = NLMSG_NEXT(nlm, len)) {
 		again = (nlm->nlmsg_flags & NLM_F_MULTI);
 		if (nlm->nlmsg_type == NLMSG_NOOP)
 			continue;
@@ -702,21 +701,20 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_DST:
 			sa = &rt->rt_dest;
 			break;
-		case RTA_SRC:
-		{
+		case RTA_SRC: {
 			union sa_ss ssa;
 			struct sockaddr *psa = (struct sockaddr *)&ssa;
 			socklen_t salen;
 
 			psa->sa_family = rtm->rtm_family;
 			salen = sa_addrlen(psa);
-			memcpy((char *)psa + sa_addroffset(psa),
-			       RTA_DATA(rta), MIN(salen, RTA_PAYLOAD(rta)));
+			memcpy((char *)psa + sa_addroffset(psa), RTA_DATA(rta),
+			    MIN(salen, RTA_PAYLOAD(rta)));
 			/* if ip-route "from" address is not unspecified,
-                           route is source-based, eg:
-                             <dest-net> from <source-net> via ... dev ...
-                           ignore the route as may otherwise appear to overlap
-                           with routes set/removed by dhcpcd */
+			   route is source-based, eg:
+			     <dest-net> from <source-net> via ... dev ...
+			   ignore the route as may otherwise appear to overlap
+			   with routes set/removed by dhcpcd */
 			if (!sa_is_unspecified(psa)) {
 				errno = ENOTSUP;
 				return -1;
@@ -736,8 +734,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_PRIORITY:
 			rt->rt_metric = *(unsigned int *)RTA_DATA(rta);
 			break;
-		case RTA_METRICS:
-		{
+		case RTA_METRICS: {
 			struct rtattr *r2;
 			size_t l2;
 
@@ -746,15 +743,15 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			for (; RTA_OK(r2, l2); r2 = RTA_NEXT(r2, l2)) {
 				switch (r2->rta_type) {
 				case RTAX_MTU:
-					rt->rt_mtu = *(unsigned int *)RTA_DATA(r2);
+					rt->rt_mtu = *(unsigned int *)RTA_DATA(
+					    r2);
 					break;
 				}
 			}
 			break;
 		}
 #ifdef HAVE_ROUTE_LIFETIME
-		case RTA_CACHEINFO:
-		{
+		case RTA_CACHEINFO: {
 			struct rta_cacheinfo ci;
 			static long hz;
 
@@ -803,7 +800,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	if (sa_is_allones(&rt->rt_netmask))
 		rt->rt_flags |= RTF_HOST;
 
-	#if 0
+#if 0
 	if (rt->rtp_ifp == NULL && rt->src.s_addr != INADDR_ANY) {
 		struct ipv4_addr *ap;
 
@@ -813,7 +810,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
-	#endif
+#endif
 
 	if (rt->rt_ifp == NULL) {
 		errno = ESRCH;
@@ -897,7 +894,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		    nlm->nlmsg_pid == (uint32_t)ctx->ps_root->psp_pid)
 			return 0;
 #endif
-		priv = (struct priv*)ctx->priv;
+		priv = (struct priv *)ctx->priv;
 		if (nlm->nlmsg_pid == priv->route_pid)
 			return 0;
 	}
@@ -948,14 +945,14 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 				break;
 		}
 
-		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr, &net, &brd, ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
+		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name, &addr,
+		    &net, &brd, ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
 		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
-		switch (rta->rta_type) {
+			switch (rta->rta_type) {
 			case IFA_ADDRESS:
 				addr6 = (struct in6_addr *)RTA_DATA(rta);
 				break;
@@ -983,9 +980,9 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 				break;
 		}
 
-		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    addr6, ifa->ifa_prefixlen, dstaddr6,
-		    ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
+		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name, addr6,
+		    ifa->ifa_prefixlen, dstaddr6, ifa->ifa_flags,
+		    (pid_t)nlm->nlmsg_pid);
 		break;
 #endif
 	}
@@ -995,9 +992,8 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 static uint8_t
 l2addr_len(unsigned short if_type)
 {
-
 	switch (if_type) {
-	case ARPHRD_ETHER: /* FALLTHROUGH */
+	case ARPHRD_ETHER:   /* FALLTHROUGH */
 	case ARPHRD_IEEE802: /*FALLTHROUGH */
 	case ARPHRD_IEEE80211:
 		return 6;
@@ -1039,7 +1035,7 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 			switch (rta->rta_type) {
 			case NDA_DST:
 				memcpy(&addr6.s6_addr, RTA_DATA(rta),
-				       sizeof(addr6.s6_addr));
+				    sizeof(addr6.s6_addr));
 				break;
 			}
 		}
@@ -1158,8 +1154,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 		dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
 	}
 
-	dhcpcd_handlecarrier(ifp,
-	    if_carrier_from_flags(ifi->ifi_flags),
+	dhcpcd_handlecarrier(ifp, if_carrier_from_flags(ifi->ifi_flags),
 	    ifi->ifi_flags);
 	return 0;
 }
@@ -1181,15 +1176,14 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 static bool
 if_netlinkpriv(int protocol, struct nlmsghdr *nlm)
 {
-
 	if (protocol != NETLINK_ROUTE)
 		return false;
 
-	switch(nlm->nlmsg_type) {
-	case RTM_NEWADDR:	/* FALLTHROUGH */
-	case RTM_DELADDR:	/* FALLTHROUGH */
-	case RTM_NEWROUTE:	/* FALLTHROUGH */
-	case RTM_DELROUTE:	/* FALLTHROUGH */
+	switch (nlm->nlmsg_type) {
+	case RTM_NEWADDR:  /* FALLTHROUGH */
+	case RTM_DELADDR:  /* FALLTHROUGH */
+	case RTM_NEWROUTE: /* FALLTHROUGH */
+	case RTM_DELROUTE: /* FALLTHROUGH */
 	case RTM_NEWLINK:
 		return true;
 	default:
@@ -1205,10 +1199,10 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	int s;
 	struct sockaddr_nl snl = { .nl_family = AF_NETLINK };
 	struct iovec iov = { .iov_base = hdr, .iov_len = hdr->nlmsg_len };
-	struct msghdr msg = {
-	    .msg_name = &snl, .msg_namelen = sizeof(snl),
-	    .msg_iov = &iov, .msg_iovlen = 1
-	};
+	struct msghdr msg = { .msg_name = &snl,
+		.msg_namelen = sizeof(snl),
+		.msg_iov = &iov,
+		.msg_iovlen = 1 };
 	struct priv *priv = (struct priv *)ctx->priv;
 	unsigned char buf[16 * 1024];
 	struct iovec riov = {
@@ -1256,7 +1250,7 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	return if_getnetlink(ctx, &riov, s, 0, cb, cbarg);
 }
 
-#define NLMSG_TAIL(nmsg)						\
+#define NLMSG_TAIL(nmsg)                              \
 	((struct rtattr *)(void *)(((char *)(nmsg)) + \
 	    NLMSG_ALIGN((nmsg)->nlmsg_len)))
 
@@ -1287,7 +1281,6 @@ static int
 add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
     uint8_t data)
 {
-
 	return add_attr_l(n, maxlen, type, &data, sizeof(data));
 }
 #endif
@@ -1314,8 +1307,8 @@ add_attr_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 }
 
 static int
-rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
-    unsigned short type, uint32_t data)
+rta_add_attr_32(struct rtattr *rta, unsigned short maxlen, unsigned short type,
+    uint32_t data)
 {
 	unsigned short len = RTA_LENGTH(sizeof(data));
 	struct rtattr *subrta;
@@ -1325,7 +1318,7 @@ rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
 		return -1;
 	}
 
-	subrta = (void *)((char*)rta + RTA_ALIGN(rta->rta_len));
+	subrta = (void *)((char *)rta + RTA_ALIGN(rta->rta_len));
 	subrta->rta_type = type;
 	subrta->rta_len = len;
 	memcpy(RTA_DATA(subrta), &data, sizeof(data));
@@ -1337,33 +1330,29 @@ rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
 static struct nlattr *
 nla_next(struct nlattr *nla, size_t *rem)
 {
-
 	*rem -= (size_t)NLA_ALIGN(nla->nla_len);
 	return (void *)((char *)nla + NLA_ALIGN(nla->nla_len));
 }
 
 #define NLA_TYPE(nla) ((nla)->nla_type & NLA_TYPE_MASK)
-#define NLA_LEN(nla) (unsigned int)((nla)->nla_len - NLA_HDRLEN)
-#define NLA_OK(nla, rem) \
+#define NLA_LEN(nla)  (unsigned int)((nla)->nla_len - NLA_HDRLEN)
+#define NLA_OK(nla, rem)                   \
 	((rem) >= sizeof(struct nlattr) && \
-	(nla)->nla_len >= sizeof(struct nlattr) && \
-	(nla)->nla_len <= rem)
+	    (nla)->nla_len >= sizeof(struct nlattr) && (nla)->nla_len <= rem)
 #define NLA_DATA(nla) (void *)((char *)(nla) + NLA_HDRLEN)
-#define NLA_FOR_EACH_ATTR(pos, head, len, rem) \
-	for (pos = head, rem = len; \
-	     NLA_OK(pos, rem); \
-	     pos = nla_next(pos, &(rem)))
+#define NLA_FOR_EACH_ATTR(pos, head, len, rem)        \
+	for (pos = head, rem = len; NLA_OK(pos, rem); \
+	    pos = nla_next(pos, &(rem)))
 
-struct nlmg
-{
+struct nlmg {
 	struct nlmsghdr hdr;
 	struct genlmsghdr ghdr;
 	char buffer[64];
 };
 
 static int
-nla_put_32(struct nlmsghdr *n, unsigned short maxlen,
-    unsigned short type, uint32_t data)
+nla_put_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    uint32_t data)
 {
 	unsigned short len;
 	struct nlattr *nla;
@@ -1384,8 +1373,8 @@ nla_put_32(struct nlmsghdr *n, unsigned short maxlen,
 }
 
 static int
-nla_put_string(struct nlmsghdr *n, unsigned short maxlen,
-    unsigned short type, const char *data)
+nla_put_string(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    const char *data)
 {
 	struct nlattr *nla;
 	size_t len, sl;
@@ -1413,7 +1402,8 @@ nla_parse(struct nlattr *tb[], struct nlattr *head, size_t len, int maxtype)
 	int type;
 
 	memset(tb, 0, sizeof(*tb) * ((unsigned int)maxtype + 1));
-	NLA_FOR_EACH_ATTR(nla, head, len, rem) {
+	NLA_FOR_EACH_ATTR(nla, head, len, rem)
+	{
 		type = NLA_TYPE(nla);
 		if (type > maxtype)
 			continue;
@@ -1463,11 +1453,11 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = CTRL_CMD_GETFAMILY;
 	nlm.ghdr.version = 1;
-	if (nla_put_string(&nlm.hdr, sizeof(nlm),
-	    CTRL_ATTR_FAMILY_NAME, name) == -1)
+	if (nla_put_string(&nlm.hdr, sizeof(nlm), CTRL_ATTR_FAMILY_NAME,
+		name) == -1)
 		return -1;
-	return if_sendnetlink(ctx, NETLINK_GENERIC, &nlm.hdr,
-	    &_gnl_getfamily, NULL);
+	return if_sendnetlink(ctx, NETLINK_GENERIC, &nlm.hdr, &_gnl_getfamily,
+	    NULL);
 }
 
 static int
@@ -1487,10 +1477,8 @@ _if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, void *arg,
 	if (tb[NL80211_ATTR_BSS] == NULL)
 		return 0;
 
-	if (nla_parse(bss,
-	    NLA_DATA(tb[NL80211_ATTR_BSS]),
-	    NLA_LEN(tb[NL80211_ATTR_BSS]),
-	    NL80211_BSS_STATUS) == -1)
+	if (nla_parse(bss, NLA_DATA(tb[NL80211_ATTR_BSS]),
+		NLA_LEN(tb[NL80211_ATTR_BSS]), NL80211_BSS_STATUS) == -1)
 		return 0;
 
 	if (bss[NL80211_BSS_BSSID] == NULL || bss[NL80211_BSS_STATUS] == NULL)
@@ -1542,8 +1530,8 @@ if_getssid_nl80211(struct interface *ifp)
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = NL80211_CMD_GET_WIPHY;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
-	if (if_sendnetlink(ifp->ctx, NETLINK_GENERIC, &nlm.hdr,
-	    NULL, NULL) == -1)
+	if (if_sendnetlink(ifp->ctx, NETLINK_GENERIC, &nlm.hdr, NULL, NULL) ==
+	    -1)
 		return -1;
 
 	/* We need to parse out the list of scan results and find the one
@@ -1579,24 +1567,22 @@ if_getssid(struct interface *ifp)
 	return r;
 }
 
-struct nlma
-{
+struct nlma {
 	struct nlmsghdr hdr;
 	struct ifaddrmsg ifa;
 	char buffer[64];
 };
 
 #ifdef INET
-struct ifiaddr
-{
+struct ifiaddr {
 	unsigned int ifa_ifindex;
 	struct in_addr ifa_addr;
 	bool ifa_found;
 };
 
 static int
-_if_addressexists(__unused struct dhcpcd_ctx *ctx,
-    void *arg, struct nlmsghdr *nlm)
+_if_addressexists(__unused struct dhcpcd_ctx *ctx, void *arg,
+    struct nlmsghdr *nlm)
 {
 	struct ifiaddr *ia = arg;
 	in_addr_t this_addr;
@@ -1633,11 +1619,11 @@ if_addressexists(struct interface *ifp, struct in_addr *addr)
 		.ifa_found = false,
 	};
 	struct nlma nlm = {
-	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
-	    .hdr.nlmsg_type = RTM_GETADDR,
-	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
-	    .ifa.ifa_family = AF_INET,
-	    .ifa.ifa_index = ifp->index,
+		.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
+		.hdr.nlmsg_type = RTM_GETADDR,
+		.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
+		.ifa.ifa_family = AF_INET,
+		.ifa.ifa_index = ifp->index,
 	};
 
 	int error = if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
@@ -1648,8 +1634,7 @@ if_addressexists(struct interface *ifp, struct in_addr *addr)
 }
 #endif
 
-struct nlmr
-{
+struct nlmr {
 	struct nlmsghdr hdr;
 	struct rtmsg rt;
 	char buffer[256];
@@ -1693,11 +1678,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 		else
 #endif
 #ifdef RTPROT_DHCP
-		if (rt->rt_dflags & RTDF_DHCP)
+		    if (rt->rt_dflags & RTDF_DHCP)
 			nlm.rt.rtm_protocol = RTPROT_DHCP;
 		else
 #endif
-		if (rt->rt_dflags & RTDF_IFA_ROUTE)
+		    if (rt->rt_dflags & RTDF_IFA_ROUTE)
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
@@ -1713,9 +1698,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 			nlm.rt.rtm_type = RTN_UNICAST;
 	}
 
-#define ADDSA(type, sa)							\
-	add_attr_l(&nlm.hdr, sizeof(nlm), (type),			\
-	    (const char *)(sa) + sa_addroffset((sa)),			\
+#define ADDSA(type, sa)                               \
+	add_attr_l(&nlm.hdr, sizeof(nlm), (type),     \
+	    (const char *)(sa) + sa_addroffset((sa)), \
 	    (unsigned short)sa_addrlen((sa)));
 	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(&rt->rt_netmask);
 	/* rt->rt_dest and rt->gateway are unions where sockaddr_in6
@@ -1739,8 +1724,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 			metrics->rta_type = RTA_METRICS;
 			metrics->rta_len = RTA_LENGTH(0);
-			rta_add_attr_32(metrics, sizeof(metricsbuf),
-			    RTAX_MTU, rt->rt_mtu);
+			rta_add_attr_32(metrics, sizeof(metricsbuf), RTAX_MTU,
+			    rt->rt_mtu);
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
 			    RTA_DATA(metrics),
 			    (unsigned short)RTA_PAYLOAD(metrics));
@@ -1750,7 +1735,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		if (rt->rt_dflags & RTDF_RA) {
 			uint8_t pref;
 
-			switch(rt->rt_pref) {
+			switch (rt->rt_pref) {
 			case RTPREF_LOW:
 				pref = ICMPV6_ROUTER_PREF_LOW;
 				break;
@@ -1782,16 +1767,14 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 
 	if (rt->rt_metric != 0)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
-		    rt->rt_metric);
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->rt_metric);
 
-	return if_sendnetlink(rt->rt_ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
-	    NULL, NULL);
+	return if_sendnetlink(rt->rt_ifp->ctx, NETLINK_ROUTE, &nlm.hdr, NULL,
+	    NULL);
 }
 
 static int
-_if_initrt(struct dhcpcd_ctx *ctx, void *arg,
-    struct nlmsghdr *nlm)
+_if_initrt(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 {
 	struct rt rt, *rtn;
 	rb_tree_t *kroutes = arg;
@@ -1812,15 +1795,15 @@ int
 if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
 	struct nlmr nlm = {
-	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
-	    .hdr.nlmsg_type = RTM_GETROUTE,
-	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
-	    .rt.rtm_table = RT_TABLE_MAIN,
-	    .rt.rtm_family = (unsigned char)af,
+		.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
+		.hdr.nlmsg_type = RTM_GETROUTE,
+		.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
+		.rt.rtm_table = RT_TABLE_MAIN,
+		.rt.rtm_family = (unsigned char)af,
 	};
 
-	return if_sendnetlink(ctx, NETLINK_ROUTE, &nlm.hdr,
-	    &_if_initrt, kroutes);
+	return if_sendnetlink(ctx, NETLINK_ROUTE, &nlm.hdr, &_if_initrt,
+	    kroutes);
 }
 
 #ifdef INET
@@ -1838,13 +1821,11 @@ bpf_open(const struct interface *ifp,
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
-	} su = {
-		.sll = {
-			.sll_family = PF_PACKET,
-			.sll_protocol = htons(ETH_P_ALL),
-			.sll_ifindex = (int)ifp->index,
-		}
-	};
+	} su = { .sll = {
+		     .sll_family = PF_PACKET,
+		     .sll_protocol = htons(ETH_P_ALL),
+		     .sll_ifindex = (int)ifp->index,
+		 } };
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
@@ -1861,7 +1842,8 @@ bpf_open(const struct interface *ifp,
 	if (bpf->bpf_buffer == NULL)
 		goto eexit;
 
-	bpf->bpf_fd = xsocket(PF_PACKET, SOCK_RAW|SOCK_CXNB,htons(ETH_P_ALL));
+	bpf->bpf_fd = xsocket(PF_PACKET, SOCK_RAW | SOCK_CXNB,
+	    htons(ETH_P_ALL));
 	if (bpf->bpf_fd == -1)
 		goto eexit;
 
@@ -1876,8 +1858,8 @@ bpf_open(const struct interface *ifp,
 	/* In the ideal world, this would be set before the bind and filter. */
 #ifdef PACKET_AUXDATA
 	n = 1;
-	if (setsockopt(bpf->bpf_fd, SOL_PACKET, PACKET_AUXDATA,
-	    &n, sizeof(n)) != 0) {
+	if (setsockopt(bpf->bpf_fd, SOL_PACKET, PACKET_AUXDATA, &n,
+		sizeof(n)) != 0) {
 		if (errno != ENOPROTOOPT)
 			goto eexit;
 	}
@@ -1890,7 +1872,7 @@ bpf_open(const struct interface *ifp,
 	 * There is no way of flushing them from userland.
 	 * As such, consumers need to inspect each packet to ensure it's valid.
 	 * Or to put it another way, don't trust the Linux BPF filter.
-	*/
+	 */
 
 	return bpf;
 
@@ -1941,10 +1923,8 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 			bytes = (ssize_t)len;
 		memcpy(data, bpf->bpf_buffer, (size_t)bytes);
 #ifdef PACKET_AUXDATA
-		for (cmsg = CMSG_FIRSTHDR(&msg);
-		     cmsg;
-		     cmsg = CMSG_NXTHDR(&msg, cmsg))
-		{
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg;
+		    cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 			if (cmsg->cmsg_level == SOL_PACKET &&
 			    cmsg->cmsg_type == PACKET_AUXDATA) {
 				aux = (void *)CMSG_DATA(cmsg);
@@ -2007,8 +1987,8 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	    (unsigned short)(strlen(ia->iface->alias) + 1));
 #endif
 
-	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
-	    &ia->addr.s_addr, sizeof(ia->addr.s_addr));
+	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL, &ia->addr.s_addr,
+	    sizeof(ia->addr.s_addr));
 
 	if (cmd == RTM_NEWADDR) {
 #ifdef IFA_F_NOPREFIXROUTE
@@ -2023,21 +2003,20 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 		memset(&cinfo, 0, sizeof(cinfo));
 		cinfo.ifa_prefered = ia->pltime;
 		cinfo.ifa_valid = ia->vltime;
-		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
-		    &cinfo, sizeof(cinfo));
+		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO, &cinfo,
+		    sizeof(cinfo));
 	}
 
-	if (if_sendnetlink(ia->iface->ctx, NETLINK_ROUTE, &nlm.hdr,
-	    NULL, NULL) == -1)
+	if (if_sendnetlink(ia->iface->ctx, NETLINK_ROUTE, &nlm.hdr, NULL,
+		NULL) == -1)
 		retval = -1;
 	return retval;
 }
 
 int
 if_addrflags(__unused const struct interface *ifp,
-__unused const struct in_addr *addr, __unused const char *alias)
+    __unused const struct in_addr *addr, __unused const char *alias)
 {
-
 	/* Linux has no support for IPv4 address flags */
 	return 0;
 }
@@ -2070,8 +2049,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
 	    ia->iface->alias, (unsigned short)(strlen(ia->iface->alias) + 1));
 #endif
-	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
-	    &ia->addr.s6_addr, sizeof(ia->addr.s6_addr));
+	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL, &ia->addr.s6_addr,
+	    sizeof(ia->addr.s6_addr));
 
 	if (cmd == RTM_NEWADDR) {
 #ifdef IPV6_MANAGETEMPADDR
@@ -2098,16 +2077,15 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		memset(&cinfo, 0, sizeof(cinfo));
 		cinfo.ifa_prefered = ia->prefix_pltime;
 		cinfo.ifa_valid = ia->prefix_vltime;
-		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
-		    &cinfo, sizeof(cinfo));
+		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO, &cinfo,
+		    sizeof(cinfo));
 	}
 
-	return if_sendnetlink(ia->iface->ctx, NETLINK_ROUTE, &nlm.hdr,
-	    NULL, NULL);
+	return if_sendnetlink(ia->iface->ctx, NETLINK_ROUTE, &nlm.hdr, NULL,
+	    NULL);
 }
 
-struct ifiaddr6
-{
+struct ifiaddr6 {
 	unsigned int ifa_ifindex;
 	struct in6_addr ifa_addr;
 	uint32_t ifa_flags;
@@ -2115,8 +2093,7 @@ struct ifiaddr6
 };
 
 static int
-_if_addrflags6(__unused struct dhcpcd_ctx *ctx,
-    void *arg, struct nlmsghdr *nlm)
+_if_addrflags6(__unused struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 {
 	struct ifiaddr6 *ia = arg;
 	size_t len;
@@ -2151,10 +2128,10 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	}
 
 	if (local) {
-	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, local))
+		if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, local))
 			ia->ifa_found = true;
 	} else if (address) {
-	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, address))
+		if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, address))
 			ia->ifa_found = true;
 	}
 	if (ia->ifa_found)
@@ -2172,11 +2149,11 @@ if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
 		.ifa_found = false,
 	};
 	struct nlma nlm = {
-	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
-	    .hdr.nlmsg_type = RTM_GETADDR,
-	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
-	    .ifa.ifa_family = AF_INET6,
-	    .ifa.ifa_index = ifp->index,
+		.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
+		.hdr.nlmsg_type = RTM_GETADDR,
+		.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
+		.ifa.ifa_family = AF_INET6,
+		.ifa.ifa_index = ifp->index,
 	};
 
 	int error = if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
@@ -2193,14 +2170,12 @@ if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
 int
 if_getlifetime6(__unused struct ipv6_addr *ia)
 {
-
 	/* God knows how to work out address lifetimes on Linux */
 	errno = ENOTSUP;
 	return -1;
 }
 
-struct nlml
-{
+struct nlml {
 	struct nlmsghdr hdr;
 	struct ifinfomsg i;
 	char buffer[32];
@@ -2220,7 +2195,6 @@ add_attr_nest(struct nlmsghdr *n, unsigned short maxlen, unsigned short type)
 static void
 add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 {
-
 	nest->rta_len = (unsigned short)((char *)NLMSG_TAIL(n) - (char *)nest);
 }
 #endif
@@ -2317,8 +2291,8 @@ if_applyra(const struct ra *rap)
 	}
 
 	if (rap->retrans != 0) {
-		snprintf(path, sizeof(path), "%s/%s/retrans_time_ms",
-		    p_neigh, ifname);
+		snprintf(path, sizeof(path), "%s/%s/retrans_time_ms", p_neigh,
+		    ifname);
 		if (if_writepathuint(ctx, path, rap->retrans) == -1)
 			error = -1;
 	}

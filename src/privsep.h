@@ -29,109 +29,106 @@
 #ifndef PRIVSEP_H
 #define PRIVSEP_H
 
-//#define PRIVSEP_DEBUG
+// #define PRIVSEP_DEBUG
 
 /* Start flags */
-#define	PSF_DROPPRIVS		0x01
-#define	PSF_ELOOP		0x02
+#define PSF_DROPPRIVS 0x01
+#define PSF_ELOOP     0x02
 
 /* Protocols */
-#define	PS_BOOTP		0x0001
-#define	PS_ND			0x0002
-#define	PS_DHCP6		0x0003
-#define	PS_BPF_BOOTP		0x0004
-#define	PS_BPF_ARP		0x0005
+#define PS_BOOTP     0x0001
+#define PS_ND	     0x0002
+#define PS_DHCP6     0x0003
+#define PS_BPF_BOOTP 0x0004
+#define PS_BPF_ARP   0x0005
 
 /* Generic commands */
-#define	PS_IOCTL		0x0010
-#define	PS_ROUTE		0x0011	/* Also used for NETLINK */
-#define	PS_SCRIPT		0x0012
-#define	PS_UNLINK		0x0013
-#define	PS_READFILE		0x0014
-#define	PS_WRITEFILE		0x0015
-#define	PS_FILEMTIME		0x0016
-#define	PS_AUTH_MONORDM		0x0017
-#define	PS_CTL			0x0018
-#define	PS_CTL_EOF		0x0019
-#define	PS_LOGREOPEN		0x0020
-#define	PS_STOPPROCS		0x0021
-#define	PS_DAEMONISED		0x0022
+#define PS_IOCTL	0x0010
+#define PS_ROUTE	0x0011 /* Also used for NETLINK */
+#define PS_SCRIPT	0x0012
+#define PS_UNLINK	0x0013
+#define PS_READFILE	0x0014
+#define PS_WRITEFILE	0x0015
+#define PS_FILEMTIME	0x0016
+#define PS_AUTH_MONORDM 0x0017
+#define PS_CTL		0x0018
+#define PS_CTL_EOF	0x0019
+#define PS_LOGREOPEN	0x0020
+#define PS_STOPPROCS	0x0021
+#define PS_DAEMONISED	0x0022
 
 /* Domains */
-#define	PS_ROOT			0x0101
-#define	PS_INET			0x0102
-#define	PS_CONTROL		0x0103
+#define PS_ROOT	   0x0101
+#define PS_INET	   0x0102
+#define PS_CONTROL 0x0103
 
 /* BSD Commands */
-#define	PS_IOCTLLINK		0x0201
-#define	PS_IOCTL6		0x0202
-#define	PS_IOCTLINDIRECT	0x0203
-#define	PS_IP6FORWARDING	0x0204
-#define	PS_GETIFADDRS		0x0205
-#define	PS_IFIGNOREGRP		0x0206
-#define	PS_SYSCTL		0x0207
+#define PS_IOCTLLINK	 0x0201
+#define PS_IOCTL6	 0x0202
+#define PS_IOCTLINDIRECT 0x0203
+#define PS_IP6FORWARDING 0x0204
+#define PS_GETIFADDRS	 0x0205
+#define PS_IFIGNOREGRP	 0x0206
+#define PS_SYSCTL	 0x0207
 
 /* Dev Commands */
-#define	PS_DEV_LISTENING	0x1001
-#define	PS_DEV_INITTED		0x1002
-#define	PS_DEV_IFCMD		0x1003
+#define PS_DEV_LISTENING 0x1001
+#define PS_DEV_INITTED	 0x1002
+#define PS_DEV_IFCMD	 0x1003
 
 /* Dev Interface Commands (via flags) */
-#define	PS_DEV_IFADDED		0x0001
-#define	PS_DEV_IFREMOVED	0x0002
-#define	PS_DEV_IFUPDATED	0x0003
+#define PS_DEV_IFADDED	 0x0001
+#define PS_DEV_IFREMOVED 0x0002
+#define PS_DEV_IFUPDATED 0x0003
 
 /* Control Type (via flags) */
-#define	PS_CTL_PRIV		0x0004
-#define	PS_CTL_UNPRIV		0x0005
+#define PS_CTL_PRIV   0x0004
+#define PS_CTL_UNPRIV 0x0005
 
 /* Sysctl Needs (via flags) */
-#define	PS_SYSCTL_OLEN		0x0001
-#define	PS_SYSCTL_ODATA		0x0002
+#define PS_SYSCTL_OLEN	0x0001
+#define PS_SYSCTL_ODATA 0x0002
 
 /* Process commands */
-#define	PS_START		0x4000
-#define	PS_STOP			0x8000
+#define PS_START 0x4000
+#define PS_STOP	 0x8000
 
 /* Max INET message size + meta data for IPC */
-#define	PS_BUFLEN		((64 * 1024) +			\
-				 sizeof(struct ps_msghdr) +	\
-				 sizeof(struct msghdr) +	\
-				 CMSG_SPACE(sizeof(struct in6_pktinfo) + \
-					    sizeof(int)))
+#define PS_BUFLEN                                                         \
+	((64 * 1024) + sizeof(struct ps_msghdr) + sizeof(struct msghdr) + \
+	    CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int)))
 
-#define	PSP_NAMESIZE		16 + INET_MAX_ADDRSTRLEN
+#define PSP_NAMESIZE 16 + INET_MAX_ADDRSTRLEN
 
 /* Handy macro to work out if in the privsep engine or not. */
-#define	IN_PRIVSEP(ctx)	\
-	((ctx)->options & DHCPCD_PRIVSEP)
-#define	IN_PRIVSEP_SE(ctx)	\
+#define IN_PRIVSEP(ctx) ((ctx)->options & DHCPCD_PRIVSEP)
+#define IN_PRIVSEP_SE(ctx) \
 	(((ctx)->options & (DHCPCD_PRIVSEP | DHCPCD_FORKED)) == DHCPCD_PRIVSEP)
 
-#define	PS_PROCESS_TIMEOUT	5	/* seconds to stop all processes */
+#define PS_PROCESS_TIMEOUT 5 /* seconds to stop all processes */
 
 #ifdef PRIVSEP
-# ifdef HAVE_CAPSICUM
-#  define PRIVSEP_RIGHTS
-# endif
+#ifdef HAVE_CAPSICUM
+#define PRIVSEP_RIGHTS
+#endif
 /* Pledge and Capsicum deny nearly all sysctls.
  * Linux needs directory access to sysctls. */
-# if defined(HAVE_CAPSICUM) ||defined(HAVE_PLEDGE) || defined(__linux__)
-#  define PRIVSEP_SYSCTL
-# endif
+#if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE) || defined(__linux__)
+#define PRIVSEP_SYSCTL
+#endif
 #endif
 
 #define PS_ROOT_FD(ctx) ((ctx)->ps_root ? (ctx)->ps_root->psp_fd : -1)
 
 #if !defined(DISABLE_SECCOMP) && defined(__linux__)
-# include <linux/version.h>
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
-#  define HAVE_SECCOMP
-# endif
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+#define HAVE_SECCOMP
+#endif
 #endif
 
-#include "config.h"
 #include "arp.h"
+#include "config.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
 
@@ -142,8 +139,8 @@ struct ps_addr {
 		struct in_addr psau_in_addr;
 		struct in6_addr psau_in6_addr;
 	} psa_u;
-#define	psa_in_addr	psa_u.psau_in_addr
-#define	psa_in6_addr	psa_u.psau_in6_addr
+#define psa_in_addr  psa_u.psau_in_addr
+#define psa_in6_addr psa_u.psau_in6_addr
 };
 
 /* Uniquely identify a process */
@@ -214,10 +211,10 @@ int ps_managersandbox(struct dhcpcd_ctx *, const char *);
 ssize_t ps_daemonised(struct dhcpcd_ctx *);
 
 int ps_unrollmsg(struct msghdr *, struct ps_msghdr *, const void *, size_t);
-ssize_t ps_sendpsmmsg(struct dhcpcd_ctx *, int,
-    struct ps_msghdr *, const struct msghdr *);
-ssize_t ps_sendpsmdata(struct dhcpcd_ctx *, int,
-    struct ps_msghdr *, const void *, size_t);
+ssize_t ps_sendpsmmsg(struct dhcpcd_ctx *, int, struct ps_msghdr *,
+    const struct msghdr *);
+ssize_t ps_sendpsmdata(struct dhcpcd_ctx *, int, struct ps_msghdr *,
+    const void *, size_t);
 ssize_t ps_sendmsg(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const struct msghdr *);
 ssize_t ps_sendcmd(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
@@ -229,7 +226,7 @@ ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
 
 /* Internal privsep functions. */
-int ps_setbuf_fdpair(int []);
+int ps_setbuf_fdpair(int[]);
 
 #ifdef PRIVSEP_RIGHTS
 int ps_rights_limit_ioctl(int);
@@ -237,7 +234,7 @@ int ps_rights_limit_fd_fctnl(int);
 int ps_rights_limit_fd_rdonly(int);
 int ps_rights_limit_fd_sockopt(int);
 int ps_rights_limit_fd(int);
-int ps_rights_limit_fdpair(int []);
+int ps_rights_limit_fdpair(int[]);
 #endif
 
 #ifdef HAVE_SECCOMP
@@ -247,8 +244,7 @@ int ps_seccomp_enter(void);
 pid_t ps_startprocess(struct ps_process *,
     void (*recv_msg)(void *, unsigned short),
     void (*recv_unpriv_msg)(void *, unsigned short),
-    int (*callback)(struct ps_process *),
-    unsigned int);
+    int (*callback)(struct ps_process *), unsigned int);
 int ps_stopprocess(struct ps_process *);
 struct ps_process *ps_findprocess(struct dhcpcd_ctx *, struct ps_id *);
 struct ps_process *ps_findprocesspid(struct dhcpcd_ctx *, pid_t);

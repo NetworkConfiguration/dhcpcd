@@ -76,8 +76,8 @@ ps_root_doroute(void *data, size_t len)
 }
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
-    void **rdata, size_t *rlen, __unused bool *free_rdata)
+ps_root_os(struct ps_msghdr *psm, struct msghdr *msg, void **rdata,
+    size_t *rlen, __unused bool *free_rdata)
 {
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;
@@ -102,11 +102,11 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
 }
 
 ssize_t
-ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
+ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data,
+    size_t len)
 {
-
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IOCTL6,
-	    request, data, len) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IOCTL6, request, data, len) ==
+	    -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }
@@ -114,7 +114,6 @@ ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t
 ssize_t
 ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_ROUTE, 0, data, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);

@@ -39,10 +39,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "common.h"
-#include "dhcpcd.h"
+#include "config.h"
 #include "control.h"
+#include "dhcpcd.h"
 #include "eloop.h"
 #include "if.h"
 #include "logerr.h"
@@ -50,7 +50,7 @@
 
 #ifndef SUN_LEN
 #define SUN_LEN(su) \
-	    (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
 static void control_handle_data(void *, unsigned short);
@@ -80,7 +80,6 @@ control_queue_free(struct fd_list *fd)
 void
 control_free(struct fd_list *fd)
 {
-
 #ifdef PRIVSEP
 	if (fd->ctx->ps_control_client == fd)
 		fd->ctx->ps_control_client = NULL;
@@ -96,7 +95,6 @@ control_free(struct fd_list *fd)
 static void
 control_hangup(struct fd_list *fd)
 {
-
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
 		if (ps_ctl_sendeof(fd) == -1)
@@ -196,7 +194,7 @@ control_handle_write(struct fd_list *fd)
 
 	/* Done sending data, stop watching write to fd */
 	if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
-	    control_handle_data, fd) == -1)
+		control_handle_data, fd) == -1)
 		logerr("%s: eloop_event_add", __func__);
 	return 0;
 }
@@ -323,14 +321,14 @@ control_handle1(struct dhcpcd_ctx *ctx, int lfd, unsigned int fd_flags,
 		;
 	else
 #endif
-	fd_flags |= FD_SENDLEN;
+		fd_flags |= FD_SENDLEN;
 
 	l = control_new(ctx, fd, fd_flags);
 	if (l == NULL)
 		goto error;
 
-	if (eloop_event_add(ctx->eloop, l->fd, ELE_READ,
-	    control_handle_data, l) == -1)
+	if (eloop_event_add(ctx->eloop, l->fd, ELE_READ, control_handle_data,
+		l) == -1)
 		logerr("%s: eloop_event_add", __func__);
 	return;
 
@@ -363,7 +361,7 @@ make_path(char *path, size_t len, const char *ifname, sa_family_t family,
 	const char *per;
 	const char *sunpriv;
 
-	switch(family) {
+	switch (family) {
 	case AF_INET:
 		per = "-4";
 		break;
@@ -378,9 +376,8 @@ make_path(char *path, size_t len, const char *ifname, sa_family_t family,
 		sunpriv = ifname ? ".unpriv" : "unpriv.";
 	else
 		sunpriv = "";
-	return snprintf(path, len, CONTROLSOCKET,
-	    ifname ? ifname : "", ifname ? per : "",
-	    sunpriv, ifname ? "." : "");
+	return snprintf(path, len, CONTROLSOCKET, ifname ? ifname : "",
+	    ifname ? per : "", sunpriv, ifname ? "." : "");
 }
 
 static int
@@ -397,7 +394,7 @@ make_sock(struct sockaddr_un *sa, const char *ifname, sa_family_t family,
 	return fd;
 }
 
-#define S_PRIV (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
+#define S_PRIV	 (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
 #define S_UNPRIV (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
 static int
@@ -417,9 +414,8 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family,
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
 	    chmod(sa.sun_path, fmode) == -1 ||
 	    (ctx->control_group &&
-	    chown(sa.sun_path, geteuid(), ctx->control_group) == -1) ||
-	    listen(fd, sizeof(ctx->control_fds)) == -1)
-	{
+		chown(sa.sun_path, geteuid(), ctx->control_group) == -1) ||
+	    listen(fd, sizeof(ctx->control_fds)) == -1) {
 		close(fd);
 		unlink(sa.sun_path);
 		return -1;
@@ -449,11 +445,10 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ctx)) {
-		make_path(ctx->control_sock, sizeof(ctx->control_sock),
-		    ifname, family, false);
+		make_path(ctx->control_sock, sizeof(ctx->control_sock), ifname,
+		    family, false);
 		make_path(ctx->control_sock_unpriv,
-		    sizeof(ctx->control_sock_unpriv),
-		    ifname, family, true);
+		    sizeof(ctx->control_sock_unpriv), ifname, family, true);
 		return 0;
 	}
 #endif
@@ -462,14 +457,14 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 		return -1;
 
 	ctx->control_fd = fd;
-	if (eloop_event_add(ctx->eloop, fd, ELE_READ,
-	    control_handle, ctx) == -1)
+	if (eloop_event_add(ctx->eloop, fd, ELE_READ, control_handle, ctx) ==
+	    -1)
 		logerr("%s: eloop_event_add", __func__);
 
 	if ((fd = control_start1(ctx, ifname, family, S_UNPRIV)) != -1) {
 		ctx->control_unpriv_fd = fd;
 		if (eloop_event_add(ctx->eloop, fd, ELE_READ,
-		    control_handle_unpriv, ctx) == -1)
+			control_handle_unpriv, ctx) == -1)
 			logerr("%s: eloop_event_add", __func__);
 	}
 	return ctx->control_fd;
@@ -486,7 +481,7 @@ control_unlink(struct dhcpcd_ctx *ctx, const char *file)
 		retval = (int)ps_root_unlink(ctx, file);
 	else
 #else
-		UNUSED(ctx);
+	UNUSED(ctx);
 #endif
 		retval = unlink(file);
 
@@ -554,7 +549,7 @@ control_open(const char *ifname, sa_family_t family, bool unpriv)
 }
 
 ssize_t
-control_send(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
+control_send(struct dhcpcd_ctx *ctx, int argc, char *const *argv)
 {
 	char buffer[1024];
 	int i;
