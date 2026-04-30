@@ -4,7 +4,7 @@ CompileFlags:
   Add: [-I.., -I../.., -I../../compat, -I../../vendor]
 ---
 If:
-  PathMatch: src/.*\.(c,h)
+  PathMatch: src/.*\.(c|h)
 CompileFlags:
   Add: [-I.., -I../compat, -I../vendor]
 ---
