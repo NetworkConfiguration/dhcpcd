@@ -2785,7 +2785,7 @@ exit1:
 #ifdef USE_SIGNALS
 	/* If still attached, detach from the launcher */
 	if (ctx.options & DHCPCD_STARTED && ctx.fork_fd != -1) {
-		if (send(ctx.fork_fd, &i, sizeof(i), MSG_EOR) == -1)
+		if (send(ctx.fork_fd, &i, sizeof(i), 0) == -1)
 			logerr("%s: send", __func__);
 	}
 #endif

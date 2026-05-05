@@ -101,8 +101,12 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 	if (psr_error->psr_datalen == 0)
 		return len;
 
-	if (pc->psr_mallocdata)
+	if (pc->psr_mallocdata) {
 		pc->psr_data = malloc(psr_error->psr_datalen);
+		if (pc->psr_data == NULL)
+			PSR_ERROR(errno);
+	} else if (psr_error->psr_datalen > pc->psr_datalen)
+		PSR_ERROR(EMSGSIZE);
 
 	len = recv(fd, pc->psr_data, psr_error->psr_datalen, MSG_WAITALL);
 	if (len == -1)

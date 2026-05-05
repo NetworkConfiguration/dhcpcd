@@ -1120,6 +1120,10 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	    psm.ps_namelen);
 	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen + psm.ps_datalen;
 	if (dlen != 0) {
+		if (dlen > sizeof(ps_data)) {
+			errno = EMSGSIZE;
+			return -1;
+		}
 		len = recv(fd, ps_data, dlen, MSG_WAITALL);
 		if ((size_t)len != dlen) {
 			errno = EINVAL;

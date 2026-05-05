@@ -236,7 +236,7 @@ __printflike(2, 0) static int vlogmessage(int pri, const char *fmt,
 				.msg_iov = iov,
 				.msg_iovlen = sizeof(iov) / sizeof(iov[0]),
 			};
-			len = (int)sendmsg(ctx->log_fd, &msg, MSG_EOR);
+			len = (int)sendmsg(ctx->log_fd, &msg, 0);
 		}
 		return len;
 	}
@@ -419,7 +419,7 @@ logreadfd(int fd)
 		errno = EMSGSIZE;
 		return -1;
 	}
-	if (mlen > sizeof(buf)) {
+	if (mlen >= sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
 	}
