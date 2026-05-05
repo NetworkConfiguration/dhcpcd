@@ -32,9 +32,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
-#include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 
 #include <assert.h>
 #include <errno.h>

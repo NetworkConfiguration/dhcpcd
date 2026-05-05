@@ -29,8 +29,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include <netinet/icmp6.h>
 #include <netinet/in.h>
+#include <netinet/icmp6.h>
 
 #include <assert.h>
 #include <errno.h>

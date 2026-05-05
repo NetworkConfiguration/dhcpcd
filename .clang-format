@@ -146,6 +146,10 @@ IncludeCategories:
   - Regex: '^<netinet/if_ether.h>'
     Priority: 7
     SortPriority:  71
+# Most BSD require <netinet/in.h> before this ...
+  - Regex: '^<netinet/icmp6.h>'
+    Priority: 7
+    SortPriority:  71
   - Regex: '^<net.*/'
     Priority: 7
     SortPriority: 70
