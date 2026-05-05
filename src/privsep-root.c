@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stddef.h>
@@ -79,11 +80,6 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 	struct dhcpcd_ctx *ctx = pc->psr_ctx;
 	int fd = PS_ROOT_FD(ctx);
 	struct psr_error *psr_error = &pc->psr_error;
-	struct iovec iov[] = {
-		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
-		{ .iov_base = pc->psr_data, .iov_len = pc->psr_datalen },
-	};
-	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = __arraycount(iov) };
 	ssize_t len;
 
 #define PSR_ERROR(e)                        \
@@ -95,45 +91,23 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 	if (eloop_waitfd(fd) == -1)
 		PSR_ERROR(errno);
 
-	if (!pc->psr_mallocdata)
-		goto recv;
-
-	/* We peek at the psr_error structure to tell us how much of a buffer
-	 * we need to read the whole packet. */
-	msg.msg_iovlen--;
-	len = recvmsg(fd, &msg, MSG_PEEK | MSG_WAITALL);
+	len = recv(fd, psr_error, sizeof(*psr_error), MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
 
-	/* After this point, we MUST do another recvmsg even on a failure
-	 * to remove the message after peeking. */
-	if ((size_t)len < sizeof(*psr_error)) {
-		/* We can't use the header to work out buffers, so
-		 * remove the message and bail. */
-		(void)recvmsg(fd, &msg, MSG_WAITALL);
+	if ((size_t)len < sizeof(*psr_error))
 		PSR_ERROR(EINVAL);
-	}
 
-	/* No data to read? Unlikely but ... */
 	if (psr_error->psr_datalen == 0)
-		goto recv;
+		return len;
 
-	pc->psr_data = malloc(psr_error->psr_datalen);
-	if (pc->psr_data != NULL) {
-		iov[1].iov_base = pc->psr_data;
-		iov[1].iov_len = psr_error->psr_datalen;
-		msg.msg_iovlen++;
-	}
+	if (pc->psr_mallocdata)
+		pc->psr_data = malloc(psr_error->psr_datalen);
 
-recv:
-	len = recvmsg(fd, &msg, MSG_WAITALL);
+	len = recv(fd, pc->psr_data, psr_error->psr_datalen, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
-	else if ((size_t)len < sizeof(*psr_error))
-		PSR_ERROR(EINVAL);
-	else if (msg.msg_flags & MSG_TRUNC)
-		PSR_ERROR(ENOBUFS);
-	else if ((size_t)len != sizeof(*psr_error) + psr_error->psr_datalen) {
+	else if ((size_t)len != psr_error->psr_datalen) {
 #ifdef PRIVSEP_DEBUG
 		logerrx("%s: recvmsg returned %zd, expecting %zu", __func__,
 		    len, sizeof(*psr_error) + psr_error->psr_datalen);
@@ -204,7 +178,7 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result, void *data,
 
 	if (len == 0)
 		msg.msg_iovlen = 1;
-	err = sendmsg(fd, &msg, MSG_EOR);
+	err = sendmsg(fd, &msg, 0);
 
 	/* Error sending the message? Try sending the error of sending. */
 	if (err == -1 && errno != EPIPE) {
@@ -214,7 +188,7 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result, void *data,
 		psr.psr_errno = errno;
 		psr.psr_datalen = 0;
 		msg.msg_iovlen = 1;
-		err = sendmsg(fd, &msg, MSG_EOR);
+		err = sendmsg(fd, &msg, 0);
 	}
 
 	return err;
@@ -857,14 +831,14 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	int logfd[2] = { -1, -1 }, datafd[2] = { -1, -1 };
 	pid_t pid;
 
-	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, logfd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, logfd) == -1)
 		return -1;
 #ifdef PRIVSEP_RIGHTS
 	if (ps_rights_limit_fdpair(logfd) == -1)
 		return -1;
 #endif
 
-	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, datafd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, datafd) == -1)
 		return -1;
 
 	if (ps_setbuf_fdpair(datafd) == -1)
@@ -950,18 +924,28 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		/* drain the log */
 		if (ctx->ps_log_root_fd != -1) {
 			ssize_t loglen;
+			struct pollfd pfd = {
+				.fd = ctx->ps_log_root_fd,
+				.events = POLLIN
+			};
+			int n;
 
-#ifdef __linux__
-			/* Seems to help to get the last parts,
-			 * sched_yield(2) does not. */
-			sleep(0);
-#endif
-			do {
+			/* the socket is blocking and we may not be able to
+			 * change it to non blocking, so poll for data */
+			for (;;) {
+				n = poll(&pfd, 1, 1);
+				if (n == -1 || n == 0)
+					break;
 				loglen = logreadfd(ctx->ps_log_root_fd);
-			} while (loglen != 0 && loglen != -1);
-			close(ctx->ps_log_root_fd);
-			ctx->ps_log_root_fd = -1;
+				if (loglen == -1 || loglen == 0)
+					break;
+			}
 		}
+	}
+
+	if (ctx->ps_log_root_fd != -1) {
+		close(ctx->ps_log_root_fd);
+		ctx->ps_log_root_fd = -1;
 	}
 
 	if (ctx->ps_data_fd != -1) {

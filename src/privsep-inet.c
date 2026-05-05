@@ -47,7 +47,7 @@
 #include "logerr.h"
 #include "privsep.h"
 
-/* We expect to have open 2 SEQPACKET, 1 udp, 1 udp6 and 1 raw6 fds */
+/* We expect to have open 2 SOCK_STREAM, 1 udp, 1 udp6 and 1 raw6 fds */
 
 #ifdef INET
 static void

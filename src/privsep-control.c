@@ -36,7 +36,7 @@
 #include "logerr.h"
 #include "privsep.h"
 
-/* We expect to have open 2 SEQPACKET, 2 STREAM and 2 file STREAM fds */
+/* We expect to have open 2 privsep STREAM, 2 STREAM and 2 file STREAM fds */
 
 static int
 ps_ctl_startcb(struct ps_process *psp)

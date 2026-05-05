@@ -384,7 +384,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	exit_code = EXIT_SUCCESS;
-	if (send(ctx->fork_fd, &exit_code, sizeof(exit_code), MSG_EOR) == -1)
+	if (send(ctx->fork_fd, &exit_code, sizeof(exit_code), 0) == -1)
 		logerr(__func__);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
@@ -1498,7 +1498,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
 		if (ctx->fork_fd != -1 && sig != SIGHUP &&
-		    send(ctx->fork_fd, &sig, sizeof(sig), MSG_EOR) == -1)
+		    send(ctx->fork_fd, &sig, sizeof(sig), 0) == -1)
 			logerr("%s: send", __func__);
 		return;
 	}
@@ -1905,7 +1905,7 @@ dhcpcd_fork_cb(void *arg, unsigned short events)
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
+	len = recv(ctx->fork_fd, &exit_code, sizeof(exit_code), MSG_WAITALL);
 	if (len == -1) {
 		logerr(__func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -2469,7 +2469,7 @@ main(int argc, char **argv, char **envp)
 	if (!(ctx.options & DHCPCD_DAEMONISE))
 		goto start_manager;
 
-	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, fork_fd) ==
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, fork_fd) ==
 	    -1) {
 		logerr("socketpair");
 		goto exit_failure;

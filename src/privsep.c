@@ -350,7 +350,7 @@ ps_startprocess(struct ps_process *psp,
 	int fd[2];
 	pid_t pid;
 
-	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, fd) == -1) {
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, fd) == -1) {
 		logerr("%s: socketpair", __func__);
 		return -1;
 	}
@@ -881,6 +881,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd, struct ps_msghdr *psm,
 
 		psm->ps_namelen = msg->msg_namelen;
 		psm->ps_controllen = (socklen_t)msg->msg_controllen;
+		psm->ps_datalen = 0;
 
 		iovp->iov_base = msg->msg_name;
 		iovp->iov_len = msg->msg_namelen;
@@ -908,10 +909,11 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd, struct ps_msghdr *psm,
 			iovp->iov_base = msg->msg_iov[i].iov_base;
 			iovp->iov_len = msg->msg_iov[i].iov_len;
 			iovp++;
+			psm->ps_datalen += msg->msg_iov[i].iov_len;
 		}
 	}
 
-	len = sendmsg(fd, &m, MSG_EOR);
+	len = sendmsg(fd, &m, 0);
 
 	if (len == -1 && ctx != NULL) {
 		if (ctx->options & DHCPCD_FORKED &&
@@ -1064,12 +1066,14 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *),
     void *cbctx)
 {
-	struct ps_msg psm;
+	struct ps_msghdr psm;
+	uint8_t ps_data[PS_BUFLEN];
 	ssize_t len;
 	size_t dlen;
 	struct iovec iov[1];
 	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = 1 };
 	bool stop = false;
+	socklen_t cmsg_padlen;
 
 	if (events & ELE_HANGUP) {
 		len = 0;
@@ -1078,24 +1082,24 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	len = read(fd, &psm, sizeof(psm));
+	len = recv(fd, &psm, sizeof(psm), MSG_WAITALL);
 #ifdef PRIVSEP_DEBUG
-	logdebugx("%s: fd=%d %zd", __func__, fd, len);
+	logdebugx("%s: pid=%d fd=%d len=%zd", __func__, getpid(), fd, len);
 #endif
 
 	if (len == -1 || len == 0)
 		stop = true;
 	else {
 		dlen = (size_t)len;
-		if (dlen < sizeof(psm.psm_hdr)) {
+		if (dlen < sizeof(psm)) {
 			errno = EINVAL;
 			return -1;
 		}
 
-		if (psm.psm_hdr.ps_cmd == PS_STOP) {
+		if (psm.ps_cmd == PS_STOP) {
 			stop = true;
 			len = 0;
-		} else if (psm.psm_hdr.ps_cmd == PS_DAEMONISED) {
+		} else if (psm.ps_cmd == PS_DAEMONISED) {
 			ps_daemonised(ctx);
 			return 0;
 		}
@@ -1111,16 +1115,26 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
-	dlen -= sizeof(psm.psm_hdr);
 
-	if (ps_unrollmsg(&msg, &psm.psm_hdr, psm.psm_data, dlen) == -1)
+	cmsg_padlen = CALC_CMSG_PADLEN(psm.ps_controllen,
+	    psm.ps_namelen);
+	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen + psm.ps_datalen;
+	if (dlen != 0) {
+		len = recv(fd, ps_data, dlen, MSG_WAITALL);
+		if ((size_t)len != dlen) {
+			errno = EINVAL;
+			return -1;
+		}
+	}
+
+	if (ps_unrollmsg(&msg, &psm, ps_data, dlen) == -1)
 		return -1;
 
 	if (callback == NULL)
 		return 0;
 
 	errno = 0;
-	return callback(cbctx, &psm.psm_hdr, &msg);
+	return callback(cbctx, &psm, &msg);
 }
 
 struct ps_process *

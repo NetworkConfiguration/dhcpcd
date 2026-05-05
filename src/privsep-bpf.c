@@ -53,7 +53,7 @@
 #include "logerr.h"
 #include "privsep.h"
 
-/* We expect to have open 3 SEQPACKET and one RAW fd */
+/* We expect to have open 3 SOCK_STREAM and one RAW fd */
 
 static void
 ps_bpf_recvbpf(void *arg, unsigned short events)
