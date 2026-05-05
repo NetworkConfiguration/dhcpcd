@@ -902,10 +902,11 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd, struct ps_msghdr *psm,
 		m.msg_iovlen++;
 
 		for (i = 0; i < (int)msg->msg_iovlen; i++) {
-			if ((size_t)(m.msg_iovlen++) > __arraycount(iov)) {
+			if ((size_t)m.msg_iovlen >= __arraycount(iov)) {
 				errno = ENOBUFS;
 				return -1;
 			}
+			m.msg_iovlen++;
 			iovp->iov_base = msg->msg_iov[i].iov_base;
 			iovp->iov_len = msg->msg_iov[i].iov_len;
 			iovp++;

@@ -419,7 +419,7 @@ logreadfd(int fd)
 		errno = EMSGSIZE;
 		return -1;
 	}
-	if (mlen >= sizeof(buf)) {
+	if (mlen > sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
 	}
@@ -433,7 +433,7 @@ logreadfd(int fd)
 	}
 
 	/* Ensure what we receive is NUL terminated */
-	buf[mlen] = '\0';
+	buf[mlen == sizeof(buf) ? mlen - 1 : mlen] = '\0';
 
 	ctx->log_pid = pid;
 	logmessage(pri, "%s", buf);
