@@ -1,7 +1,7 @@
 /*
  * eloop - portable event based main loop.
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2026 Roy Marples <roy@marples.name>
  * All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,7 @@
  * On Linux use epoll(7)
  * Everywhere else use ppoll(2)
  */
-#ifdef BSD
+#if defined(BSD) || defined(__APPLE__)
 #include <sys/event.h>
 #define USE_KQUEUE
 #if defined(__NetBSD__)
@@ -625,6 +625,12 @@ eloop_open(struct eloop *eloop)
 	fd = kqueue1(O_CLOEXEC);
 #elif defined(KQUEUE_CLOEXEC)
 	fd = kqueuex(KQUEUE_CLOEXEC);
+#elif defined(USE_KQUEUE) && defined(__APPLE__)
+	/* macOS does not allow setting CLOEXEC on kqueue.
+	 * This should not be a problem because eloop consumers
+	 * fork and exec rather than just exec and kqueue is
+	 * automatically closed on fork. */
+	fd = kqueue();
 #elif defined(USE_KQUEUE)
 	int flags;
 
@@ -694,7 +700,11 @@ eloop_forked(struct eloop *eloop, unsigned short flags)
 	unsigned short events;
 	int err;
 
-	/* The fd is invalid after a fork, no need to close it. */
+/* kqueue invalidates the fd on fork.
+ * epoll shares state across fork, so we close the old and create a new one. */
+#ifdef USE_EPOLL
+	close(eloop->fd);
+#endif
 	eloop->fd = -1;
 	if (flags && eloop_open(eloop) == -1)
 		return -1;
@@ -871,7 +881,7 @@ eloop_waitfd(int fd)
 	struct pollfd pfd = { .fd = fd, .events = POLLIN };
 	int err;
 
-	err = ppoll(&pfd, 1, NULL, NULL);
+	err = poll(&pfd, 1, -1);
 	if (err == -1 || err == 0)
 		return err;
 
