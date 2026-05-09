@@ -218,22 +218,25 @@ __printflike(2, 0) static int vlogmessage(int pri, const char *fmt,
 	if (ctx->log_fd != -1) {
 		pid_t pid = getpid();
 		char buf[LOGERR_SYSLOGBUF];
+		size_t mlen = 0;
 		struct iovec iov[] = {
 			{ .iov_base = &pri, .iov_len = sizeof(pri) },
 			{ .iov_base = &pid, .iov_len = sizeof(pid) },
+			{ .iov_base = &mlen, .iov_len = sizeof(mlen) },
 			{ .iov_base = buf },
 		};
 
 		len = vsnprintf(buf, sizeof(buf), fmt, args);
 		if (len != -1) {
-			if ((size_t)len >= sizeof(buf))
-				len = (int)sizeof(buf) - 1;
-			iov[2].iov_len = (size_t)(len + 1);
+			mlen = (size_t)len + 1;
+			if (mlen > sizeof(buf))
+				mlen = sizeof(buf);
+			iov[3].iov_len = mlen;
 			struct msghdr msg = {
 				.msg_iov = iov,
 				.msg_iovlen = sizeof(iov) / sizeof(iov[0]),
 			};
-			len = (int)sendmsg(ctx->log_fd, &msg, MSG_EOR);
+			len = (int)sendmsg(ctx->log_fd, &msg, 0);
 		}
 		return len;
 	}
@@ -399,10 +402,11 @@ logreadfd(int fd)
 	int pri;
 	pid_t pid;
 	char buf[LOGERR_SYSLOGBUF] = { '\0' };
+	size_t mlen;
 	struct iovec iov[] = {
 		{ .iov_base = &pri, .iov_len = sizeof(pri) },
 		{ .iov_base = &pid, .iov_len = sizeof(pid) },
-		{ .iov_base = buf, .iov_len = sizeof(buf) },
+		{ .iov_base = &mlen, .iov_len = sizeof(mlen) },
 	};
 	struct msghdr msg = { .msg_iov = iov,
 		.msg_iovlen = sizeof(iov) / sizeof(iov[0]) };
@@ -411,14 +415,25 @@ logreadfd(int fd)
 	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == -1 || len == 0)
 		return len;
-	/* Ensure we received the minimum and at least one character to log */
-	if ((size_t)len < sizeof(pri) + sizeof(pid) + 1 ||
-	    msg.msg_flags & MSG_TRUNC) {
+	if ((size_t)len != sizeof(pri) + sizeof(pid) + sizeof(mlen)) {
 		errno = EMSGSIZE;
 		return -1;
 	}
+	if (mlen > sizeof(buf)) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	len = recv(fd, buf, mlen, MSG_WAITALL);
+	if (len == -1)
+		return -1;
+	if ((size_t)len != mlen) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	/* Ensure what we receive is NUL terminated */
-	buf[(size_t)len - (sizeof(pri) + sizeof(pid)) - 1] = '\0';
+	buf[mlen == sizeof(buf) ? mlen - 1 : mlen] = '\0';
 
 	ctx->log_pid = pid;
 	logmessage(pri, "%s", buf);

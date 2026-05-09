@@ -76,7 +76,7 @@ __printflike(2, 3) void logerrmessage(int pri, const char *fmt, ...);
 #define logerr(...)    log_err(__VA_ARGS__)
 #define logerrx(...)   log_errx(__VA_ARGS__)
 
-/* For logging in a chroot using SOCK_SEQPACKET */
+/* For logging in a chroot using SOCK_STREAM */
 int loggetfd(void);
 void logsetfd(int);
 ssize_t logreadfd(int);
