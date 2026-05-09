@@ -959,8 +959,10 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	}
 
 	/* Only the manager process gets past this point. */
-	if (ctx->options & DHCPCD_FORKED)
-		return 0;
+	if (ctx->options & DHCPCD_FORKED) {
+		err = 0;
+		goto out;
+	}
 
 	/* We cannot log the root process exited before we
 	 * log dhcpcd exits because the latter requires the former.
@@ -976,6 +978,7 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	} /* else the root process has already exited :( */
 
 	err = ps_stopwait(ctx);
+out:
 	if (ctx->ps_root != NULL)
 		ps_freeprocess(ctx->ps_root);
 	return err;
