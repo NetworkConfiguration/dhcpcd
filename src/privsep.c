@@ -1094,7 +1094,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 		dlen = (size_t)len;
 		if (dlen < sizeof(psm)) {
 			errno = EINVAL;
-			return -1;
+			goto stop;
 		}
 
 		if (psm.ps_cmd == PS_STOP) {
@@ -1123,12 +1123,12 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	if (dlen != 0) {
 		if (dlen > sizeof(ps_data)) {
 			errno = EMSGSIZE;
-			return -1;
+			goto stop;
 		}
 		len = recv(fd, ps_data, dlen, MSG_WAITALL);
 		if ((size_t)len != dlen) {
 			errno = EINVAL;
-			return -1;
+			goto stop;
 		}
 	}
 
