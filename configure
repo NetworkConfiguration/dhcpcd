@@ -42,6 +42,8 @@ SMALL=
 SANITIZE=no
 STATUSARG=
 OPENSSL=
+NTPD=
+TIMESYNCD=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
 
@@ -80,6 +82,10 @@ for x do
 	--enable-seccomp) SECCOMP=yes;;
 	--disable-ntp) NTP=no;;
 	--enable-ntp) NTP=yes;;
+	--disable-ntpd) NTPD=no;;
+	--enable-ntpd) NTPD=yes; NTP=yes;;
+	--disable-timesyncd) TIMESYNCD=no;;
+	--enable-timesyncd) TIMESYNCD=yes; NTP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
 	--sysconfdir) SYSCONFDIR=$var;;
@@ -554,6 +560,11 @@ if [ -z "$INET6" ] || [ "$INET6" = yes ]; then
 		echo "CPPFLAGS+=	-DDHCP6" >>$CONFIG_MK
 		echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
 	fi
+fi
+if [ "$NTP" = "yes" ]; then
+	# NTP enabled: --enable-ntp, or implied by --enable-ntpd / --enable-timesyncd
+	echo "Enabling NTP support"
+	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 fi
 if [ -z "$AUTH" ] || [ "$AUTH" = yes ]; then
 	echo "Enabling Authentication"
@@ -1701,41 +1712,68 @@ echo "STATUSARG=	$STATUSARG" >>config.mk
 
 HOOKS=
 if ! $HOOKSET; then
-	printf "Checking for ntpd ... "
-	NTPD=$(_which ntpd)
-	if [ -n "$NTPD" ]; then
-		echo "$NTPD (50-ntp.conf)"
-	else
-		echo "not found"
-	fi
-	printf "Checking for chronyd ... "
-	CHRONYD=$(_which chronyd)
-	if [ -n "$CHRONYD" ]; then
-		echo "$CHRONYD (50-ntp.conf)"
-	else
-		echo "not found"
-	fi
-	if [ -n "$NTPD" ] || [ -n "$CHRONYD" ]; then
-		HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
-	fi
-	# Warn if both are detected
-	if [ -n "$NTPD" ] && [ -n "$CHRONYD" ]; then
-		echo "NTP will default to $NTPD"
-	fi
-
-	printf "Checking for timesyncd ... "
-	TIMESYNCD=
-	for x in /usr/lib/systemd/systemd-timesyncd; do
-		if [ -x "$x" ]; then
-			TIMESYNCD=$x
-			break
+    if [ "$NTP" = "yes" ]; then
+	    printf "Checking for ntpd ... "
+	    if [ -z "$NTPD" ]; then
+		    # if not explicitly set enable/disable, try to autodetect
+			NTPD_PATH=$(_which ntpd)
+			if [ -n "$NTPD_PATH" ]; then
+				NTPD=yes
+				NTP=yes
+				echo "$NTPD_PATH (Selecting 50-ntp.conf)"
+			else
+				echo "not found"
+			fi
+			printf "Checking for chronyd ... "
+			CHRONYD_PATH=$(_which chronyd)
+			if [ -n "$CHRONYD_PATH" ]; then
+				NTPD=yes
+				NTP=yes
+				echo "$CHRONYD_PATH (Selecting 50-ntp.conf)"
+			else
+				echo "not found"
+			fi
+			
+			# Warn if both are detected
+			if [ -n "$NTPD_PATH" ] && [ -n "$CHRONYD_PATH" ]; then
+				echo "NTP will default to $NTPD_PATH"
+			fi
+		elif [ "$NTPD" = "no" ]; then
+			echo "skipped"
+		else
+			echo "selected via --enable-ntpd (Selecting 50-ntp.conf)"
 		fi
-	done
-	if [ -n "$TIMESYNCD" ]; then
-		echo "$TIMESYNCD"
-		HOOKS="$HOOKS${HOOKS:+ }50-timesyncd.conf"
-	else
-		echo "not found"
+
+		printf "Checking for timesyncd ... "
+		if [ -z "$TIMESYNCD" ]; then
+			TIMESYNCD_PATH=
+			for x in /lib/systemd/systemd-timesyncd \
+                /usr/lib/systemd/systemd-timesyncd; do
+				if [ -x "$x" ]; then
+					TIMESYNCD=yes
+					TIMESYNCD_PATH=$x
+					NTP=yes
+					break
+				fi
+			done
+			if [ "$TIMESYNCD" = "yes" ]; then
+				echo "$TIMESYNCD_PATH (Selecting 50-timesyncd.conf)"
+			else
+				echo "not found"
+			fi
+		elif [ "$TIMESYNCD" = "no" ]; then
+			echo "skipped"
+		else
+			echo "selected via --enable-timesyncd (Selecting 50-timesyncd.conf)"
+		fi
+
+		# Choose hook based on enabled time service
+		if [ "$NTPD" = "yes" ]; then
+			HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
+		fi
+		if [ "$TIMESYNCD" = "yes" ]; then
+			HOOKS="$HOOKS${HOOKS:+ }50-timesyncd.conf"
+		fi
 	fi
 
 	printf "Checking for ypbind ... "
@@ -1792,10 +1830,6 @@ if ! $HOOKSET; then
 			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
 		fi
 	fi
-fi
-if [ "$NTP" = yes ]; then
-	# --enable-ntp
-	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 fi
 
 echo >>$CONFIG_H
