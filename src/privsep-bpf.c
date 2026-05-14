@@ -240,13 +240,13 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	case PS_BPF_ARP:
 		psp->psp_proto = ETHERTYPE_ARP;
 		psp->psp_protostr = "ARP";
-		psp->psp_filter = bpf_arp;
+		psp->psp_filter = bpf_filter_arp;
 		break;
 #endif
 	case PS_BPF_BOOTP:
 		psp->psp_proto = ETHERTYPE_IP;
 		psp->psp_protostr = "BOOTP";
-		psp->psp_filter = bpf_bootp;
+		psp->psp_filter = bpf_filter_bootp;
 		break;
 	}
 

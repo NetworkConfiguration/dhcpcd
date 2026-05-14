@@ -63,6 +63,7 @@ struct bpf {
 	size_t bpf_len;
 	size_t bpf_pos;
 };
+struct iovec;
 
 extern const char *bpf_name;
 size_t bpf_frame_header_len(const struct interface *);
@@ -73,9 +74,13 @@ struct bpf *bpf_open(const struct interface *,
     int (*)(const struct bpf *, const struct in_addr *),
     const struct in_addr *);
 void bpf_close(struct bpf *);
-int bpf_attach(int, void *, unsigned int);
+int bpf_setfilter(const struct bpf *, void *, unsigned int);
+int bpf_setwfilter(const struct bpf *, void *, unsigned int);
+int bpf_lock(const struct bpf *);
 ssize_t bpf_send(const struct bpf *, uint16_t, const void *, size_t);
+ssize_t bpf_writev(const struct bpf *, struct iovec *, int);
 ssize_t bpf_read(struct bpf *, void *, size_t);
-int bpf_arp(const struct bpf *, const struct in_addr *);
-int bpf_bootp(const struct bpf *, const struct in_addr *);
+
+int bpf_filter_arp(const struct bpf *, const struct in_addr *);
+int bpf_filter_bootp(const struct bpf *, const struct in_addr *);
 #endif

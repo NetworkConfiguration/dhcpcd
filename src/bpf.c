@@ -138,181 +138,7 @@ bpf_frame_bcast(const struct interface *ifp, const void *frame)
 	}
 }
 
-#ifndef __linux__
-/* Linux is a special snowflake for opening, attaching and reading BPF.
- * See if-linux.c for the Linux specific BPF functions. */
-
-const char *bpf_name = "Berkley Packet Filter";
-
-struct bpf *
-bpf_open(const struct interface *ifp,
-    int (*filter)(const struct bpf *, const struct in_addr *),
-    const struct in_addr *ia)
-{
-	struct bpf *bpf;
-	struct bpf_version pv = { .bv_major = 0, .bv_minor = 0 };
-	struct ifreq ifr = { .ifr_flags = 0 };
-	int ibuf_len = 0;
-#ifdef O_CLOEXEC
-#define BPF_OPEN_FLAGS O_RDWR | O_NONBLOCK | O_CLOEXEC
-#else
-#define BPF_OPEN_FLAGS O_RDWR | O_NONBLOCK
-#endif
-#ifdef BIOCIMMEDIATE
-	unsigned int flags;
-#endif
-#ifndef O_CLOEXEC
-	int fd_opts;
-#endif
-
-	bpf = calloc(1, sizeof(*bpf));
-	if (bpf == NULL)
-		return NULL;
-	bpf->bpf_ifp = ifp;
-	bpf->bpf_flags = BPF_EOF;
-
-	/* /dev/bpf is a cloner on modern kernels */
-	bpf->bpf_fd = open("/dev/bpf", BPF_OPEN_FLAGS);
-
-	/* Support older kernels where /dev/bpf is not a cloner */
-	if (bpf->bpf_fd == -1) {
-		char device[32];
-		int n = 0;
-
-		do {
-			snprintf(device, sizeof(device), "/dev/bpf%d", n++);
-			bpf->bpf_fd = open(device, BPF_OPEN_FLAGS);
-		} while (bpf->bpf_fd == -1 && errno == EBUSY);
-	}
-
-	if (bpf->bpf_fd == -1)
-		goto eexit;
-
-#ifndef O_CLOEXEC
-	if ((fd_opts = fcntl(bpf->bpf_fd, F_GETFD)) == -1 ||
-	    fcntl(bpf->bpf_fd, F_SETFD, fd_opts | FD_CLOEXEC) == -1)
-		goto eexit;
-#endif
-
-	if (ioctl(bpf->bpf_fd, BIOCVERSION, &pv) == -1)
-		goto eexit;
-	if (pv.bv_major != BPF_MAJOR_VERSION ||
-	    pv.bv_minor < BPF_MINOR_VERSION) {
-		logerrx("BPF version mismatch - recompile");
-		goto eexit;
-	}
-
-	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	if (ioctl(bpf->bpf_fd, BIOCSETIF, &ifr) == -1)
-		goto eexit;
-
-#ifdef BIOCIMMEDIATE
-	flags = 1;
-	if (ioctl(bpf->bpf_fd, BIOCIMMEDIATE, &flags) == -1)
-		goto eexit;
-#endif
-
-	if (filter(bpf, ia) != 0)
-		goto eexit;
-
-	/* Get the required BPF buffer length from the kernel. */
-	if (ioctl(bpf->bpf_fd, BIOCGBLEN, &ibuf_len) == -1)
-		goto eexit;
-
-	bpf->bpf_size = (size_t)ibuf_len;
-	bpf->bpf_buffer = malloc(bpf->bpf_size);
-	if (bpf->bpf_buffer == NULL)
-		goto eexit;
-
-	return bpf;
-
-eexit:
-	if (bpf->bpf_fd != -1)
-		close(bpf->bpf_fd);
-	free(bpf);
-	return NULL;
-}
-
-/* BPF requires that we read the entire buffer.
- * So we pass the buffer in the API so we can loop on >1 packet. */
-ssize_t
-bpf_read(struct bpf *bpf, void *data, size_t len)
-{
-	ssize_t bytes;
-	struct bpf_hdr packet;
-	const char *payload;
-
-	bpf->bpf_flags &= ~BPF_EOF;
-	for (;;) {
-		if (bpf->bpf_len == 0) {
-			bytes = read(bpf->bpf_fd, bpf->bpf_buffer,
-			    bpf->bpf_size);
-#if defined(__sun)
-			/* After 2^31 bytes, the kernel offset overflows.
-			 * To work around this bug, lseek 0. */
-			if (bytes == -1 && errno == EINVAL) {
-				lseek(bpf->bpf_fd, 0, SEEK_SET);
-				continue;
-			}
-#endif
-			if (bytes == -1 || bytes == 0)
-				return bytes;
-			bpf->bpf_len = (size_t)bytes;
-			bpf->bpf_pos = 0;
-		}
-		bytes = -1;
-		payload = (const char *)bpf->bpf_buffer + bpf->bpf_pos;
-		memcpy(&packet, payload, sizeof(packet));
-		if (bpf->bpf_pos + packet.bh_caplen + packet.bh_hdrlen >
-		    bpf->bpf_len)
-			goto next; /* Packet beyond buffer, drop. */
-		payload += packet.bh_hdrlen;
-		if (packet.bh_caplen > len)
-			bytes = (ssize_t)len;
-		else
-			bytes = (ssize_t)packet.bh_caplen;
-		if (bpf_frame_bcast(bpf->bpf_ifp, payload) == 0)
-			bpf->bpf_flags |= BPF_BCAST;
-		else
-			bpf->bpf_flags &= ~BPF_BCAST;
-		memcpy(data, payload, (size_t)bytes);
-	next:
-		bpf->bpf_pos += BPF_WORDALIGN(
-		    packet.bh_hdrlen + packet.bh_caplen);
-		if (bpf->bpf_pos >= bpf->bpf_len) {
-			bpf->bpf_len = bpf->bpf_pos = 0;
-			bpf->bpf_flags |= BPF_EOF;
-		}
-		if (bytes != -1)
-			return bytes;
-	}
-
-	/* NOTREACHED */
-}
-
-int
-bpf_attach(int fd, void *filter, unsigned int filter_len)
-{
-	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
-
-	/* Install the filter. */
-	return ioctl(fd, BIOCSETF, &pf);
-}
-
-#ifdef BIOCSETWF
-static int
-bpf_wattach(int fd, void *filter, unsigned int filter_len)
-{
-	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
-
-	/* Install the filter. */
-	return ioctl(fd, BIOCSETWF, &pf);
-}
-#endif
-#endif
-
 #ifndef __sun
-/* SunOS is special too - sending via BPF goes nowhere. */
 ssize_t
 bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
 {
@@ -335,17 +161,10 @@ bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
 	}
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-	return writev(bpf->bpf_fd, iov, 2);
+
+	return bpf_writev(bpf, iov, __arraycount(iov));
 }
 #endif
-
-void
-bpf_close(struct bpf *bpf)
-{
-	close(bpf->bpf_fd);
-	free(bpf->bpf_buffer);
-	free(bpf);
-}
 
 #ifdef ARP
 #define BPF_CMP_HWADDR_LEN ((((HWADDR_LEN / 4) + 2) * 2) + 1)
@@ -489,6 +308,7 @@ bpf_arp_rw(const struct bpf *bpf, const struct in_addr *ia, bool recv)
 	struct bpf_insn buf[BPF_ARP_LEN + 1];
 	struct bpf_insn *bp;
 	uint16_t arp_len;
+	unsigned int len;
 
 	bp = buf;
 	/* Check frame header. */
@@ -542,26 +362,22 @@ bpf_arp_rw(const struct bpf *bpf, const struct in_addr *ia, bool recv)
 	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
 	bp++;
 
-#ifdef BIOCSETWF
-	if (!recv)
-		return bpf_wattach(bpf->bpf_fd, buf, (unsigned int)(bp - buf));
-#endif
-
-	return bpf_attach(bpf->bpf_fd, buf, (unsigned int)(bp - buf));
+	len = (unsigned int)(bp - buf);
+	if (recv) return bpf_setfilter(bpf, buf, len);
+	return bpf_setwfilter(bpf, buf, len);
+		return -1;
 }
 
 int
-bpf_arp(const struct bpf *bpf, const struct in_addr *ia)
+bpf_filter_arp(const struct bpf *bpf, const struct in_addr *ia)
 {
-#ifdef BIOCSETWF
-	if (bpf_arp_rw(bpf, ia, true) == -1 ||
-	    bpf_arp_rw(bpf, ia, false) == -1 ||
-	    ioctl(bpf->bpf_fd, BIOCLOCK) == -1)
+	if (bpf_arp_rw(bpf, ia, true) == -1)
+		return -1;
+	if (bpf_arp_rw(bpf, ia, false) == -1 && errno != ENOSYS)
+		return -1;
+	if (bpf_lock(bpf) == -1 && errno != ENOSYS)
 		return -1;
 	return 0;
-#else
-	return bpf_arp_rw(bpf, ia, true);
-#endif
 }
 #endif
 
@@ -617,7 +433,6 @@ static const struct bpf_insn bpf_bootp_read[] = {
 };
 #define BPF_BOOTP_READ_LEN __arraycount(bpf_bootp_read)
 
-#ifdef BIOCSETWF
 static const struct bpf_insn bpf_bootp_write[] = {
 	/* Make sure it's from and to the right port.
 	 * RFC2131 makes no mention of encforcing a source port,
@@ -627,7 +442,6 @@ static const struct bpf_insn bpf_bootp_write[] = {
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 #define BPF_BOOTP_WRITE_LEN __arraycount(bpf_bootp_write)
-#endif
 
 #define BPF_BOOTP_CHADDR_LEN ((BOOTP_CHADDR_LEN / 4) * 3)
 #define BPF_BOOTP_XID_LEN    4 /* BOUND check is 4 instructions */
@@ -664,7 +478,6 @@ bpf_bootp_rw(const struct bpf *bpf, bool read)
 	memcpy(bp, bpf_bootp_base, sizeof(bpf_bootp_base));
 	bp += BPF_BOOTP_BASE_LEN;
 
-#ifdef BIOCSETWF
 	if (!read) {
 		memcpy(bp, bpf_bootp_write, sizeof(bpf_bootp_write));
 		bp += BPF_BOOTP_WRITE_LEN;
@@ -673,11 +486,8 @@ bpf_bootp_rw(const struct bpf *bpf, bool read)
 		BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
 		bp++;
 
-		return bpf_wattach(bpf->bpf_fd, buf, (unsigned int)(bp - buf));
+		return bpf_setwfilter(bpf, buf, (unsigned int)(bp - buf));
 	}
-#else
-	UNUSED(read);
-#endif
 
 	memcpy(bp, bpf_bootp_read, sizeof(bpf_bootp_read));
 	bp += BPF_BOOTP_READ_LEN;
@@ -686,26 +496,17 @@ bpf_bootp_rw(const struct bpf *bpf, bool read)
 	BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
 	bp++;
 
-	return bpf_attach(bpf->bpf_fd, buf, (unsigned int)(bp - buf));
+	return bpf_setfilter(bpf, buf, (unsigned int)(bp - buf));
 }
 
 int
-bpf_bootp(const struct bpf *bpf, __unused const struct in_addr *ia)
+bpf_filter_bootp(const struct bpf *bpf, __unused const struct in_addr *ia)
 {
-#ifdef BIOCSETWF
-	if (bpf_bootp_rw(bpf, true) == -1 || bpf_bootp_rw(bpf, false) == -1 ||
-	    ioctl(bpf->bpf_fd, BIOCLOCK) == -1)
+	if (bpf_bootp_rw(bpf, true) == -1)
+	       return -1;
+	if (bpf_bootp_rw(bpf, false) == -1 && errno != ENOSYS)
+		return -1;
+	if (bpf_lock(bpf) == -1 && errno != ENOSYS)
 		return -1;
 	return 0;
-#else
-#ifdef PRIVSEP
-#if defined(__sun) /* Solaris cannot send via BPF. */
-#elif defined(BIOCSETF)
-#warning No BIOCSETWF support - a compromised BPF can be used as a raw socket
-#else
-#warning A compromised PF_PACKET socket can be used as a raw socket
-#endif
-#endif
-	return bpf_bootp_rw(bpf, true);
-#endif
 }

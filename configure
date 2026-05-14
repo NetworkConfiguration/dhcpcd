@@ -465,6 +465,7 @@ if [ "$SMALL" = yes ]; then
 	echo "DHCPCD_DEFS=	$DHCPCD_DEFS" >>$CONFIG_MK
 fi
 
+BPF_OS=
 case "$OS" in
 freebsd*|kfreebsd*)
 	# FreeBSD hide some newer POSIX APIs behind _GNU_SOURCE ...
@@ -497,6 +498,7 @@ linux*)
 	echo "#include		<asm/types.h> /* fix broken headers */" >>$CONFIG_H
 	echo "#include		<sys/socket.h> /* fix broken headers */" >>$CONFIG_H
 	echo "#include		<linux/rtnetlink.h>" >>$CONFIG_H
+	BPF_OS="bpf-linux.c"
 	# cksum does't support -a and netpgp is rare
 	echo "CKSUM=		sha256sum --tag" >>$CONFIG_MK
 	echo "PGP=		gpg2" >>$CONFIG_MK
@@ -516,6 +518,10 @@ solaris*|sunos*)
 	;;
 esac
 
+if [ -z "$BPF_OS" ]; then
+	BPF_OS="bpf-bsd.c"
+fi
+
 if [ -n "${_DEFAULT_HOSTNAME+x}" ]; then
 	DEFAULT_HOSTNAME="${_DEFAULT_HOSTNAME}"
 else
@@ -529,7 +535,7 @@ echo "DEFAULT_HOSTNAME=		$DEFAULT_HOSTNAME" >>$CONFIG_MK
 if [ -z "$INET" ] || [ "$INET" = yes ]; then
 	echo "Enabling INET support"
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	dhcp.c ipv4.c bpf.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	dhcp.c ipv4.c bpf.c $BPF_OS" >>$CONFIG_MK
 	if [ -z "$ARP" ] || [ "$ARP" = yes ]; then
 		echo "Enabling ARP support"
 		echo "CPPFLAGS+=	-DARP" >>$CONFIG_MK

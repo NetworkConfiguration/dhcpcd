@@ -562,7 +562,7 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	} else
 #endif
 	{
-		astate->bpf = bpf_open(ifp, bpf_arp, addr);
+		astate->bpf = bpf_open(ifp, bpf_filter_arp, addr);
 		if (astate->bpf == NULL) {
 			logerr(__func__);
 			free(astate);

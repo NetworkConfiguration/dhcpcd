@@ -3859,7 +3859,7 @@ dhcp_openbpf(struct interface *ifp)
 	if (state->bpf != NULL)
 		return 0;
 
-	state->bpf = bpf_open(ifp, bpf_bootp, NULL);
+	state->bpf = bpf_open(ifp, bpf_filter_bootp, NULL);
 	if (state->bpf == NULL) {
 		if (errno == ENOENT) {
 			logerrx("%s not found", bpf_name);
