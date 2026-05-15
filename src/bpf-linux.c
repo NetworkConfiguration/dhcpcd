@@ -1,5 +1,5 @@
 /*
- * dhcpcd: BPF Linux interface
+ * BPF Linux interface
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
