@@ -139,6 +139,11 @@ are disabled by default.
 For Valgrind, it needs to unlink the pipe files which it can't do anyway
 as it's dropped permissions. Otherwise it works fine.
 
+Enable libpcap support with --with-libpcap.
+This should only be done on systems that lack the needed kernel hooks
+as libpcap does not support a write filter and is vulnerable
+if the application is exploited.
+
 ## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then

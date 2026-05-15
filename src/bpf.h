@@ -56,6 +56,7 @@
 
 struct bpf {
 	const struct interface *bpf_ifp;
+	void *bpf_handle;
 	int bpf_fd;
 	unsigned int bpf_flags;
 	void *bpf_buffer;

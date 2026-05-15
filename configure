@@ -42,6 +42,7 @@ SMALL=
 SANITIZE=no
 STATUSARG=
 OPENSSL=
+LIBPCAP=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
 
@@ -119,6 +120,8 @@ for x do
 	--with-poll) POLL="$var";;
 	--with-openssl) OPENSSL=yes;;
 	--without-openssl) OPENSSL=no;;
+	--with-libpcap) LIBPCAP=yes;;
+	--without-libpcap) LIBPCAP=no;;
 	--sanitise|--sanitize) SANITIZEADDRESS="yes";;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
@@ -520,6 +523,9 @@ esac
 
 if [ -z "$BPF_OS" ]; then
 	BPF_OS="bpf-bsd.c"
+fi
+if [ "$LIBPCAP" = yes ]; then
+	BPF_OS="bpf-pcap.c"
 fi
 
 if [ -n "${_DEFAULT_HOSTNAME+x}" ]; then
@@ -1510,6 +1516,36 @@ EOF
 	SHA2_RENAMED=
 	echo "$SHA2"
 	rm -f _openssl_sha.c _openssl_sha
+fi
+
+if [ "$LIBPCAP" = yes ]; then
+	printf "Testing for libpcap ... "
+	if $PKG_CONFIG --exists libpcap 2>/dev/null; then
+		LIBPCAP_CFLAGS=$($PKG_CONFIG --cflags libpcap 2>/dev/null)
+		LIBPCAP_LIBS=$($PKG_CONFIG --libs libpcap 2>/dev/null)
+		echo "yes"
+		echo "CFLAGS+=	$LIBPCAP_CFLAGS" >>$CONFIG_MK
+		echo "LDADD+=		$LIBPCAP_LIBS" >>$CONFIG_MK
+	else
+		cat <<EOF >_libpcap.c
+#include <pcap.h>
+
+int main(void) {
+	return pcap_activate(NULL);
+}
+EOF
+		if $XCC _libpcap.c -o libpcap -lpcap 2>&3; then
+			echo "yes"
+			echo "LDADD+=		-lpcap" >>$CONFIG_MK
+			abort=false
+		else
+			echo "no"
+			abort=true
+		fi
+		rm -f _libpcap.c libpcap
+		$abort && exit 1
+	fi
+	echo "#define	USE_LIBPCAP" >>$CONFIG_H
 fi
 
 # Workaround for DragonFlyBSD import
