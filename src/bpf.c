@@ -375,7 +375,7 @@ bpf_filter_arp(const struct bpf *bpf, const struct in_addr *ia)
 		return -1;
 	if (bpf_arp_rw(bpf, ia, false) == -1 && errno != ENOSYS)
 		return -1;
-	if (bpf_lock(bpf) == -1 && errno != ENOSYS)
+	if (bpf_lockfilter(bpf) == -1 && errno != ENOSYS)
 		return -1;
 	return 0;
 }
@@ -506,7 +506,7 @@ bpf_filter_bootp(const struct bpf *bpf, __unused const struct in_addr *ia)
 		return -1;
 	if (bpf_bootp_rw(bpf, false) == -1 && errno != ENOSYS)
 		return -1;
-	if (bpf_lock(bpf) == -1 && errno != ENOSYS)
+	if (bpf_lockfilter(bpf) == -1 && errno != ENOSYS)
 		return -1;
 	return 0;
 }

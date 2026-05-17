@@ -77,7 +77,7 @@ struct bpf *bpf_open(const struct interface *,
 void bpf_close(struct bpf *);
 int bpf_setfilter(const struct bpf *, void *, unsigned int);
 int bpf_setwfilter(const struct bpf *, void *, unsigned int);
-int bpf_lock(const struct bpf *);
+int bpf_lockfilter(const struct bpf *);
 ssize_t bpf_send(const struct bpf *, uint16_t, const void *, size_t);
 ssize_t bpf_writev(const struct bpf *, struct iovec *, int);
 ssize_t bpf_read(struct bpf *, void *, size_t);

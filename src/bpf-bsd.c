@@ -228,7 +228,7 @@ bpf_setwfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 }
 
 int
-bpf_lock(const struct bpf *bpf)
+bpf_lockfilter(const struct bpf *bpf)
 {
 #ifdef BIOCLOCK
 	return ioctl(bpf->bpf_fd, BIOCLOCK);

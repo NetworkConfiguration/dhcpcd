@@ -37,10 +37,11 @@
 #define PCAP_CHECK(call, name)                                         \
 	do {                                                           \
 		int status = (call);                                   \
-		if (status < 0)                                        \
+		if (status < 0) {                                      \
 			logerrx("%s: %s failed: %s", __func__, name,   \
 			    pcap_statustostr(status));                 \
-		else if (status > 0)                                   \
+			goto eexit;                                    \
+		} else if (status > 0)                                 \
 			logwarnx("%s: %s warning: %s", __func__, name, \
 			    pcap_statustostr(status));                 \
 	} while (0)
@@ -52,7 +53,7 @@ const char *bpf_name = "Berkeley Packet Filter (libpcap)";
 struct bpf *
 bpf_open(const struct interface *ifp,
     int (*filter)(const struct bpf *, const struct in_addr *),
-    __unused const struct in_addr *ia)
+    const struct in_addr *ia)
 {
 	int err;
 	struct bpf *bpf;
@@ -80,7 +81,8 @@ bpf_open(const struct interface *ifp,
 		goto eexit;
 	}
 
-	PCAP_CHECK(pcap_set_snaplen(handle, (int)bpf->bpf_size), "pcap_set_snaplen");
+	PCAP_CHECK(pcap_set_snaplen(handle, (int)bpf->bpf_size),
+	    "pcap_set_snaplen");
 	PCAP_CHECK(pcap_set_promisc(handle, 0), "pcap_set_promisc");
 	PCAP_CHECK(pcap_set_immediate_mode(handle, 1),
 	    "pcap_set_immediate_mode");
@@ -180,20 +182,33 @@ bpf_setfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 }
 
 int
-bpf_setwfilter(__unused const struct bpf *bpf, __unused void *filter,
-    __unused unsigned int filter_len)
+bpf_setwfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 {
+#ifdef HAVE_PCAP_SETWRITEFILTER
+	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
+
+	return pcap_setwritefilter(bpf->bpf_handle, &pf);
+#else
 #warning A compromised libpcap socket can be used as a raw socket
 
+	UNUSED(bpf);
+	UNUSED(filter);
+	UNUSED(filter_len);
 	errno = ENOSYS;
 	return -1;
+#endif
 }
 
 int
-bpf_lock(__unused const struct bpf *bpf)
+bpf_lockfilter(const struct bpf *bpf)
 {
+#ifdef HAVE_PCAP_LOCKFILTER
+	return pcap_lockfilter(bpf->bpf_handle);
+#else
+	UNUSED(bpf);
 	errno = ENOSYS;
 	return -1;
+#endif
 }
 
 void

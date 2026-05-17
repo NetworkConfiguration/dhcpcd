@@ -1524,8 +1524,6 @@ if [ "$LIBPCAP" = yes ]; then
 		LIBPCAP_CFLAGS=$($PKG_CONFIG --cflags libpcap 2>/dev/null)
 		LIBPCAP_LIBS=$($PKG_CONFIG --libs libpcap 2>/dev/null)
 		echo "yes"
-		echo "CFLAGS+=	$LIBPCAP_CFLAGS" >>$CONFIG_MK
-		echo "LDADD+=		$LIBPCAP_LIBS" >>$CONFIG_MK
 	else
 		cat <<EOF >_libpcap.c
 #include <pcap.h>
@@ -1536,7 +1534,8 @@ int main(void) {
 EOF
 		if $XCC _libpcap.c -o libpcap -lpcap 2>&3; then
 			echo "yes"
-			echo "LDADD+=		-lpcap" >>$CONFIG_MK
+			LIBPCAP_CFLAGS=
+			LIBPCAP_LIBS="-lpcap"
 			abort=false
 		else
 			echo "no"
@@ -1545,7 +1544,42 @@ EOF
 		rm -f _libpcap.c libpcap
 		$abort && exit 1
 	fi
+	LIBPCAP_LIBS="-L/tmp/foo/usr/local/lib -lpcap"
+	echo "CFLAGS+=	$LIBPCAP_CFLAGS" >>$CONFIG_MK
+	echo "LDADD+=		$LIBPCAP_LIBS" >>$CONFIG_MK
 	echo "#define	USE_LIBPCAP" >>$CONFIG_H
+
+	printf "Testing for pcap_setwritefilter() ... "
+	cat <<EOF >_libpcap_write.c
+#include <pcap.h>
+
+int main(void) {
+	return pcap_setwritefilter(NULL, NULL);
+}
+EOF
+	if $XCC $LIBPCAP_CFLAGS _libpcap_write.c -o libpcap_write $LIBPCAP_LIBS 2>&3; then
+		echo "yes"
+		echo "#define HAVE_PCAP_SETWRITEFILTER" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _libpcap_write.c libpcap_write
+
+	printf "Testing for pcap_lockfilter() ... "
+	cat <<EOF >_libpcap_lock.c
+#include <pcap.h>
+
+int main(void) {
+	return pcap_lockfilter(NULL);
+}
+EOF
+	if $XCC $LIBPCAP_CFLAGS _libpcap_lock.c -o libpcap_lock $LIBPCAP_LIBS 2>&3; then
+		echo "yes"
+		echo "#define HAVE_PCAP_LOCKFILTER" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _libpcap_lock.c libpcap_lock
 fi
 
 # Workaround for DragonFlyBSD import

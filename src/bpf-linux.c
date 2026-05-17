@@ -192,7 +192,7 @@ bpf_setwfilter(__unused const struct bpf *bpf, __unused void *filter, __unused u
 }
 
 int
-bpf_lock(const struct bpf *bpf)
+bpf_lockfilter(const struct bpf *bpf)
 {
 #ifdef SO_LOCK_FILTER
 	int fd = bpf->bpf_fd, on = 1;
