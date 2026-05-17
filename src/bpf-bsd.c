@@ -40,7 +40,7 @@
 #include "bpf.h"
 #include "logerr.h"
 
-const char *bpf_name = "Berkley Packet Filter";
+const char *bpf_name = "Berkeley Packet Filter";
 
 struct bpf *
 bpf_open(const struct interface *ifp,
@@ -66,8 +66,6 @@ bpf_open(const struct interface *ifp,
 	bpf = calloc(1, sizeof(*bpf));
 	if (bpf == NULL)
 		return NULL;
-	bpf->bpf_ifp = ifp;
-	bpf->bpf_flags = BPF_EOF;
 
 	/* /dev/bpf is a cloner on modern kernels */
 	bpf->bpf_fd = open("/dev/bpf", BPF_OPEN_FLAGS);
@@ -85,6 +83,9 @@ bpf_open(const struct interface *ifp,
 
 	if (bpf->bpf_fd == -1)
 		goto eexit;
+
+	bpf->bpf_ifp = ifp;
+	bpf->bpf_flags = BPF_EOF;
 
 #ifndef O_CLOEXEC
 	if ((fd_opts = fcntl(bpf->bpf_fd, F_GETFD)) == -1 ||
@@ -125,9 +126,7 @@ bpf_open(const struct interface *ifp,
 	return bpf;
 
 eexit:
-	if (bpf->bpf_fd != -1)
-		close(bpf->bpf_fd);
-	free(bpf);
+	bpf_close(bpf);
 	return NULL;
 }
 
@@ -138,54 +137,67 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 {
 	ssize_t bytes;
 	struct bpf_hdr packet;
-	const char *payload;
+	size_t hdr_max;
+	const uint8_t *payload;
 
 	bpf->bpf_flags &= ~BPF_EOF;
-	for (;;) {
-		if (bpf->bpf_len == 0) {
-			bytes = read(bpf->bpf_fd, bpf->bpf_buffer,
-			    bpf->bpf_size);
-#if defined(__sun)
-			/* After 2^31 bytes, the kernel offset overflows.
-			 * To work around this bug, lseek 0. */
-			if (bytes == -1 && errno == EINVAL) {
-				lseek(bpf->bpf_fd, 0, SEEK_SET);
-				continue;
-			}
+	if (bpf->bpf_len == 0) {
+		bytes = read(bpf->bpf_fd, bpf->bpf_buffer, bpf->bpf_size);
+#ifdef __sun
+		/* After 2^31 bytes, the kernel offset overflows.
+		 * To work around this bug, lseek 0. */
+		if (bytes == -1 && errno == EINVAL) {
+			lseek(bpf->bpf_fd, 0, SEEK_SET);
+			return 0;
+		}
 #endif
-			if (bytes == -1 || bytes == 0)
-				return bytes;
-			bpf->bpf_len = (size_t)bytes;
-			bpf->bpf_pos = 0;
-		}
-		bytes = -1;
-		payload = (const char *)bpf->bpf_buffer + bpf->bpf_pos;
-		memcpy(&packet, payload, sizeof(packet));
-		if (bpf->bpf_pos + packet.bh_caplen + packet.bh_hdrlen >
-		    bpf->bpf_len)
-			goto next; /* Packet beyond buffer, drop. */
-		payload += packet.bh_hdrlen;
-		if (packet.bh_caplen > len)
-			bytes = (ssize_t)len;
-		else
-			bytes = (ssize_t)packet.bh_caplen;
-		if (bpf_frame_bcast(bpf->bpf_ifp, payload) == 0)
-			bpf->bpf_flags |= BPF_BCAST;
-		else
-			bpf->bpf_flags &= ~BPF_BCAST;
-		memcpy(data, payload, (size_t)bytes);
-	next:
-		bpf->bpf_pos += BPF_WORDALIGN(
-		    packet.bh_hdrlen + packet.bh_caplen);
-		if (bpf->bpf_pos >= bpf->bpf_len) {
-			bpf->bpf_len = bpf->bpf_pos = 0;
-			bpf->bpf_flags |= BPF_EOF;
-		}
-		if (bytes != -1)
+		if (bytes == -1 || bytes == 0)
 			return bytes;
+		bpf->bpf_len = (size_t)bytes;
+		bpf->bpf_pos = 0;
 	}
 
-	/* NOTREACHED */
+	if (bpf->bpf_pos + sizeof(packet) > bpf->bpf_len) {
+		errno = EINVAL;
+		goto err;
+	}
+
+	payload = (const uint8_t *)bpf->bpf_buffer + bpf->bpf_pos;
+	memcpy(&packet, payload, sizeof(packet));
+
+	hdr_max = SIZE_MAX - packet.bh_caplen;
+	if (packet.bh_hdrlen > hdr_max) {
+		errno = EOVERFLOW;
+		goto err;
+	}
+	if (packet.bh_hdrlen + packet.bh_caplen > bpf->bpf_len - bpf->bpf_pos) {
+		errno = EBADMSG;
+		goto err;
+	}
+
+	payload += packet.bh_hdrlen;
+	if (packet.bh_caplen > len)
+		bytes = (ssize_t)len;
+	else
+		bytes = (ssize_t)packet.bh_caplen;
+
+	if (bpf_frame_bcast(bpf->bpf_ifp, payload) == 0)
+		bpf->bpf_flags |= BPF_BCAST;
+	else
+		bpf->bpf_flags &= ~BPF_BCAST;
+	memcpy(data, payload, (size_t)bytes);
+
+	bpf->bpf_pos += BPF_WORDALIGN(packet.bh_hdrlen + packet.bh_caplen);
+	if (bpf->bpf_pos >= bpf->bpf_len) {
+		bpf->bpf_len = bpf->bpf_pos = 0;
+		bpf->bpf_flags |= BPF_EOF;
+	}
+	return bytes;
+
+err:
+	bpf->bpf_len = bpf->bpf_pos = 0;
+	bpf->bpf_flags |= BPF_EOF;
+	return -1;
 }
 
 int
@@ -239,7 +251,8 @@ bpf_writev(const struct bpf *bpf, struct iovec *iov, int iovcnt)
 void
 bpf_close(struct bpf *bpf)
 {
-	close(bpf->bpf_fd);
+	if (bpf->bpf_fd != -1)
+		close(bpf->bpf_fd);
 	free(bpf->bpf_buffer);
 	free(bpf);
 }

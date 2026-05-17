@@ -363,9 +363,9 @@ bpf_arp_rw(const struct bpf *bpf, const struct in_addr *ia, bool recv)
 	bp++;
 
 	len = (unsigned int)(bp - buf);
-	if (recv) return bpf_setfilter(bpf, buf, len);
+	if (recv)
+		return bpf_setfilter(bpf, buf, len);
 	return bpf_setwfilter(bpf, buf, len);
-		return -1;
 }
 
 int
@@ -441,7 +441,7 @@ static const struct bpf_insn bpf_bootp_write[] = {
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (BOOTPC << 16) + BOOTPS, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
-#define BPF_BOOTP_WRITE_LEN __arraycount(bpf_bootp_write)
+#define BPF_BOOTP_WRITE_LEN  __arraycount(bpf_bootp_write)
 
 #define BPF_BOOTP_CHADDR_LEN ((BOOTP_CHADDR_LEN / 4) * 3)
 #define BPF_BOOTP_XID_LEN    4 /* BOUND check is 4 instructions */
@@ -503,7 +503,7 @@ int
 bpf_filter_bootp(const struct bpf *bpf, __unused const struct in_addr *ia)
 {
 	if (bpf_bootp_rw(bpf, true) == -1)
-	       return -1;
+		return -1;
 	if (bpf_bootp_rw(bpf, false) == -1 && errno != ENOSYS)
 		return -1;
 	if (bpf_lock(bpf) == -1 && errno != ENOSYS)

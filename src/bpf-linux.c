@@ -55,6 +55,7 @@ bpf_open(const struct interface *ifp,
 		     .sll_protocol = htons(ETH_P_ALL),
 		     .sll_ifindex = (int)ifp->index,
 		 } };
+	int mtu;
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
@@ -64,9 +65,10 @@ bpf_open(const struct interface *ifp,
 		return NULL;
 	bpf->bpf_ifp = ifp;
 	bpf->bpf_flags = BPF_EOF;
+	bpf->bpf_fd = -1;
 
-	/* Allocate a suitably large buffer for a single packet. */
-	bpf->bpf_size = ETH_FRAME_LEN;
+	mtu = ifp->mtu ? ifp->mtu : ETH_DATA_LEN;
+	bpf->bpf_size = bpf_frame_header_len(ifp) + (size_t)mtu;
 	bpf->bpf_buffer = malloc(bpf->bpf_size);
 	if (bpf->bpf_buffer == NULL)
 		goto eexit;
@@ -106,10 +108,7 @@ bpf_open(const struct interface *ifp,
 	return bpf;
 
 eexit:
-	if (bpf->bpf_fd != -1)
-		close(bpf->bpf_fd);
-	free(bpf->bpf_buffer);
-	free(bpf);
+	bpf_close(bpf);
 	return NULL;
 }
 
@@ -141,6 +140,10 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 	bytes = recvmsg(bpf->bpf_fd, &msg, 0);
 	if (bytes == -1)
 		return -1;
+	if (msg.msg_flags & MSG_TRUNC) {
+		errno = ENOBUFS;
+		return -1;
+	}
 	bpf->bpf_flags |= BPF_EOF; /* We only ever read one packet. */
 	bpf->bpf_flags &= ~BPF_PARTIALCSUM;
 	if (bytes) {
@@ -211,7 +214,8 @@ bpf_writev(const struct bpf *bpf, struct iovec *iov, int iovcnt)
 void
 bpf_close(struct bpf *bpf)
 {
-	close(bpf->bpf_fd);
+	if (bpf->bpf_fd != -1)
+		close(bpf->bpf_fd);
 	free(bpf->bpf_buffer);
 	free(bpf);
 }

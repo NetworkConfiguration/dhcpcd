@@ -47,7 +47,7 @@
 
 #define ETH_MTU 1500
 
-const char *bpf_name = "Berkley Packet Filter (libpcap)";
+const char *bpf_name = "Berkeley Packet Filter (libpcap)";
 
 struct bpf *
 bpf_open(const struct interface *ifp,
@@ -58,15 +58,15 @@ bpf_open(const struct interface *ifp,
 	struct bpf *bpf;
 	pcap_t *handle;
 	char errbuf[PCAP_ERRBUF_SIZE];
-	int snaplen;
+	int mtu;
 
 	bpf = calloc(1, sizeof(*bpf));
 	if (bpf == NULL)
 		return NULL;
 
-	snaplen = ifp->mtu ? ifp->mtu : ETH_MTU;
+	mtu = ifp->mtu ? ifp->mtu : ETH_MTU;
 	bpf->bpf_ifp = ifp;
-	bpf->bpf_size = bpf_frame_header_len(ifp) + (size_t)snaplen;
+	bpf->bpf_size = bpf_frame_header_len(ifp) + (size_t)mtu;
 	bpf->bpf_buffer = malloc(bpf->bpf_size);
 	if (bpf->bpf_buffer == NULL)
 		goto eexit;
@@ -80,7 +80,7 @@ bpf_open(const struct interface *ifp,
 		goto eexit;
 	}
 
-	PCAP_CHECK(pcap_set_snaplen(handle, snaplen), "pcap_set_snaplen");
+	PCAP_CHECK(pcap_set_snaplen(handle, (int)bpf->bpf_size), "pcap_set_snaplen");
 	PCAP_CHECK(pcap_set_promisc(handle, 0), "pcap_set_promisc");
 	PCAP_CHECK(pcap_set_immediate_mode(handle, 1),
 	    "pcap_set_immediate_mode");
@@ -124,6 +124,8 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 
 	err = pcap_next_ex(bpf->bpf_handle, &pkt_header, &pkt_data);
 
+	if (err == 0)
+		return 0;
 	if (err < 0)
 		return -1;
 
@@ -132,6 +134,11 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 	if (cap_len > len)
 		cap_len = len;
 	memcpy(data, pkt_data, cap_len);
+
+	if (bpf_frame_bcast(bpf->bpf_ifp, pkt_data) == 0)
+		bpf->bpf_flags |= BPF_BCAST;
+	else
+		bpf->bpf_flags &= ~BPF_BCAST;
 
 	return (ssize_t)cap_len;
 }
@@ -144,17 +151,23 @@ bpf_writev(const struct bpf *bpf, struct iovec *iov, int iovcnt)
 	uint8_t *bp = bpf->bpf_buffer;
 
 	for (i = 0; i < iovcnt; i++) {
-		len += iov[i].iov_len;
 		/* This should be impossible. */
-		if (bpf->bpf_size < len) {
+		if (iov[i].iov_len > bpf->bpf_size - len) {
 			errno = ENOBUFS;
 			return -1;
 		}
+
 		memcpy(bp, iov[i].iov_base, iov[i].iov_len);
 		bp += iov[i].iov_len;
+		len += iov[i].iov_len;
 	}
 
-	return pcap_inject(bpf->bpf_handle, bpf->bpf_buffer, len);
+	i = pcap_inject(bpf->bpf_handle, bpf->bpf_buffer, len);
+	if (i < 0) {
+		logerrx("%s: %s", __func__, pcap_geterr(bpf->bpf_handle));
+		return -1;
+	}
+	return i;
 }
 
 int
