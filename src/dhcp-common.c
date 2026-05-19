@@ -476,8 +476,9 @@ valid_domainname(char *lbl, int type)
  */
 static const char hexchrs[] = "0123456789abcdef";
 ssize_t
-print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
+print_string(char *dst, size_t len, int type, const void *data, size_t dl)
 {
+	const uint8_t *d = (const uint8_t *)data;
 	char *odst;
 	uint8_t c;
 	const uint8_t *e;
@@ -485,10 +486,10 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 
 	odst = dst;
 	bytes = 0;
-	e = data + dl;
+	e = d + dl;
 
-	while (data < e) {
-		c = *data++;
+	while (d < e) {
+		c = *d++;
 		if (type & OT_BINHEX) {
 			if (dst) {
 				if (len == 0 || len == 1) {
@@ -856,7 +857,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 	if (ifp->wireless) {
 		ssid[0] = '-';
 		print_string(ssid + 1, sizeof(ssid) - 1, OT_ESCFILE,
-		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
+		    ifp->ssid, ifp->ssid_len);
 	} else
 		ssid[0] = '\0';
 	return snprintf(leasefile, len,

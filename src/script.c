@@ -215,6 +215,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 	const struct interface *ifp2;
 	int af;
 	bool is_stdin = ifp->name[0] == '\0';
+	char if_name[sizeof(ifp->name) * 4];
 	const char *if_up, *if_down;
 	rb_tree_t ifaces;
 	struct rt *rt;
@@ -330,7 +331,9 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 #endif
 
 	if (!is_stdin) {
-		if (efprintf(fp, "interface=%s", ifp->name) == -1)
+		print_string(if_name, sizeof(if_name), OT_ESCFILE, ifp->name,
+		    strlen(ifp->name));
+		if (efprintf(fp, "interface=%s", if_name) == -1)
 			goto eexit;
 		if (protocols[protocol] != NULL) {
 			if (efprintf(fp, "protocol=%s", protocols[protocol]) ==
@@ -387,9 +390,11 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		goto eexit;
 	RB_TREE_FOREACH(rt, &ifaces)
 	{
+		print_string(if_name, sizeof(if_name), OT_ESCFILE,
+		    rt->rt_ifp->name, strlen(rt->rt_ifp->name));
 		if (rt != RB_TREE_MIN(&ifaces) && fprintf(fp, "%s", " ") == -1)
 			goto eexit;
-		if (fprintf(fp, "%s", rt->rt_ifp->name) == -1)
+		if (fprintf(fp, "%s", if_name) == -1)
 			goto eexit;
 	}
 	rt_headclear(&ifaces, AF_UNSPEC);

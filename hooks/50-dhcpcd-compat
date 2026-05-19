@@ -37,7 +37,7 @@ if [ "$r" != "down" ]; then
 	for x in IPADDR INTERFACE NETMASK BROADCAST NETWORK DHCPSID GATEWAYS \
 		DNSSERVERS DNSDOMAIN DNSSEARCH NISDOMAIN NISSERVERS \
 		NTPSERVERS GATEWAY DNS; do
-		eval echo "$x=\'\$$x\'" >> /var/lib/dhcpcd-"$INTERFACE".info
+		eval printf '%s\\n' "$x=\'\$$x\'" >> /var/lib/dhcpcd-"$INTERFACE".info
 	done
 fi
 

@@ -2971,7 +2971,7 @@ log_dhcp(int loglevel, const char *msg, const struct interface *ifp,
 				free(a);
 				return;
 			}
-			print_string(tmp, tmpl, OT_STRING, (uint8_t *)a, al);
+			print_string(tmp, tmpl, OT_STRING, a, al);
 			free(a);
 			a = tmp;
 		}
