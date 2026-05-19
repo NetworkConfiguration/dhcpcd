@@ -38,6 +38,9 @@
 #include <string.h>
 
 #include "bpf.h"
+#ifdef __sun
+#include "bpf-dlpi.h"
+#endif
 #include "logerr.h"
 
 const char *bpf_name = "Berkeley Packet Filter";
@@ -122,6 +125,11 @@ bpf_open(const struct interface *ifp,
 	bpf->bpf_buffer = malloc(bpf->bpf_size);
 	if (bpf->bpf_buffer == NULL)
 		goto eexit;
+
+#ifdef __sun
+	if (bpf_dlpi_open(bpf) == -1)
+		goto eexit;
+#endif
 
 	return bpf;
 
@@ -251,6 +259,9 @@ bpf_writev(const struct bpf *bpf, struct iovec *iov, int iovcnt)
 void
 bpf_close(struct bpf *bpf)
 {
+#ifdef __sun
+	bpf_dlpi_close(bpf);
+#endif
 	if (bpf->bpf_fd != -1)
 		close(bpf->bpf_fd);
 	free(bpf->bpf_buffer);

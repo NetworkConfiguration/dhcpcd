@@ -138,7 +138,6 @@ bpf_frame_bcast(const struct interface *ifp, const void *frame)
 	}
 }
 
-#ifndef __sun
 ssize_t
 bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
 {
@@ -164,7 +163,6 @@ bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
 
 	return bpf_writev(bpf, iov, __arraycount(iov));
 }
-#endif
 
 #ifdef ARP
 #define BPF_CMP_HWADDR_LEN ((((HWADDR_LEN / 4) + 2) * 2) + 1)

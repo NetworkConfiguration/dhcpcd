@@ -515,6 +515,7 @@ solaris*|sunos*)
 	    >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-sun.c" >>$CONFIG_MK
 	echo "LDADD+=		-ldlpi -lkstat" >>$CONFIG_MK
+	BPF_OS="bpf-bsd.c bpf-dlpi.c"
 	;;
 *)
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
