@@ -202,7 +202,7 @@ bpf_setwfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 	}
 	return ioctl(fd, BIOCSETWF, &pf);
 #else
-#warning No BIOCSETWF support - a compromised BPF can be used as a raw socket
+#warning a compromised libpcap can inject arbitary packets
 	UNUSED(bpf);
 	UNUSED(filter);
 	UNUSED(filter_len);
