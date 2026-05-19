@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/ioctl.h>
+
 #include <errno.h>
 #include <pcap.h>
 #include <stdlib.h>
@@ -188,9 +190,17 @@ bpf_setwfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
 
 	return pcap_setwritefilter(bpf->bpf_handle, &pf);
-#else
-#warning A compromised libpcap socket can be used as a raw socket
+#elif defined(BIOCSETWF)
+	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
+	int fd = pcap_fileno(bpf->bpf_handle);
 
+	if (fd == -1) {
+		errno = EBADF;
+		return -1;
+	}
+	return ioctl(fd, BIOCSETWF, &pf);
+#else
+#warning No BIOCSETWF support - a compromised BPF can be used as a raw socket
 	UNUSED(bpf);
 	UNUSED(filter);
 	UNUSED(filter_len);
@@ -204,6 +214,14 @@ bpf_lockfilter(const struct bpf *bpf)
 {
 #ifdef HAVE_PCAP_LOCKFILTER
 	return pcap_lockfilter(bpf->bpf_handle);
+#elif defined(BIOCLOCK)
+	int fd = pcap_fileno(bpf->bpf_handle);
+
+	if (fd == -1) {
+		errno = EBADF;
+		return -1;
+	}
+	return ioctl(fd, BIOCLOCK);
 #else
 	UNUSED(bpf);
 	errno = ENOSYS;

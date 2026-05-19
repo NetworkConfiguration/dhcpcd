@@ -1544,7 +1544,6 @@ EOF
 		rm -f _libpcap.c libpcap
 		$abort && exit 1
 	fi
-	LIBPCAP_LIBS="-L/tmp/foo/usr/local/lib -lpcap"
 	echo "CFLAGS+=	$LIBPCAP_CFLAGS" >>$CONFIG_MK
 	echo "LDADD+=		$LIBPCAP_LIBS" >>$CONFIG_MK
 	echo "#define	USE_LIBPCAP" >>$CONFIG_H
