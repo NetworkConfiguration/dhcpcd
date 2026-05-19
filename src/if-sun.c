@@ -26,16 +26,21 @@
  * SUCH DAMAGE.
  */
 
+/* Stop sunos headers including the system queue ... */
+#include "queue.h"
+
 #include <sys/ioctl.h>
 #include <sys/mac.h>
 #include <sys/pfmod.h>
 #include <sys/tihdr.h>
 #include <sys/utsname.h>
 
+#include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
-#include <netinet/udp.h>
 #include <netinet/if_ether.h>
+#include <netinet/in.h>
+#include <netinet/udp.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -1583,24 +1588,6 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, int af)
 }
 
 #ifdef INET
-/* XXX We should fix this to write via the BPF interface. */
-ssize_t
-bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
-{
-	const struct interface *ifp = bpf->bpf_ifp;
-	dlpi_handle_t dh;
-	dlpi_info_t di;
-	int r;
-
-	if (dlpi_open(ifp->name, &dh, 0) != DLPI_SUCCESS)
-		return -1;
-	if ((r = dlpi_info(dh, &di, 0)) == DLPI_SUCCESS &&
-	    (r = dlpi_bind(dh, protocol, NULL)) == DLPI_SUCCESS)
-		r = dlpi_send(dh, di.di_bcastaddr, ifp->hwlen, data, len, NULL);
-	dlpi_close(dh);
-	return r == DLPI_SUCCESS ? (ssize_t)len : -1;
-}
-
 int
 if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
