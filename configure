@@ -1548,6 +1548,22 @@ EOF
 	echo "LDADD+=		$LIBPCAP_LIBS" >>$CONFIG_MK
 	echo "#define	USE_LIBPCAP" >>$CONFIG_H
 
+	printf "Testing for pcap_set_immediate_mode() ... "
+	cat <<EOF >_libpcap_imm.c
+#include <pcap.h>
+
+int main(void) {
+	return pcap_set_immediate_mode(NULL, 1);
+}
+EOF
+	if $XCC $LIBPCAP_CFLAGS _libpcap_imm.c -o libpcap_imm $LIBPCAP_LIBS 2>&3; then
+		echo "yes"
+		echo "#define HAVE_PCAP_SET_IMMEDIATE_MODE" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _libpcap_imm.c libpcap_imm
+
 	printf "Testing for pcap_setwritefilter() ... "
 	cat <<EOF >_libpcap_write.c
 #include <pcap.h>
