@@ -920,7 +920,7 @@ eloop_epollevents(struct epoll_event *epe)
 
 	return events;
 }
-#elif defined(USE_POLL)
+#elif defined(USE_PPOLL)
 static unsigned short
 eloop_pollevents(struct pollfd *pfd)
 {
