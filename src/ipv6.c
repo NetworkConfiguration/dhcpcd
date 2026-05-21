@@ -1023,8 +1023,8 @@ ipv6_freeaddr(struct ipv6_addr *ia)
 #endif
 
 	if (ia->dhcp6_fd != -1) {
-		close(ia->dhcp6_fd);
 		eloop_event_delete(eloop, ia->dhcp6_fd);
+		close(ia->dhcp6_fd);
 	}
 
 	eloop_q_timeout_delete(eloop, ELOOP_QUEUE_ALL, NULL, ia);
