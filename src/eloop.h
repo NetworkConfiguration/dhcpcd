@@ -97,7 +97,10 @@ struct eloop *eloop_new(void);
 void eloop_free(struct eloop *);
 void eloop_exit(struct eloop *, int);
 int eloop_forked(struct eloop *, unsigned short);
-int eloop_waitfd(int);
 int eloop_start(struct eloop *);
+
+int eloop_openfdwaiter(struct eloop *);
+int eloop_waitfd(struct eloop *, int);
+int eloop_closefdwaiter(struct eloop *);
 
 #endif
