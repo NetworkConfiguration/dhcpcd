@@ -385,6 +385,7 @@ eloop_event_delete(struct eloop *eloop, int fd)
 	struct kevent ke[2], *kep = &ke[0];
 	size_t n;
 #endif
+	int error;
 
 	if (fd == -1) {
 		errno = EINVAL;
@@ -400,6 +401,7 @@ eloop_event_delete(struct eloop *eloop, int fd)
 		return -1;
 	}
 
+	error = 1;
 #if defined(USE_KQUEUE)
 	n = 0;
 	if (e->events & ELE_READ) {
@@ -411,16 +413,18 @@ eloop_event_delete(struct eloop *eloop, int fd)
 		n++;
 	}
 	if (n != 0 && kevent(eloop->fd, ke, (KEVENT_N)n, NULL, 0, NULL) == -1)
-		return -1;
+		error = -1;
 #elif defined(USE_EPOLL)
 	if (epoll_ctl(eloop->fd, EPOLL_CTL_DEL, fd, NULL) == -1)
-		return -1;
+		error = -1;
 #endif
 
+	/* We should remove the event from the eloop even if kevent or epoll
+	 * report an error, it's possible it could be EBADF for example. */
 	e->fd = -1;
 	eloop->nevents--;
 	eloop->events_need_setup = true;
-	return 1;
+	return error;
 }
 
 unsigned long long
