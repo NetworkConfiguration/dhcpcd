@@ -88,7 +88,7 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 		goto error;                 \
 	} while (0 /* CONSTCOND */)
 
-	if (eloop_waitfd(fd) == -1)
+	if (eloop_waitfd(ctx->eloop, fd) == -1)
 		PSR_ERROR(errno);
 
 	len = recv(fd, psr_error, sizeof(*psr_error), MSG_WAITALL);
@@ -834,6 +834,9 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	struct ps_process *psp;
 	int logfd[2] = { -1, -1 }, datafd[2] = { -1, -1 };
 	pid_t pid;
+
+	if (eloop_openfdwaiter(ctx->eloop) == -1)
+		return -1;
 
 	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, logfd) == -1)
 		return -1;

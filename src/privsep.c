@@ -151,27 +151,12 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
-	/* Prohibit new files, sockets, etc */
-	/*
-	 * If poll(2) is called with nfds>RLIMIT_NOFILE then it returns EINVAL.
-	 * We don't know the final value of nfds at this point *easily*.
-	 * Sadly, this is a POSIX limitation and most platforms adhere to it.
-	 * However, some are not that strict and are whitelisted below.
-	 * Also, if we're not using poll then we can be restrictive.
-	 *
-	 * For the non whitelisted platforms there should be a sandbox to
-	 * fallback to where we don't allow new files, etc:
-	 *      Linux:seccomp, FreeBSD:capsicum, OpenBSD:pledge
-	 * Solaris users are sadly out of luck on both counts.
-	 */
-#if defined(__NetBSD__) || defined(__DragonFly__) || defined(HAVE_KQUEUE) || \
-    defined(HAVE_EPOLL)
-	/* The control proxy *does* need to create new fd's via accept(2). */
+	/* Prohibit new files, sockets, etc
+	 * The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
 		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 	}
-#endif
 
 #define DHC_NOCHKIO (DHCPCD_STARTED | DHCPCD_DAEMONISE)
 	/* Prohibit writing to files.
@@ -408,6 +393,7 @@ ps_startprocess(struct ps_process *psp,
 	}
 
 	/* If we are not the root process, close un-needed stuff. */
+	eloop_closefdwaiter(ctx->eloop);
 	if (ctx->ps_root != psp) {
 		ps_root_close(ctx);
 #ifdef PLUGIN_DEV
@@ -1119,7 +1105,8 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 
 	cmsg_padlen = CALC_CMSG_PADLEN(psm.ps_controllen,
 	    psm.ps_namelen);
-	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen + psm.ps_datalen;
+	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen +
+	    psm.ps_datalen;
 	if (dlen != 0) {
 		if (dlen > sizeof(ps_data)) {
 			errno = EMSGSIZE;
