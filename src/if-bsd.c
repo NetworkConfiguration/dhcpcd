@@ -438,10 +438,10 @@ if_carrier(struct interface *ifp, const void *ifadata)
 #elif defined(SIOCGIFXMEDIA)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct ifmediareq ifmr = { .ifm_active = 0 };
-	int error;
 
+	UNUSED(ifadata);
 	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
-	if (ioctl(ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1)
+	if (ioctl(ctx->pf_inet_fd, SIOCGIFXMEDIA, &ifmr) == -1)
 		return LINK_UNKNOWN;
 	if (!(ifmr.ifm_status & IFM_AVALID))
 		return LINK_UNKNOWN;

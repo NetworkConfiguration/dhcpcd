@@ -10,11 +10,11 @@ env:
   CC: clang
 
 jobs:
-  # macos is a good plaform as we know it ships with a sanitier we can use
+  # macos is a good platform as we know it ships with a sanitizer we can use
   macos:
     strategy:
       matrix:
-        os: [ macos-15, macos-26 ]
+        os: [ macos-26 ]
     runs-on: ${{ matrix.os }}
 
     steps:

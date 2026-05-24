@@ -1985,6 +1985,7 @@ dup_null(int fd)
 }
 
 #ifdef __APPLE__
+#warning OS does not report interface link state change, polling every second
 static void
 dhcpcd_poll_carrier(void *arg)
 {

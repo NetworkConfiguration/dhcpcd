@@ -127,7 +127,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	struct passwd *pw = ctx->ps_user;
 	int fd_out = ctx->options & DHCPCD_DUMPLEASE ? STDOUT_FILENO :
 						       STDERR_FILENO;
-return 0;
+
 	if (ctx->options & DHCPCD_LAUNCHER)
 #ifdef ASAN
 		logwarnx("not chrooting as compiled for ASAN");
