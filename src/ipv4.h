@@ -77,8 +77,12 @@
 	(IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
 #endif
 
-#define IN_ARE_ADDR_EQUAL(a, b)	  ((a)->s_addr == (b)->s_addr)
+#ifndef IN_ARE_ADDR_EQUAL
+#define IN_ARE_ADDR_EQUAL(a, b) ((a)->s_addr == (b)->s_addr)
+#endif
+#ifndef IN_IS_ADDR_UNSPECIFIED
 #define IN_IS_ADDR_UNSPECIFIED(a) ((a)->s_addr == INADDR_ANY)
+#endif
 
 #ifdef __linux__
 #define IP_LIFETIME

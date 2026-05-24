@@ -10,6 +10,25 @@ env:
   CC: clang
 
 jobs:
+  # macos is a good plaform as we know it ships with a sanitier we can use
+  macos:
+    strategy:
+      matrix:
+        os: [ macos-15, macos-26 ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Configure
+      run: ./configure --sanitize
+
+    - name: Build
+      run: make
+
+    - name: Tests
+      run: make tests
+
   ubuntu:
     strategy:
       matrix:
@@ -17,7 +36,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     
     - name: Configure
       run: ./configure

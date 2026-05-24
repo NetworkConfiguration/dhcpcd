@@ -260,6 +260,10 @@ if [ -z "$OS" ]; then
 	esac
 	# Special case
 	case "$OS" in
+	darwin*)
+		# Can't install /libexec
+		: ${PREFIX:=/usr/local}
+		;;
 	dragonfly*)
 		# This means /usr HAS to be mounted not via dhcpcd
 		: ${LIBEXECDIR:=${PREFIX:-/usr}/libexec}
@@ -376,7 +380,7 @@ else
 	ALLOW_USR_LIBS=true
 fi
 case "$OS" in
-linux*|solaris*|sunos*|kfreebsd*|dragonfly*|freebsd*) ;;
+darwin*|linux*|solaris*|sunos*|kfreebsd*|dragonfly*|freebsd*) ;;
 *)
 	# There might be more than one ...
 	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
@@ -589,8 +593,7 @@ if [ "$PRIVSEP" = yes ]; then
 	if [ -z "$PRIVSEP_USER" ]; then
 		printf "Detecting a suitable user for dhcpcd ... "
 		for x in _dhcpcd _dhcp dhcpcd; do
-			home=$(getent passwd $x 2>/dev/null | cut -d: -f6)
-			if [ -d "$home" ]; then
+			if id "$x" >/dev/null 2>&1; then
 				PRIVSEP_USER="$x"
 				break
 			fi
@@ -649,7 +652,7 @@ _CC=false
 if $XCC _test.c -o _test >/dev/null 2>&3; then
 	[ -x _test ] && _CC=true
 fi
-rm -f _test.c _test
+rm -rf _test.* _test
 if ! $_CC; then
 	echo $XCC
 	echo "$CC does not create executables" >&2
@@ -672,7 +675,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _capsicum.c _capsicum
+	rm -rf _capsicum.* _capsicum
 
 	printf "Testing for pledge ... "
 	cat <<EOF >_pledge.c
@@ -687,7 +690,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _pledge.c _pledge
+	rm -rf _pledge.* _pledge
 fi
 
 # This block needs to be after the compiler test due to embedded quotes.
@@ -715,7 +718,7 @@ EOF
 		echo "no"
 		echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
 	fi
-	rm -f _nl80211.c _nl80211
+	rm -rf _nl80211.* _nl80211
 
 	printf "Testing for IN6_ADDR_GEN_MODE_NONE ... "
 	cat <<EOF >_IN6_ADDR_GEN_MODE_NONE.c
@@ -731,7 +734,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _IN6_ADDR_GEN_MODE_NONE.c _IN6_ADDR_GEN_MODE_NONE
+	rm -rf _IN6_ADDR_GEN_MODE_NONE.* _IN6_ADDR_GEN_MODE_NONE
 else
 	printf "Testing for ifam_pid ... "
 	cat <<EOF >_ifam_pid.c
@@ -747,7 +750,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _ifam_pid.c _ifam_pid
+	rm -rf _ifam_pid.* _ifam_pid
 
 	printf "Testing for ifam_addrflags ... "
 	cat <<EOF >_ifam_addrflags.c
@@ -763,7 +766,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _ifam_addrflags.c _ifam_addrflags
+	rm -rf _ifam_addrflags.* _ifam_addrflags
 fi
 
 abort=false
@@ -789,7 +792,7 @@ else
 	echo "libc support for getifaddrs is required - aborting" >&2
 	abort=true
 fi
-rm -f _getifaddrs.c _getifaddrs
+rm -rf _getifaddrs.* _getifaddrs
 $abort && exit 1
 
 printf "Testing for ifaddrs.ifa_addrflags ... "
@@ -808,7 +811,7 @@ if $XCC _getifaddrs_addrflags.c -o _getifaddrs_addrflags $LIBSOCKET 2>&3; then
 else
 	echo "no"
 fi
-rm -f _getifaddrs_addrflags.c _getifaddrs_addrflags
+rm -rf _getifaddrs_addrflags.* _getifaddrs_addrflags
 
 printf "Testing for clock_gettime ... "
 cat <<EOF >_clock_gettime.c
@@ -828,7 +831,7 @@ else
 	echo "libc support for clock_getttime is required - aborting" >&2
 	abort=true
 fi
-rm -f _clock_gettime.c _clock_gettime
+rm -rf _clock_gettime.* _clock_gettime
 $abort && exit 1
 
 if [ -z "$CLOSEFROM" ]; then
@@ -848,7 +851,7 @@ EOF
 	fi
 	echo "$CLOSEFROM"
 fi
-rm -f _closefrom.c _closefrom
+rm -rf _closefrom.* _closefrom
 if [ "$CLOSEFROM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/closefrom.c" >>$CONFIG_MK
 	echo "#include			\"compat/closefrom.h\"" >>$CONFIG_H
@@ -873,7 +876,7 @@ echo "$IOCTL_REQ"
 if [ "$IOCTL_REQ" != "unsigned long" ]; then
 	echo "#define	IOCTL_REQUEST_TYPE	$IOCTL_REQ" >>$CONFIG_H
 fi
-rm -f _ioctl.c _ioctl
+rm -rf _ioctl.* _ioctl
 
 printf "Testing for inet_ntoa ... "
 cat <<EOF >_inet_ntoa.c
@@ -898,7 +901,7 @@ else
 	echo "libc support for inet_ntoa is required - aborting" >&2
 	abort=true
 fi
-rm -f _inet_ntoa.c _inet_ntoa
+rm -rf _inet_ntoa.* _inet_ntoa
 $abort && exit 1
 
 if [ -z "$ARC4RANDOM" ]; then
@@ -915,7 +918,7 @@ EOF
 		ARC4RANDOM=no
 	fi
 	echo "$ARC4RANDOM"
-	rm -f _arc4random.c _arc4random
+	rm -rf _arc4random.* _arc4random
 fi
 if [ "$ARC4RANDOM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random.c" >>$CONFIG_MK
@@ -936,7 +939,7 @@ EOF
 		ARC4RANDOM_UNIFORM=no
 	fi
 	echo "$ARC4RANDOM_UNIFORM"
-	rm -f _arc4random_uniform.c _arc4random_uniform
+	rm -rf _arc4random_uniform.* _arc4random_uniform
 fi
 if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random_uniform.c" >>$CONFIG_MK
@@ -960,7 +963,7 @@ EOF
 		MEMSET_EXPLICIT=no
 	fi
 	echo "$MEMSET_EXPLICIT"
-	rm -f _memset_explicit.c _memset_explicit
+	rm -rf _memset_explicit.* _memset_explicit
 fi
 if [ "$MEMSET_EXPLICIT" = yes ]; then
 	echo "#define	HAVE_MEMSET_EXPLICIT" >>$CONFIG_H
@@ -983,7 +986,7 @@ EOF
 		EXPLICIT_BZERO=no
 	fi
 	echo "$EXPLICIT_BZERO"
-	rm -f _explicit_bzero.c _explicit_bzero
+	rm -rf _explicit_bzero.* _explicit_bzero
 fi
 if [ "$EXPLICIT_BZERO" = yes ]; then
 	echo "#define	HAVE_EXPLICIT_BZERO" >>$CONFIG_H
@@ -1006,7 +1009,7 @@ EOF
 		MEMSET_S=no
 	fi
 	echo "$MEMSET_S"
-	rm -f _memset_s.c _memset_s
+	rm -rf _memset_s.* _memset_s
 fi
 if [ "$MEMSET_S" = yes ]; then
 	echo "#define	__STDC_WANT_LIB_EXT1__	1" >>$CONFIG_H
@@ -1027,7 +1030,7 @@ EOF
 		OPEN_MEMSTREAM=no
 	fi
 	echo "$OPEN_MEMSTREAM"
-	rm -f _open_memstream.c _open_memstream
+	rm -rf _open_memstream.* _open_memstream
 fi
 if [ "$OPEN_MEMSTREAM" = yes ]; then
 	echo "#define	HAVE_OPEN_MEMSTREAM" >>$CONFIG_H
@@ -1059,7 +1062,7 @@ EOF
 		PIDFILE_LOCK=no
 	fi
 	echo "$PIDFILE_LOCK"
-	rm -f _pidfile.c _pidfile
+	rm -rf _pidfile.* _pidfile
 fi
 if [ "$PIDFILE_LOCK" = no ]; then
 	echo "COMPAT_SRCS+=	compat/pidfile.c" >>$CONFIG_MK
@@ -1087,11 +1090,11 @@ EOF
 		SETPROCTITLE=no
 	fi
 	echo "$SETPROCTITLE"
-	rm -f _setproctitle.c _setproctitle
+	rm -rf _setproctitle.* _setproctitle
 fi
 if [ "$SETPROCTITLE" = no ]; then
 	case "$OS" in
-	solaris*|sunos*)
+	darwin*|solaris*|sunos*)
 		echo "$OS has no support for setting process title"
 		echo "#define	setproctitle(...)" >>$CONFIG_H
 		;;
@@ -1099,8 +1102,12 @@ if [ "$SETPROCTITLE" = no ]; then
 		echo "COMPAT_SRCS+=	compat/setproctitle.c" >>$CONFIG_MK
 		echo "#include			\"compat/setproctitle.h\"" \
 			>>$CONFIG_H
+		SETPROCTITLE=yes
 		;;
 	esac
+fi
+if [ "$SETPROCTITLE" = yes ]; then
+	echo "#define HAVE_SETPROCTITLE" >>$CONFIG_H
 fi
 
 if [ -z "$STRLCPY" ]; then
@@ -1119,7 +1126,7 @@ EOF
 		STRLCPY=no
 	fi
 	echo "$STRLCPY"
-	rm -f _strlcpy.c _strlcpy
+	rm -rf _strlcpy.* _strlcpy
 fi
 if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
@@ -1143,7 +1150,7 @@ EOF
 		STRTOI=no
 	fi
 	echo "$STRTOI"
-	rm -f _strtoi.c _strtoi
+	rm -rf _strtoi.* _strtoi
 fi
 if [ "$STRTOI" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strtoi.c compat/strtou.c" >>$CONFIG_MK
@@ -1164,7 +1171,7 @@ EOF
 		CONSTTIME_MEMEQUAL=no
 	fi
 	echo "$CONSTTIME_MEMEQUAL"
-	rm -f _consttime_memequal.c _consttime_memequal
+	rm -rf _consttime_memequal.* _consttime_memequal
 fi
 if [ "$CONSTTIME_MEMEQUAL" = no ] && [ -z "$TIMINGSAFE_BCMP" ]; then
 	printf "Testing for timingsafe_bcmp ... "
@@ -1180,7 +1187,7 @@ EOF
 		TIMINGSAFE_BCMP=no
 	fi
 	echo "$TIMINGSAFE_BCMP"
-	rm -f _timingsafe_bcmp.c _timingsafe_bcmp
+	rm -rf _timingsafe_bcmp.* _timingsafe_bcmp
 fi
 
 if [ "$CONSTTIME_MEMEQUAL" = no ]; then
@@ -1207,7 +1214,7 @@ EOF
 		DPRINTF=no
 	fi
 	echo "$DPRINTF"
-	rm -f _dprintf.c _dprintf
+	rm -rf _dprintf.* _dprintf
 fi
 if [ "$DPRINTF" = no ]; then
 	echo "COMPAT_SRCS+=	compat/dprintf.c" >>$CONFIG_MK
@@ -1231,7 +1238,7 @@ EOF
 		RBTREE=no
 	fi
 	echo "$RBTREE"
-	rm -f _rbtree.c _rbtree
+	rm -rf _rbtree.* _rbtree
 fi
 if [ "$RBTREE" = no ]; then
 	echo "VENDOR_SRCS+=	vendor/rbtree.c" >>$CONFIG_MK
@@ -1261,7 +1268,7 @@ EOF
 		REALLOCARRAY=no
 	fi
 	echo "$REALLOCARRAY"
-	rm -f _reallocarray.c _reallocarray
+	rm -rf _reallocarray.* _reallocarray
 fi
 if [ "$REALLOCARRAY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/reallocarray.c" >>$CONFIG_MK
@@ -1286,7 +1293,7 @@ EOF
 		BE64ENC=no
 	fi
 	echo "$BE64ENC"
-	rm -f _be64enc.c _be64enc
+	rm -rf _be64enc.* _be64enc
 fi
 if [ "$BE64ENC" = no ]; then
 	echo "#include			\"compat/endian.h\"" >>$CONFIG_H
@@ -1306,7 +1313,7 @@ EOF
 		FLS64=no
 	fi
 	echo "$FLS64"
-	rm -f _fls64.c _fls64
+	rm -rf _fls64.* _fls64
 fi
 if [ "$FLS64" = yes ]; then
 	echo "#define	HAVE_SYS_BITOPS_H" >>$CONFIG_H
@@ -1340,7 +1347,7 @@ EOF
 		MD5=no
 	fi
 	echo "$MD5"
-	rm -f _md5.c _md5
+	rm -rf _md5.* _md5
 fi
 
 if [ -z "$SHA2_H" ]; then
@@ -1390,7 +1397,7 @@ EOF
 		SHA2=no
 	fi
 	echo "$SHA2"
-	rm -f _sha256.c _sha256
+	rm -rf _sha256.* _sha256
 	if [ "$SHA2" = no ]; then
 		# Did OpenBSD really change this? grrrr
 		printf "Testing for SHA256Init ... "
@@ -1424,7 +1431,7 @@ EOF
 			SHA2=no
 		fi
 		echo "$SHA2"
-		rm -f _sha256.c _sha256
+		rm -rf _sha256.* _sha256
 	fi
 fi
 
@@ -1457,7 +1464,7 @@ EOF
 		fi
 	fi
 	echo "$HMAC"
-	rm -f _hmac.c _hmac
+	rm -rf _hmac.* _hmac
 fi
 
 if [ "$OPENSSL" = yes ] ||
@@ -1491,7 +1498,7 @@ EOF
 		OPENSSL=no
 	fi
 	echo "$OPENSSL"
-	rm -f _openssl.c _openssl
+	rm -rf _openssl.* _openssl
 fi
 
 if [ "$OPENSSL" = yes ]; then
@@ -1516,7 +1523,7 @@ EOF
 	SHA2_LIB=
 	SHA2_RENAMED=
 	echo "$SHA2"
-	rm -f _openssl_sha.c _openssl_sha
+	rm -rf _openssl_sha.* _openssl_sha
 fi
 
 if [ "$LIBPCAP" = yes ]; then
@@ -1542,7 +1549,7 @@ EOF
 			echo "no"
 			abort=true
 		fi
-		rm -f _libpcap.c libpcap
+		rm -rf _libpcap.* libpcap
 		$abort && exit 1
 	fi
 	echo "CFLAGS+=	$LIBPCAP_CFLAGS" >>$CONFIG_MK
@@ -1563,7 +1570,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _libpcap_imm.c libpcap_imm
+	rm -rf _libpcap_imm.* libpcap_imm
 
 	printf "Testing for pcap_setwritefilter() ... "
 	cat <<EOF >_libpcap_write.c
@@ -1579,7 +1586,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _libpcap_write.c libpcap_write
+	rm -rf _libpcap_write.* libpcap_write
 
 	printf "Testing for pcap_lockfilter() ... "
 	cat <<EOF >_libpcap_lock.c
@@ -1595,7 +1602,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _libpcap_lock.c libpcap_lock
+	rm -rf _libpcap_lock.* libpcap_lock
 fi
 
 # Workaround for DragonFlyBSD import
@@ -1709,7 +1716,7 @@ EOF
 		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_NOFILTER" >>$CONFIG_MK
 		echo "no"
 	fi
-	rm -f _udev.c _udev
+	rm -rf _udev.* _udev
 
 	printf "Checking udev_device_get_is_initialized ... "
 	cat <<EOF >_udev.c
@@ -1726,7 +1733,7 @@ EOF
 		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_NOINIT" >>$CONFIG_MK
 		echo "no"
 	fi
-	rm -f _udev.c _udev
+	rm -rf _udev.* _udev
 elif [ "$DEV" != no ] && [ "$UDEV" != no ] && [ -n "$UDEV" ]; then
 	echo "udev has been explicitly requested ... aborting" >&2
 	exit 1
@@ -1761,7 +1768,7 @@ EOF
 		echo "no"
 		echo "libc for dlopen is required - aborting"
 	fi
-	rm -f _dlopen.c _dlopen
+	rm -rf _dlopen.* _dlopen
 	$abort && exit 1
 fi
 

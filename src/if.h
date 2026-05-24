@@ -128,7 +128,7 @@ struct priv {
 #ifdef INET6
 	int pf_inet6_fd;
 #endif
-#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+#if (defined(SIOCALIFADDR) && defined(IFLR_ACTIVE)) || defined(SIOCGIFSTATUS)
 	int pf_link_fd;
 #endif
 };
