@@ -158,7 +158,7 @@ main(int argc, char **argv)
 		err(EXIT_FAILURE, "malloc");
 
 	for (i = 0, p = pipes; i < npipes; i++, p++) {
-		if (pipe2(p->fd, O_CLOEXEC | O_NONBLOCK) == -1)
+		if (pipe(p->fd) == -1)
 			err(EXIT_FAILURE, "pipe");
 		if (eloop_event_add(e, p->fd[0], ELE_READ, read_cb, p) == -1)
 			err(EXIT_FAILURE, "eloop_event_add");

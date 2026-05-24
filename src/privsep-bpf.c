@@ -149,16 +149,20 @@ static int
 ps_bpf_start_bpf(struct ps_process *psp)
 {
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
-	char *addr;
 	struct in_addr *ia = &psp->psp_id.psi_addr.psa_in_addr;
+#ifdef HAVE_SETPROCTITLE
+	char *addr;
+#endif
 
-	if (ia->s_addr == INADDR_ANY) {
+	if (ia->s_addr == INADDR_ANY)
 		ia = NULL;
-		addr = NULL;
-	} else
-		addr = inet_ntoa(*ia);
+
+#ifdef HAVE_SETPROCTITLE
+	addr = ia != NULL ? inet_ntoa(*ia) : NULL;
 	setproctitle("[BPF %s] %s%s%s", psp->psp_protostr, psp->psp_ifname,
 	    addr != NULL ? " " : "", addr != NULL ? addr : "");
+#endif
+
 	ps_freeprocesses(ctx, psp);
 
 	psp->psp_bpf = bpf_open(&psp->psp_ifp, psp->psp_filter, ia);

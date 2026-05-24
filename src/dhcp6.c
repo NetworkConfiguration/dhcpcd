@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#define __APPLE_USE_RFC_3542
+
 #include <sys/types.h>
 #include <sys/utsname.h>
 

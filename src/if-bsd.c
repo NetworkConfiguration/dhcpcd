@@ -50,16 +50,23 @@
 #include <arpa/inet.h>
 
 #include "config.h"
+#include "src/dhcpcd.h"
 #ifdef __NetBSD__
 #include <net/if_vlanvar.h> /* Needs netinet/if_ether.h */
 #elif defined(__DragonFly__)
 #include <net/vlan/if_vlan_var.h>
+#elif defined(__APPLE__)
+/* Apple doesn't ship this in include/net ... */
+struct vlanreq {
+	char vlr_parent[IFNAMSIZ];
+	u_short vlr_tag;
+};
 #else
 #include <net/if_vlan_var.h>
 #endif
 #ifdef __DragonFly__
 #include <netproto/802_11/ieee80211_ioctl.h>
-#else
+#elif !defined(__APPLE__)
 #include <net80211/ieee80211.h>
 #include <net80211/ieee80211_ioctl.h>
 #endif
@@ -96,11 +103,15 @@
 #include "sa.h"
 
 #ifndef RT_ROUNDUP
+#ifdef __APPLE__
+#define RT_ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(uint32_t) - 1))) : sizeof(uint32_t))
+#else
 #define RT_ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#endif
 #define RT_ADVANCE(x, n) (x += RT_ROUNDUP((n)->sa_len))
 #endif
-
 /* Ignore these interface names which look like ethernet but are virtual or
  * just won't work without explicit configuration. */
 static const char *const ifnames_ignore[] = { "bridge",
@@ -108,6 +119,9 @@ static const char *const ifnames_ignore[] = { "bridge",
 	"fwe",			 /* Firewire */
 	"fwip",			 /* Firewire */
 	"tap", "vether", "xvif", /* XEN DOM0 -> guest interface */
+#ifdef __APPLE__
+	"ap", "awdl", "llw",
+#endif
 	NULL };
 
 struct rtm {
@@ -227,7 +241,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 		ps_rights_limit_fd_sockopt(ctx->link_fd);
 #endif
 
-#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+#if (defined(SIOCALIFADDR) && defined(IFLR_ACTIVE))
 	priv->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM, 0);
 	if (priv->pf_link_fd == -1)
 		logerr("%s: socket(PF_LINK)", __func__);
@@ -400,6 +414,7 @@ if_indirect_ioctl(struct dhcpcd_ctx *ctx, const char *ifname, unsigned long cmd,
 int
 if_carrier(struct interface *ifp, const void *ifadata)
 {
+#ifdef LINK_STATE_UP
 	const struct if_data *ifi = ifadata;
 
 	/*
@@ -408,7 +423,6 @@ if_carrier(struct interface *ifp, const void *ifadata)
 	 * support SIOCGIFMEDIA.
 	 */
 	assert(ifadata != NULL);
-
 	if (ifi->ifi_link_state >= LINK_STATE_UP)
 		return LINK_UP;
 	if (ifi->ifi_link_state == LINK_STATE_UNKNOWN) {
@@ -421,6 +435,23 @@ if_carrier(struct interface *ifp, const void *ifadata)
 		return LINK_UNKNOWN;
 	}
 	return LINK_DOWN;
+#elif defined(SIOCGIFXMEDIA)
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct ifmediareq ifmr = { .ifm_active = 0 };
+
+	UNUSED(ifadata);
+	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
+	if (ioctl(ctx->pf_inet_fd, SIOCGIFXMEDIA, &ifmr) == -1)
+		return LINK_UNKNOWN;
+	if (!(ifmr.ifm_status & IFM_AVALID))
+		return LINK_UNKNOWN;
+	return ifmr.ifm_status & IFM_ACTIVE ? LINK_UP : LINK_DOWN;
+#else
+#warning OS does not report interface link state
+	UNUSED(ifp);
+	UNUSED(ifadata);
+	return LINK_UNKNOWN;
+#endif
 }
 
 bool
@@ -489,6 +520,10 @@ if_getssid1(struct dhcpcd_ctx *ctx, const char *ifname, void *ssid)
 		}
 	}
 #else
+#warning OS does not report interface SSID
+	UNUSED(ctx);
+	UNUSED(ifname);
+	UNUSED(ssid);
 	errno = ENOSYS;
 #endif
 
@@ -528,7 +563,7 @@ if_vimaster(struct dhcpcd_ctx *ctx, const char *ifname)
 		return -1;
 	if (ifmr.ifm_status & IFM_AVALID &&
 	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211) {
-		if (if_getssid1(ctx, ifname, NULL) == -1)
+		if (if_getssid1(ctx, ifname, NULL) == -1 && errno != ENOSYS)
 			return 1;
 	}
 	return 0;
@@ -537,7 +572,7 @@ if_vimaster(struct dhcpcd_ctx *ctx, const char *ifname)
 unsigned short
 if_vlanid(const struct interface *ifp)
 {
-#ifdef SIOCGETVLAN
+#if defined(SIOCGETVLAN)
 	struct vlanreq vlr = { .vlr_tag = 0 };
 
 	if (if_indirect_ioctl(ifp->ctx, ifp->name, SIOCGETVLAN, &vlr,
@@ -929,7 +964,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 }
 
 static int
-if_sysctl(struct dhcpcd_ctx *ctx, const int *name, u_int namelen, void *oldp,
+if_sysctl(struct dhcpcd_ctx *ctx, int *name, u_int namelen, void *oldp,
     size_t *oldlenp, void *newp, size_t newlen)
 {
 #if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
@@ -1225,6 +1260,7 @@ if_getlifetime6(struct ipv6_addr *ia)
 }
 #endif
 
+#ifdef IFAN_ARRIVAL
 static int
 if_announce(struct dhcpcd_ctx *ctx, const struct if_announcemsghdr *ifan)
 {
@@ -1242,6 +1278,7 @@ if_announce(struct dhcpcd_ctx *ctx, const struct if_announcemsghdr *ifan)
 
 	return 0;
 }
+#endif
 
 static int
 if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)

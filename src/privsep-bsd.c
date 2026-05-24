@@ -43,12 +43,13 @@
 #include <netinet/if_ether.h>
 #elif defined(__DragonFly__)
 #include <net/vlan/if_vlan_var.h>
+#elif defined(__APPLE__)
 #else
 #include <net/if_vlan_var.h>
 #endif
 #ifdef __DragonFly__
 #include <netproto/802_11/ieee80211_ioctl.h>
-#else
+#elif !defined(__APPLE__)
 #include <net80211/ieee80211.h>
 #include <net80211/ieee80211_ioctl.h>
 #endif

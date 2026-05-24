@@ -1984,6 +1984,29 @@ dup_null(int fd)
 	return err;
 }
 
+#ifdef __APPLE__
+#warning OS does not report interface link state change, polling every second
+static void
+dhcpcd_poll_carrier(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	struct interface *ifp;
+	int link_status;
+
+	if (ctx->options & DHCPCD_EXITING)
+		return;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (!(ifp->active))
+			continue;
+		link_status = if_carrier(ifp, NULL);
+		dhcpcd_handlecarrier(ifp, link_status, ifp->flags);
+	}
+
+	eloop_timeout_add_sec(ctx->eloop, 1, dhcpcd_poll_carrier, ctx);
+}
+#endif
+
 int
 main(int argc, char **argv, char **envp)
 {
@@ -2720,6 +2743,10 @@ start_manager:
 			eloop_timeout_add_sec(ctx.eloop, 0,
 			    dhcpcd_prestartinterface, ifp);
 	}
+
+#ifdef __APPLE__
+	dhcpcd_poll_carrier(&ctx);
+#endif
 
 run_loop:
 	i = eloop_start(ctx.eloop);

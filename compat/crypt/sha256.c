@@ -36,7 +36,7 @@
 #ifdef __GLIBC__
 #  include <endian.h>
 #endif
-#ifdef BSD
+#if defined(BSD) || defined(__APPLE__)
 #  ifndef __QNX__
 #    include <sys/endian.h>
 #  endif
