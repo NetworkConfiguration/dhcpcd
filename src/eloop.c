@@ -997,7 +997,14 @@ int
 eloop_closefdwaiter(struct eloop *eloop)
 {
 #if defined(USE_KQUEUE) || defined(USE_EPOLL)
-	int err = close(eloop->waitfd);
+	int err;
+
+        if (eloop->waitfd == -1) {
+		errno = EBADF;
+		return -1;
+	}
+
+	err = close(eloop->waitfd);
 	eloop->waitfd = -1;
 	return err;
 #else
