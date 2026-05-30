@@ -337,6 +337,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_fstat64
 	SECCOMP_ALLOW(__NR_fstat64),
 #endif
+#ifdef __NR_ftruncate
+	SECCOMP_ALLOW(__NR_ftruncate),
+#endif
 #ifdef __NR_gettimeofday
 	SECCOMP_ALLOW(__NR_gettimeofday),
 #endif
@@ -363,6 +366,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TIOCGWINSZ),
 /* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
  * which lives in the impossible to include linux/wireless.h header */
+#endif
+#ifdef __NR_lseek
+	SECCOMP_ALLOW(__NR_lseek),
 #endif
 #ifdef __NR_madvise /* needed for musl */
 	SECCOMP_ALLOW(__NR_madvise),

@@ -2289,11 +2289,15 @@ main(int argc, char **argv, char **envp)
 			default:
 				per = "";
 			}
-			snprintf(ctx.pidfile, sizeof(ctx.pidfile), PIDFILE,
-			    ifname, per, ".");
+			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") == -1) {
+				logerr("%s: asprintf", __func__);
+				goto exit_failure;
+			}
 		} else {
-			snprintf(ctx.pidfile, sizeof(ctx.pidfile), PIDFILE, "",
-			    "", "");
+			if (asprintf(&ctx.pidfile, PIDFILE, "", "", "") == -1) {
+				logerr("%s: asprintf", __func__);
+				goto exit_failure;
+			}
 			ctx.options |= DHCPCD_MANAGER;
 
 			/*
@@ -2582,6 +2586,18 @@ start_manager:
 #endif
 		goto exit_failure;
 	}
+#ifdef PRIVSEP_RIGHTS
+	{
+		cap_rights_t rights;
+
+		cap_rights_init(&rights, CAP_READ, CAP_SEEK, CAP_FTRUNCATE);
+		if (cap_rights_limit(pidfile_fd(), &rights) == -1 &&
+		    errno != ENOSYS) {
+			logerr("%s: cap_rights_limit", __func__);
+			goto exit_failure;
+		}
+	}
+#endif
 #endif
 
 	os_init();
@@ -2817,6 +2833,7 @@ exit1:
 	}
 #endif
 
+	free(ctx.pidfile);
 	eloop_free(ctx.eloop);
 	logclose();
 	free(ctx.logfile);
@@ -2826,9 +2843,5 @@ exit1:
 	setproctitle_fini();
 #endif
 
-#ifdef USE_SIGNALS
-	if (ctx.options & (DHCPCD_FORKED | DHCPCD_PRIVSEP))
-		_exit(i); /* so atexit won't remove our pidfile */
-#endif
 	return i;
 }

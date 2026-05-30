@@ -392,8 +392,11 @@ ps_startprocess(struct ps_process *psp,
 		return pid;
 	}
 
-	/* If we are not the root process, close un-needed stuff. */
+	/* Close things we no longer need */
+	pidfile_unlock();
 	eloop_closefdwaiter(ctx->eloop);
+
+	/* Close more if we are not root */
 	if (ctx->ps_root != psp) {
 		ps_root_close(ctx);
 #ifdef PLUGIN_DEV
@@ -420,7 +423,6 @@ ps_startprocess(struct ps_process *psp,
 		goto errexit;
 	}
 
-	pidfile_clean();
 	ps_freeprocesses(ctx, psp);
 
 	if (ctx->ps_root != psp) {
@@ -621,6 +623,9 @@ ps_managersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 		logerr("%s: ps_dropprivs", __func__);
 		return -1;
 	}
+
+	/* We can no longer unlink the pidfile. */
+	pidfile_unremoveable();
 
 #ifdef PRIVSEP_RIGHTS
 	if ((ctx->pf_inet_fd != -1 &&

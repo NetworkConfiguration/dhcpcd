@@ -116,7 +116,7 @@ TAILQ_HEAD(if_head, interface);
 struct passwd;
 
 struct dhcpcd_ctx {
-	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
+	char *pidfile;
 	char vendor[256];
 	int fork_fd; /* FD for the fork init signal pipe */
 	const char *cffile;
