@@ -1,6 +1,6 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 1999, 2016 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2016, 2026 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -31,10 +31,16 @@
 #ifndef PIDFILE_H
 #define PIDFILE_H
 
-#include <unistd.h>
+#include "config.h"
 
+int		pidfile(const char *);
 int		pidfile_clean(void);
 pid_t		pidfile_lock(const char *);
 pid_t		pidfile_read(const char *);
+int		pidfile_unlock(void);
+
+int		pidfile_fd(void);
+const char *	pidfile_path(void);
+void		pidfile_unremoveable(void);
 
 #endif
