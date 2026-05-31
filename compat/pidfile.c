@@ -1,4 +1,4 @@
-/*	$NetBSD: pidfile.c,v 1.16 2021/08/01 15:29:29 andvar Exp $	*/
+/*	$NetBSD: pidfile.c,v 1.18 2026/05/31 11:31:02 roy Exp $	*/
 
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
@@ -52,7 +52,7 @@
 #endif
 
 #ifdef __RCSID
-__RCSID("$NetBSD: pidfile.c,v 1.16 2021/08/01 15:29:29 andvar Exp $");
+__RCSID("$NetBSD: pidfile.c,v 1.18 2026/05/31 11:31:02 roy Exp $");
 #endif
 
 static char *pf_path;
