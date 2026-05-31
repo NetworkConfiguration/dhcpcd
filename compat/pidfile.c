@@ -112,9 +112,10 @@ pidfile_unlock(void)
 {
 	int error;
 
-	if (pf_fd == -1)
-		error = EBADF;
-	else {
+	if (pf_fd == -1) {
+		error = -1;
+		errno = EBADF;
+	} else {
 		error = close(pf_fd);
 		pf_fd = -1;
 	}
@@ -208,6 +209,8 @@ pidfile_read(const char *path)
 		goto out;
 
 	pid = pidfile_readfd(fd);
+	if (fd != pf_fd)
+		(void)close(fd);
 
 out:
 	free(dpath);
@@ -260,7 +263,7 @@ pidfile_lock(const char *path)
 
 #ifndef O_CLOEXEC
 		if ((opts = fcntl(fd, F_GETFD)) == -1 ||
-		    fcntl(fd, F_SETFL, opts | FD_CLOEXEC) == -1) {
+		    fcntl(fd, F_SETFD, opts | FD_CLOEXEC) == -1) {
 			int error = errno;
 
 			(void)close(fd);
@@ -299,8 +302,17 @@ return_pid:
 		if (path == dpath) {
 			pf_path = dpath;
 			dpath = NULL;
-		} else
+		} else {
 			pf_path = strdup(path);
+			if (pf_path == NULL) {
+				int error = errno;
+
+				(void)close(pf_fd);
+				pf_fd = -1;
+				errno = error;
+				goto out;
+			}
+		}
 	}
 
 	/* Truncate the file, as we could be re-writing it.

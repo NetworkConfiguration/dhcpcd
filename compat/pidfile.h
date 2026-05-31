@@ -31,6 +31,8 @@
 #ifndef PIDFILE_H
 #define PIDFILE_H
 
+#include <sys/types.h>
+
 #include "config.h"
 
 int		pidfile(const char *);
