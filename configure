@@ -1044,7 +1044,7 @@ if [ -z "$PIDFILE_LOCK" ]; then
 #include <stdlib.h>
 #include <util.h>
 int main(void) {
-	return (int)xpidfile_unlock();
+	return (int)pidfile_unlock();
 }
 EOF
 	# We only want to link to libutil if it exists in /lib
