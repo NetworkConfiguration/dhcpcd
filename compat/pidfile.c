@@ -129,7 +129,7 @@ pidfile_unlock(void)
  * The pidfile is truncated because we may have dropped permissions
  * or entered a chroot and thus unable to unlink it.
  *
- * Returns 0 on truncation success, otherwise -1. */
+ * Returns 0 on success, otherwise -1. */
 int
 pidfile_clean(void)
 {
