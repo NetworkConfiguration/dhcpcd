@@ -952,6 +952,7 @@ eloop_openfdwaiter(struct eloop *eloop)
 	eloop->waitfd = fd;
 	return fd;
 #else
+	UNUSED(eloop);
 	/* Not an error, but no fd */
 	errno = 0;
 	return -1;
@@ -986,6 +987,7 @@ eloop_waitfd(struct eloop *eloop, int fd)
 #else
 	struct pollfd pfd = { .fd = fd, .events = POLLIN };
 
+	UNUSED(eloop);
 	n = poll(&pfd, 1, -1);
 	if (n == -1 || n == 0)
 		return n;
@@ -1008,6 +1010,7 @@ eloop_closefdwaiter(struct eloop *eloop)
 	eloop->waitfd = -1;
 	return err;
 #else
+	UNUSED(eloop);
 	return 0;
 #endif
 }
