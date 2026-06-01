@@ -34,20 +34,21 @@
 #include <netinet/if_ether.h>
 
 #include <arpa/inet.h>
-
-#ifdef __linux__
-/* Special BPF snowflake. */
-#include <linux/filter.h>
-#define bpf_insn sock_filter
-#else
-#include <net/bpf.h>
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "config.h"
+#ifdef USE_LIBPCAP
+#include <pcap/bpf.h>
+#elif defined(__linux__)
+#include <linux/filter.h>
+#define bpf_insn sock_filter
+#else
+#include <net/bpf.h>
+#endif
 
 #include "arp.h"
 #include "bpf.h"
@@ -268,7 +269,7 @@ static const struct bpf_insn bpf_arp_ether[] = {
 	/* Make sure the hardware length matches. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, offsetof(struct arphdr, ar_hln)),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-	    sizeof(((struct ether_arp *)0)->arp_sha), 1, 0),
+	    sizeof(((struct ether_header *)0)->ether_shost), 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 #define BPF_ARP_ETHER_LEN __arraycount(bpf_arp_ether)
@@ -314,8 +315,10 @@ bpf_arp_rw(const struct bpf *bpf, const struct in_addr *ia, bool recv)
 	case ARPHRD_ETHER:
 		memcpy(bp, bpf_arp_ether, sizeof(bpf_arp_ether));
 		bp += BPF_ARP_ETHER_LEN;
-		arp_len = sizeof(struct ether_header) +
-		    sizeof(struct ether_arp);
+		arp_len = sizeof(struct ether_header) + sizeof(struct arphdr) +
+		    ((sizeof(((struct ether_header *)0)->ether_shost) +
+			 sizeof(uint32_t)) *
+			2);
 		break;
 	default:
 		errno = EINVAL;
