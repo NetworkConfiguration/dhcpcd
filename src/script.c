@@ -583,11 +583,13 @@ send_interface(struct fd_list *fd, const struct interface *ifp, int af)
 	const struct dhcp6_state *d6;
 #endif
 
-#ifndef AF_LINK
-#define AF_LINK AF_PACKET
+	if (af == AF_UNSPEC
+#if defined(AF_LINK)
+	    || af == AF_LINK
+#elif defined(AF_PACKET)
+	    || af == AF_PACKET
 #endif
-
-	if (af == AF_UNSPEC || af == AF_LINK) {
+	) {
 		const char *reason;
 
 		switch (ifp->carrier) {
