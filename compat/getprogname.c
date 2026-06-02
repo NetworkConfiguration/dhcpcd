@@ -1,5 +1,5 @@
 /*
- * getprogname: Portable
+ * getprogname: compat
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -27,13 +27,13 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
 
 #include "config.h"
-#include "common.h"
 #include "defs.h"
 #include "getprogname.h"
 
-static char *progname;
+static const char *progname;
 
 const char *
 getprogname(void)
@@ -53,5 +53,5 @@ getprogname(void)
 void
 setprogname(const char *name)
 {
-	progname = UNCONST(name);
+	progname = name;
 }
