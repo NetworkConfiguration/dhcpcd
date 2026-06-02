@@ -26,67 +26,32 @@
  * SUCH DAMAGE.
  */
 
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <errno.h>
 
+#include "config.h"
 #include "common.h"
 #include "defs.h"
 #include "getprogname.h"
 
 static char *progname;
-static bool progname_free;
-static bool progname_atexit;
-
-static void
-freeprogname(void)
-{
-	if (progname_free)
-		free(progname);
-	progname = NULL;
-}
 
 const char *
 getprogname(void)
 {
-#if defined(__linux__)
-	const char *p;
-
-	/* Use PATH_MAX + 1 to avoid truncation. */
-	if (progname == NULL) {
-		/* readlink(2) does not append a NULL byte,
-		 * so zero the buffer. */
-		if ((progname = calloc(1, PATH_MAX + 1)) == NULL)
-			return NULL;
-		progname_free = true;
-		if (!progname_atexit) {
-			atexit(freeprogname);
-			progname_atexit = true;
-		}
-		if (readlink("/proc/self/exe", progname, PATH_MAX + 1) == -1) {
-			free(progname);
-			progname = NULL;
-			return NULL;
-		}
-	}
-	if (progname[0] == '[')
-		return NULL;
-	p = strrchr(progname, '/');
-	if (p == NULL)
-		return progname;
-	return p + 1;
+#if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
+	if (progname == NULL)
+		progname = program_invocation_short_name;
+	return progname;
 #else
 #warning "no OS support for getprogname(3)"
-	UNUSED(progname_atexit);
-	return PACKAGE;
+	if (progname == NULL)
+		progname = PACKAGE;
+	return progname;
 #endif
 }
 
 void
 setprogname(const char *name)
 {
-	freeprogname();
 	progname = UNCONST(name);
-	progname_free = false;
 }
