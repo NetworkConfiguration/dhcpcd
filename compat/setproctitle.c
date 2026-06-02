@@ -165,7 +165,7 @@ spt_copyargs(int argc, char *argv[])
 void
 setproctitle_init(int argc, char *argv[], char *envp[])
 {
-	char *base, *end, *nul, *tmp;
+	char *base, *end, *nul;
 	int i, envc, error;
 
 	/* Try to make sure we got called with main() arguments. */
@@ -199,13 +199,6 @@ setproctitle_init(int argc, char *argv[], char *envp[])
 		SPT.error = errno;
 		return;
 	}
-
-	tmp = strdup(getprogname());
-	if (tmp == NULL) {
-		SPT.error = errno;
-		return;
-	}
-	setprogname(tmp);
 
 	error = spt_copyenv(envc, envp);
 	if (error) {
