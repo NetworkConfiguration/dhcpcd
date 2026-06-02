@@ -1075,6 +1075,43 @@ else
 	fi
 fi
 
+if [ -z "$GETPROGNAME" ]; then
+	printf "Testing for getprogname ... "
+	cat << EOF >_getprogname.c
+#include <stdlib.h>
+int main(void) {
+	return getprogname() ? 0 : 1;
+}
+EOF
+	if $XCC _getprogname.c -o _getprogname 2>&3; then
+		GETPROGNAME=yes
+	else
+		GETPROGNAME=no
+	fi
+	echo "$GETPROGNAME"
+	rm -rf _getprogname.* _getprogname
+fi
+if [ "$GETPROGNAME" = no ]; then
+	echo "COMPAT_SRCS+=	compat/getprogname.c" >>$CONFIG_MK
+	echo "#include			\"compat/getprogname.h\"" >>$CONFIG_H
+
+	printf "Testing for program_invocation_short_name ... "
+	cat << EOF >_getprognameshort.c
+#include <errno.h>
+int main(void) {
+	return program_invocation_short_name ? 0 : 1;
+}
+EOF
+	if $XCC _getprognameshort.c -o _getprognameshort 2>&3; then
+		GETPROGNAMESHORT=yes
+		echo "#define	HAVE_PROGRAM_INVOCATION_SHORT_NAME" >>$CONFIG_H
+	else
+		GETPROGNAMESHORT=no
+	fi
+	echo "$GETPROGNAMESHORT"
+	rm -rf _getprognameshort.* _getprognameshort
+fi
+
 if [ -z "$SETPROCTITLE" ]; then
 	printf "Testing for setproctitle ... "
 	cat << EOF >_setproctitle.c

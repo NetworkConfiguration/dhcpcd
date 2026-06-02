@@ -39,6 +39,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "logerr.h"
 
 #ifndef LOGERR_SYSLOG_FACILITY
@@ -73,35 +74,6 @@ static struct logctx _logctx = {
 	.log_fd = -1,
 	.log_pid = 0,
 };
-
-#if defined(__linux__)
-/* Poor man's getprogname(3). */
-static char *_logprog;
-static const char *
-getprogname(void)
-{
-	const char *p;
-
-	/* Use PATH_MAX + 1 to avoid truncation. */
-	if (_logprog == NULL) {
-		/* readlink(2) does not append a NULL byte,
-		 * so zero the buffer. */
-		if ((_logprog = calloc(1, PATH_MAX + 1)) == NULL)
-			return NULL;
-		if (readlink("/proc/self/exe", _logprog, PATH_MAX + 1) == -1) {
-			free(_logprog);
-			_logprog = NULL;
-			return NULL;
-		}
-	}
-	if (_logprog[0] == '[')
-		return NULL;
-	p = strrchr(_logprog, '/');
-	if (p == NULL)
-		return _logprog;
-	return p + 1;
-}
-#endif
 
 #ifndef SMALL
 /* Write the time, syslog style. month day time - */
@@ -518,10 +490,6 @@ logclose(void)
 #endif
 
 	closelog();
-#if defined(__linux__)
-	free(_logprog);
-	_logprog = NULL;
-#endif
 #ifndef SMALL
 	if (ctx->log_file == NULL)
 		return;
