@@ -1330,9 +1330,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			*fp = ' ';
 			if ((rt = rt_new0(ctx)) == NULL)
 				return -1;
-			sa_in_init(&rt->rt_dest, &addr);
-			sa_in_init(&rt->rt_netmask, &addr2);
-			sa_in_init(&rt->rt_gateway, &addr3);
+			sa_in_init(rt->rt_dest, &addr);
+			sa_in_init(rt->rt_netmask, &addr2);
+			sa_in_init(rt->rt_gateway, &addr3);
 			if (rt_proto_add_ctx(&ifo->routes, rt, ctx))
 				add_environ(&ifo->config, arg, 0);
 #else
@@ -1351,9 +1351,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if ((rt = rt_new0(ctx)) == NULL)
 				return -1;
 			addr2.s_addr = INADDR_ANY;
-			sa_in_init(&rt->rt_dest, &addr2);
-			sa_in_init(&rt->rt_netmask, &addr2);
-			sa_in_init(&rt->rt_gateway, &addr);
+			sa_in_init(rt->rt_dest, &addr2);
+			sa_in_init(rt->rt_netmask, &addr2);
+			sa_in_init(rt->rt_gateway, &addr);
 			if (rt_proto_add_ctx(&ifo->routes, rt, ctx))
 				add_environ(&ifo->config, arg, 0);
 #else

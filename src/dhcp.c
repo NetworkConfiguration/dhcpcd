@@ -434,9 +434,9 @@ decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp, const uint8_t *data,
 		if (netmask.s_addr == INADDR_BROADCAST)
 			rt->rt_flags = RTF_HOST;
 
-		sa_in_init(&rt->rt_dest, &dest);
-		sa_in_init(&rt->rt_netmask, &netmask);
-		sa_in_init(&rt->rt_gateway, &gateway);
+		sa_in_init(rt->rt_dest, &dest);
+		sa_in_init(rt->rt_netmask, &netmask);
+		sa_in_init(rt->rt_gateway, &gateway);
 		if (rt_proto_add(routes, rt))
 			n = 1;
 	}
@@ -614,9 +614,9 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 			if (netmask.s_addr == INADDR_BROADCAST)
 				rt->rt_flags = RTF_HOST;
 
-			sa_in_init(&rt->rt_dest, &dest);
-			sa_in_init(&rt->rt_netmask, &netmask);
-			sa_in_init(&rt->rt_gateway, &gateway);
+			sa_in_init(rt->rt_dest, &dest);
+			sa_in_init(rt->rt_netmask, &netmask);
+			sa_in_init(rt->rt_gateway, &gateway);
 			if (rt_proto_add(routes, rt))
 				n++;
 		}
@@ -636,9 +636,9 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 				return -1;
 			memcpy(&gateway.s_addr, p, sizeof(gateway.s_addr));
 			p += 4;
-			sa_in_init(&rt->rt_dest, &dest);
-			sa_in_init(&rt->rt_netmask, &netmask);
-			sa_in_init(&rt->rt_gateway, &gateway);
+			sa_in_init(rt->rt_dest, &dest);
+			sa_in_init(rt->rt_netmask, &netmask);
+			sa_in_init(rt->rt_gateway, &gateway);
 			if (rt_proto_add(routes, rt))
 				n++;
 		}

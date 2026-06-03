@@ -572,21 +572,21 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg, unsigned char cmd,
 	rtm->rtm_flags = rt->rt_flags;
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY;
 
-	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
+	gateway_unspec = sa_is_unspecified(rt->rt_gateway);
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
+		bool netmask_bcast = sa_is_allones(rt->rt_netmask);
 
 		rtm->rtm_flags |= RTF_UP;
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
-		    !sa_is_loopback(&rt->rt_gateway)) {
+		    !sa_is_loopback(rt->rt_gateway)) {
 			rtm->rtm_addrs |= RTA_IFP;
 			/* RTA_IFA is currently ignored by the kernel.
 			 * RTA_SRC and RTF_SETSRC look like what we want,
 			 * but they don't work with RTF_GATEWAY.
 			 * We set RTA_IFA just in the hope that the
 			 * kernel will one day support this. */
-			if (!sa_is_unspecified(&rt->rt_ifa))
+			if (!sa_is_unspecified(rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
 		}
 
@@ -607,15 +607,15 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg, unsigned char cmd,
 	if (!(rtm->rtm_flags & RTF_HOST))
 		rtm->rtm_addrs |= RTA_NETMASK;
 
-	ADDSA(&rt->rt_dest);
+	ADDSA(rt->rt_dest);
 
 	if (gateway_unspec)
-		ADDSA(&rt->rt_ifa);
+		ADDSA(rt->rt_ifa);
 	else
-		ADDSA(&rt->rt_gateway);
+		ADDSA(rt->rt_gateway);
 
 	if (rtm->rtm_addrs & RTA_NETMASK)
-		ADDSA(&rt->rt_netmask);
+		ADDSA(rt->rt_netmask);
 
 	if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl sdl;
@@ -625,11 +625,11 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg, unsigned char cmd,
 	}
 
 	if (rtm->rtm_addrs & RTA_IFA)
-		ADDSA(&rt->rt_ifa);
+		ADDSA(rt->rt_ifa);
 
 #if 0
 	if (rtm->rtm_addrs & RTA_SRC)
-		ADDSA(&rt->rt_ifa);
+		ADDSA(rt->rt_ifa);
 #endif
 
 	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
@@ -662,12 +662,12 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
 		return -1;
 
-	memset(rt, 0, sizeof(*rt));
-
+	rt_init(rt);
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
-	COPYSA(&rt->rt_dest, rti_info[RTAX_DST]);
+
+	COPYSA(rt->rt_dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
-		COPYSA(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
+		COPYSA(rt->rt_netmask, rti_info[RTAX_NETMASK]);
 
 	/* dhcpcd likes an unspecified gateway to indicate via the link.
 	 * However we need to know if gateway was a link with an address. */
@@ -680,11 +680,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 			if (sdl->sdl_alen != 0)
 				rt->rt_dflags |= RTDF_GATELINK;
 		} else if (rtm->rtm_flags & RTF_GATEWAY)
-			COPYSA(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+			COPYSA(rt->rt_gateway, rti_info[RTAX_GATEWAY]);
 	}
 
 	if (rtm->rtm_addrs & RTA_SRC)
-		COPYSA(&rt->rt_ifa, rti_info[RTAX_SRC]);
+		COPYSA(rt->rt_ifa, rti_info[RTAX_SRC]);
 	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
@@ -748,14 +748,14 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 	 * of the owning address.
 	 * dhcpcd has a blank gateway here to indicate a
 	 * subnet route. */
-	if (!sa_is_unspecified(&rt->rt_dest) &&
-	    !sa_is_unspecified(&rt->rt_gateway)) {
-		switch (rt->rt_gateway.sa_family) {
+	if (!sa_is_unspecified(rt->rt_dest) &&
+	    !sa_is_unspecified(rt->rt_gateway)) {
+		switch (rt->rt_gateway->sa_family) {
 #ifdef INET
 		case AF_INET: {
 			struct in_addr *in;
 
-			in = &satosin(&rt->rt_gateway)->sin_addr;
+			in = &satosin(rt->rt_gateway)->sin_addr;
 			if (ipv4_findaddr(ctx, in))
 				in->s_addr = INADDR_ANY;
 			break;
@@ -765,7 +765,7 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 		case AF_INET6: {
 			struct in6_addr *in6;
 
-			in6 = &satosin6(&rt->rt_gateway)->sin6_addr;
+			in6 = &satosin6(rt->rt_gateway)->sin6_addr;
 			if (ipv6_findaddr(ctx, in6, 0))
 				*in6 = in6addr_any;
 			break;
@@ -839,15 +839,16 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	 * existance with a hardware address.
 	 * Ensure we don't call this for a newly incomplete state.
 	 */
-	if (rt.rt_dest.sa_family == AF_INET6 &&
+	if (rt.rt_dest->sa_family == AF_INET6 &&
 	    (rt.rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
 	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK))) {
 		bool reachable;
+		struct sockaddr_in6 *dest = (struct sockaddr_in6 *)rt.rt_dest;
 
 		reachable = (rtm->rtm_type == RTM_ADD ||
 				rtm->rtm_type == RTM_CHANGE) &&
 		    rt.rt_dflags & RTDF_GATELINK;
-		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, reachable);
+		ipv6nd_neighbour(ctx, &dest->sin6_addr, reachable);
 	}
 #endif
 
@@ -1392,16 +1393,16 @@ if_walkrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 			break;
 		}
 
-		memset(&rt, 0, sizeof(rt));
+		rt_init(&rt);
 		in.s_addr = re->ipRouteDest;
-		sa_in_init(&rt.rt_dest, &in);
+		sa_in_init(rt.rt_dest, &in);
 		in.s_addr = re->ipRouteMask;
-		sa_in_init(&rt.rt_netmask, &in);
+		sa_in_init(rt.rt_netmask, &in);
 		in.s_addr = re->ipRouteNextHop;
-		sa_in_init(&rt.rt_gateway, &in);
+		sa_in_init(rt.rt_gateway, &in);
 		rt.rt_flags = re->ipRouteInfo.re_flags;
 		in.s_addr = re->ipRouteInfo.re_src_addr;
-		sa_in_init(&rt.rt_ifa, &in);
+		sa_in_init(rt.rt_ifa, &in);
 		rt.rt_mtu = re->ipRouteInfo.re_max_frag;
 		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
@@ -1413,7 +1414,7 @@ if_walkrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 			logerr(__func__);
 			break;
 		}
-		memcpy(rtn, &rt, sizeof(*rtn));
+		rt_copy(rtn, &rt);
 		if (rb_tree_insert_node(routes, rtn) != rtn)
 			rt_free(rtn);
 	} while (++re < e);
@@ -1451,12 +1452,12 @@ if_walkrt6(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 			break;
 		}
 
-		memset(&rt, 0, sizeof(rt));
-		sa_in6_init(&rt.rt_dest, &re->ipv6RouteDest);
+		rt_init(&rt);
+		sa_in6_init(rt.rt_dest, &re->ipv6RouteDest);
 		ipv6_mask(&in6, re->ipv6RoutePfxLength);
-		sa_in6_init(&rt.rt_netmask, &in6);
-		sa_in6_init(&rt.rt_gateway, &re->ipv6RouteNextHop);
-		sa_in6_init(&rt.rt_ifa, &re->ipv6RouteInfo.re_src_addr);
+		sa_in6_init(rt.rt_netmask, &in6);
+		sa_in6_init(rt.rt_gateway, &re->ipv6RouteNextHop);
+		sa_in6_init(rt.rt_ifa, &re->ipv6RouteInfo.re_src_addr);
 		rt.rt_mtu = re->ipv6RouteInfo.re_max_frag;
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
@@ -1468,7 +1469,7 @@ if_walkrt6(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 			logerr(__func__);
 			break;
 		}
-		memcpy(rtn, &rt, sizeof(*rtn));
+		rt_copy(rtn, &rt);
 		if (rb_tree_insert_node(routes, rtn) != rtn)
 			rt_free(rtn);
 	} while (++re < e);

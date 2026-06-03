@@ -2211,20 +2211,20 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 	if ((rt = inet6_makeroute(ifp, rap)) == NULL)
 		return NULL;
 
-	sa_in6_init(&rt->rt_dest, &addr->prefix);
+	sa_in6_init(rt->rt_dest, &addr->prefix);
 	ipv6_mask(&netmask, addr->prefix_len);
-	sa_in6_init(&rt->rt_netmask, &netmask);
+	sa_in6_init(rt->rt_netmask, &netmask);
 	if (addr->flags & IPV6_AF_PFXDELEGATION) {
 		rt->rt_flags |= RTF_REJECT;
 		/* Linux does not like a gateway for a reject route. */
 #ifndef __linux__
-		sa_in6_init(&rt->rt_gateway, &in6addr_loopback);
+		sa_in6_init(rt->rt_gateway, &in6addr_loopback);
 #endif
 	} else if (!(addr->flags & IPV6_AF_ONLINK))
-		sa_in6_init(&rt->rt_gateway, &rap->from);
+		sa_in6_init(rt->rt_gateway, &rap->from);
 	else
-		rt->rt_gateway.sa_family = AF_UNSPEC;
-	sa_in6_init(&rt->rt_ifa, &addr->addr);
+		rt->rt_gateway->sa_family = AF_UNSPEC;
+	sa_in6_init(rt->rt_ifa, &addr->addr);
 	return rt;
 }
 
@@ -2235,9 +2235,9 @@ inet6_makerouter(struct ra *rap)
 
 	if ((rt = inet6_makeroute(rap->iface, rap)) == NULL)
 		return NULL;
-	sa_in6_init(&rt->rt_dest, &in6addr_any);
-	sa_in6_init(&rt->rt_netmask, &in6addr_any);
-	sa_in6_init(&rt->rt_gateway, &rap->from);
+	sa_in6_init(rt->rt_dest, &in6addr_any);
+	sa_in6_init(rt->rt_netmask, &in6addr_any);
+	sa_in6_init(rt->rt_gateway, &rap->from);
 	return rt;
 }
 
@@ -2293,9 +2293,9 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 
 			in6_addr_fromprefix(&netmask, rinfo->prefix_len);
 
-			sa_in6_init(&rt->rt_dest, &rinfo->prefix);
-			sa_in6_init(&rt->rt_netmask, &netmask);
-			sa_in6_init(&rt->rt_gateway, &rap->from);
+			sa_in6_init(rt->rt_dest, &rinfo->prefix);
+			sa_in6_init(rt->rt_netmask, &netmask);
+			sa_in6_init(rt->rt_gateway, &rap->from);
 			rt->rt_dflags |= RTDF_RA;
 #ifdef HAVE_ROUTE_PREF
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);

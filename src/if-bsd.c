@@ -751,15 +751,15 @@ if_route(unsigned char cmd, const struct rt *rt)
 		rtm->rtm_flags |= RTF_PINNED;
 #endif
 
-	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
+	gateway_unspec = sa_is_unspecified(rt->rt_gateway);
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
+		bool netmask_bcast = sa_is_allones(rt->rt_netmask);
 
 		rtm->rtm_flags |= RTF_UP;
 		rtm->rtm_addrs |= RTA_GATEWAY;
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
-		    !sa_is_loopback(&rt->rt_gateway)) {
+		    !sa_is_loopback(rt->rt_gateway)) {
 			rtm->rtm_index = (unsigned short)rt->rt_ifp->index;
 /*
  * OpenBSD rejects this for on-link routes when there is no default route
@@ -770,10 +770,10 @@ if_route(unsigned char cmd, const struct rt *rt)
 #ifdef __OpenBSD__
 #warning kernel does not allow IPv6 address sharing
 			if (!gateway_unspec ||
-			    rt->rt_dest.sa_family != AF_INET6)
+			    rt->rt_dest->sa_family != AF_INET6)
 #endif
 				rtm->rtm_addrs |= RTA_IFP;
-			if (!sa_is_unspecified(&rt->rt_ifa))
+			if (!sa_is_unspecified(rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
 		}
 		if (netmask_bcast)
@@ -822,31 +822,32 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 	if_linkaddr(&sdl, rt->rt_ifp);
 
-	ADDSA(&rt->rt_dest);
+	ADDSA(rt->rt_dest);
 
 	if (rtm->rtm_addrs & RTA_GATEWAY) {
 		if (gateway_unspec)
 			ADDSA((struct sockaddr *)&sdl);
 		else {
-			union sa_ss gateway;
+			struct sockaddr_storage gss;
+			struct sockaddr *gsa = (struct sockaddr *)&gss;
 
-			if_copysa(&gateway.sa, &rt->rt_gateway);
+			if_copysa(gsa, rt->rt_gateway);
 #ifdef INET6
-			if (gateway.sa.sa_family == AF_INET6)
-				ipv6_setscope(&gateway.sin6, rt->rt_ifp->index);
+			if (gss.ss_family == AF_INET6)
+				ipv6_setscope((struct sockaddr_in6 *)&gss, rt->rt_ifp->index);
 #endif
-			ADDSA(&gateway.sa);
+			ADDSA(gsa);
 		}
 	}
 
 	if (rtm->rtm_addrs & RTA_NETMASK)
-		ADDSA(&rt->rt_netmask);
+		ADDSA(rt->rt_netmask);
 
 	if (rtm->rtm_addrs & RTA_IFP)
 		ADDSA((struct sockaddr *)&sdl);
 
 	if (rtm->rtm_addrs & RTA_IFA)
-		ADDSA(&rt->rt_ifa);
+		ADDSA(rt->rt_ifa);
 
 #undef ADDSA
 
@@ -903,13 +904,13 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	if (get_addrs(rtm->rtm_addrs, (const char *)rtm + sizeof(*rtm),
 		rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
 		return -1;
-	memset(rt, 0, sizeof(*rt));
 
+	rt_init(rt);
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
-	if_copysa(&rt->rt_dest, rti_info[RTAX_DST]);
+	if_copysa(rt->rt_dest, rti_info[RTAX_DST]);
 
 	if (rtm->rtm_addrs & RTA_NETMASK) {
-		if_copysa(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
+		if_copysa(rt->rt_netmask, rti_info[RTAX_NETMASK]);
 		/*
 		 * Netmask family and length are ignored by traditional
 		 * userland tools such as route and netstat and are assumed
@@ -921,8 +922,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		 *
 		 * This is currently true for all BSD kernels.
 		 */
-		rt->rt_netmask.sa_family = rt->rt_dest.sa_family;
-		rt->rt_netmask.sa_len = rt->rt_dest.sa_len;
+		rt->rt_netmask->sa_family = rt->rt_dest->sa_family;
+		rt->rt_netmask->sa_len = rt->rt_dest->sa_len;
 	}
 
 	/* dhcpcd likes an unspecified gateway to indicate via the link.
@@ -936,11 +937,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 			if (sdl->sdl_alen != 0)
 				rt->rt_dflags |= RTDF_GATELINK;
 		} else if (rtm->rtm_flags & RTF_GATEWAY)
-			if_copysa(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+			if_copysa(rt->rt_gateway, rti_info[RTAX_GATEWAY]);
 	}
 
 	if (rtm->rtm_addrs & RTA_IFA)
-		if_copysa(&rt->rt_ifa, rti_info[RTAX_IFA]);
+		if_copysa(rt->rt_ifa, rti_info[RTAX_IFA]);
 
 	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
@@ -1018,7 +1019,7 @@ again:
 			logerr(__func__);
 			break;
 		}
-		memcpy(rtn, &rt, sizeof(*rtn));
+		rt_copy(rtn, &rt);
 		if (rb_tree_insert_node(kroutes, rtn) != rtn)
 			rt_free(rtn);
 	}
@@ -1332,15 +1333,16 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	 * existance with a hardware address.
 	 * Ensure we don't call this for a newly incomplete state.
 	 */
-	if (rt.rt_dest.sa_family == AF_INET6 &&
+	if (rt.rt_dest->sa_family == AF_INET6 &&
 	    (rt.rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
 	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK))) {
 		bool reachable;
+		struct sockaddr_in6 *dest = (struct sockaddr_in6 *)&rt.rt_ss_dest;
 
 		reachable = (rtm->rtm_type == RTM_ADD ||
 				rtm->rtm_type == RTM_CHANGE) &&
 		    rt.rt_dflags & RTDF_GATELINK;
-		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, reachable);
+		ipv6nd_neighbour(ctx, &dest->sin6_addr, reachable);
 	}
 #endif
 

@@ -689,7 +689,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	if (rtm->rtm_table != RT_TABLE_MAIN)
 		return -1;
 
-	memset(rt, 0, sizeof(*rt));
+	rt_init(rt);
 	if (rtm->rtm_type == RTN_UNREACHABLE)
 		rt->rt_flags |= RTF_REJECT;
 
@@ -699,11 +699,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		sa = NULL;
 		switch (rta->rta_type) {
 		case RTA_DST:
-			sa = &rt->rt_dest;
+			sa = rt->rt_dest;
 			break;
 		case RTA_SRC: {
-			union sa_ss ssa;
-			struct sockaddr *psa = (struct sockaddr *)&ssa;
+			struct sockaddr_storage ss;	
+			struct sockaddr *psa = (struct sockaddr *)&ss;
 			socklen_t salen;
 
 			psa->sa_family = rtm->rtm_family;
@@ -722,10 +722,10 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			break;
 		}
 		case RTA_GATEWAY:
-			sa = &rt->rt_gateway;
+			sa = rt->rt_gateway;
 			break;
 		case RTA_PREFSRC:
-			sa = &rt->rt_ifa;
+			sa = rt->rt_ifa;
 			break;
 		case RTA_OIF:
 			ifindex = *(unsigned int *)RTA_DATA(rta);
@@ -784,20 +784,18 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 			sa->sa_family = rtm->rtm_family;
 			salen = sa_addrlen(sa);
-			/* sa is a union where sockaddr_in6 is the biggest. */
-			/* coverity[overrun-buffer-arg] */
 			memcpy((char *)sa + sa_addroffset(sa), RTA_DATA(rta),
 			    MIN(salen, RTA_PAYLOAD(rta)));
 		}
 	}
 
 	/* If no RTA_DST set the unspecified address for the family. */
-	if (rt->rt_dest.sa_family == AF_UNSPEC)
-		rt->rt_dest.sa_family = rtm->rtm_family;
+	if (rt->rt_dest->sa_family == AF_UNSPEC)
+		rt->rt_dest->sa_family = rtm->rtm_family;
 
-	rt->rt_netmask.sa_family = rtm->rtm_family;
-	sa_fromprefix(&rt->rt_netmask, rtm->rtm_dst_len);
-	if (sa_is_allones(&rt->rt_netmask))
+	rt->rt_netmask->sa_family = rtm->rtm_family;
+	sa_fromprefix(rt->rt_netmask, rtm->rtm_dst_len);
+	if (sa_is_allones(rt->rt_netmask))
 		rt->rt_flags |= RTF_HOST;
 
 #if 0
@@ -1662,10 +1660,10 @@ if_route(unsigned char cmd, const struct rt *rt)
 		break;
 	}
 	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
-	nlm.rt.rtm_family = (unsigned char)rt->rt_dest.sa_family;
+	nlm.rt.rtm_family = (unsigned char)rt->rt_dest->sa_family;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
 
-	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
+	gateway_unspec = sa_is_unspecified(rt->rt_gateway);
 
 	if (cmd == RTM_DELETE) {
 		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
@@ -1702,22 +1700,18 @@ if_route(unsigned char cmd, const struct rt *rt)
 	add_attr_l(&nlm.hdr, sizeof(nlm), (type),     \
 	    (const char *)(sa) + sa_addroffset((sa)), \
 	    (unsigned short)sa_addrlen((sa)));
-	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(&rt->rt_netmask);
-	/* rt->rt_dest and rt->gateway are unions where sockaddr_in6
-	 * is the biggest member. However, we access them as the
-	 * generic sockaddr and coverity thinks this will overrun. */
-	/* coverity[overrun-buffer-arg] */
-	ADDSA(RTA_DST, &rt->rt_dest);
+	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(rt->rt_netmask);
+	ADDSA(RTA_DST, rt->rt_dest);
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		if (!gateway_unspec) {
 			/* coverity[overrun-buffer-arg] */
-			ADDSA(RTA_GATEWAY, &rt->rt_gateway);
+			ADDSA(RTA_GATEWAY, rt->rt_gateway);
 		}
 		/* Cannot add tentative source addresses.
 		 * We don't know this here, so just skip INET6 ifa's.*/
-		if (!sa_is_unspecified(&rt->rt_ifa) &&
-		    rt->rt_ifa.sa_family != AF_INET6)
-			ADDSA(RTA_PREFSRC, &rt->rt_ifa);
+		if (!sa_is_unspecified(rt->rt_ifa) &&
+		    rt->rt_ifa->sa_family != AF_INET6)
+			ADDSA(RTA_PREFSRC, rt->rt_ifa);
 		if (rt->rt_mtu) {
 			char metricsbuf[32];
 			struct rtattr *metrics = (void *)metricsbuf;
@@ -1754,7 +1748,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 	}
 
-	if (!sa_is_loopback(&rt->rt_gateway))
+	if (!sa_is_loopback(rt->rt_gateway))
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
 
 #ifdef HAVE_ROUTE_LIFETIME
@@ -1785,7 +1779,7 @@ _if_initrt(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 		logerr(__func__);
 		return 0;
 	}
-	memcpy(rtn, &rt, sizeof(*rtn));
+	rt_copy(rtn, &rt);
 	if (rb_tree_insert_node(kroutes, rtn) != rtn)
 		rt_free(rtn);
 	return 0;
