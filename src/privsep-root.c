@@ -835,7 +835,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	int logfd[2] = { -1, -1 }, datafd[2] = { -1, -1 };
 	pid_t pid;
 
-	if (eloop_openfdwaiter(ctx->eloop) == -1)
+	if (eloop_openfdwaiter(ctx->eloop) == -1 && errno != 0)
 		return -1;
 
 	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, logfd) == -1)
