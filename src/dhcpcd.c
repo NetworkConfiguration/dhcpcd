@@ -2289,7 +2289,8 @@ main(int argc, char **argv, char **envp)
 			default:
 				per = "";
 			}
-			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") == -1) {
+			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") ==
+			    -1) {
 				logerr("%s: asprintf", __func__);
 				goto exit_failure;
 			}
@@ -2657,7 +2658,8 @@ start_manager:
 
 	/* Start handling kernel messages for interfaces, addresses and
 	 * routes. */
-	if (eloop_event_add(ctx.eloop, ctx.link_fd, ELE_READ, dhcpcd_handlelink,
+	if (ctx.link_fd != -1 &&
+	    eloop_event_add(ctx.eloop, ctx.link_fd, ELE_READ, dhcpcd_handlelink,
 		&ctx) == -1)
 		logerr("%s: eloop_event_add", __func__);
 
