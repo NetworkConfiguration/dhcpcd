@@ -308,12 +308,12 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 			return -1;
 		rt->rt_dflags |= RTDF_IFA_ROUTE;
 		in.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
-		sa_in_init(&rt->rt_dest, &in);
+		sa_in_init(rt->rt_dest, &in);
 		in.s_addr = state->addr->mask.s_addr;
-		sa_in_init(&rt->rt_netmask, &in);
+		sa_in_init(rt->rt_netmask, &in);
 		// in.s_addr = INADDR_ANY;
-		// sa_in_init(&rt->rt_gateway, &in);
-		rt->rt_gateway.sa_family = AF_UNSPEC;
+		// sa_in_init(rt->rt_gateway, &in);
+		rt->rt_gateway->sa_family = AF_UNSPEC;
 		rt_proto_add(&nroutes, rt);
 	}
 
@@ -321,11 +321,11 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	if (RB_TREE_MIN(&ifp->options->routes)) {
 		RB_TREE_FOREACH(r, &ifp->options->routes)
 		{
-			if (sa_is_unspecified(&r->rt_gateway))
+			if (sa_is_unspecified(r->rt_gateway))
 				break;
 			if ((rt = rt_new0(ifp->ctx)) == NULL)
 				return -1;
-			memcpy(rt, r, sizeof(*rt));
+			rt_copy(rt, r);
 			rt_setif(rt, ifp);
 			rt->rt_dflags = RTDF_STATIC;
 			rt_proto_add(&nroutes, rt);
@@ -342,10 +342,10 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
 		in.s_addr = INADDR_ANY;
-		sa_in_init(&rt->rt_dest, &in);
-		sa_in_init(&rt->rt_netmask, &in);
-		sa_in_init(&rt->rt_gateway, &state->addr->brd);
-		sa_in_init(&rt->rt_ifa, &state->addr->addr);
+		sa_in_init(rt->rt_dest, &in);
+		sa_in_init(rt->rt_netmask, &in);
+		sa_in_init(rt->rt_gateway, &state->addr->brd);
+		sa_in_init(rt->rt_ifa, &state->addr->addr);
 		rt_proto_add(&nroutes, rt);
 	}
 
@@ -359,7 +359,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 			rt->rt_dflags |= RTDF_DHCP;
 		if (state->added & STATE_FAKE)
 			rt->rt_dflags |= RTDF_FAKE;
-		sa_in_init(&rt->rt_ifa, &state->addr->addr);
+		sa_in_init(rt->rt_ifa, &state->addr->addr);
 		if (rb_tree_insert_node(routes, rt) != rt) {
 			rt_free(rt);
 			continue;
@@ -393,26 +393,26 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 
 	RB_TREE_FOREACH(rt, routes)
 	{
-		if (rt->rt_dest.sa_family != AF_INET)
+		if (rt->rt_dest->sa_family != AF_INET)
 			continue;
-		if (!sa_is_unspecified(&rt->rt_dest) ||
-		    sa_is_unspecified(&rt->rt_gateway))
+		if (!sa_is_unspecified(rt->rt_dest) ||
+		    sa_is_unspecified(rt->rt_gateway))
 			continue;
-		gateway = satosin(&rt->rt_gateway);
+		gateway = satosin(rt->rt_gateway);
 		/* Scan for a route to match */
 		RB_TREE_FOREACH(rth, routes)
 		{
 			if (rth == rt)
 				break;
 			/* match host */
-			if (sa_cmp(&rth->rt_dest, &rt->rt_gateway) == 0)
+			if (sa_cmp(rth->rt_dest, rt->rt_gateway) == 0)
 				break;
 			/* match subnet */
 			/* XXX ADD TO RT_COMARE? XXX */
 			cp = (const char *)&gateway->sin_addr.s_addr;
-			dest = satosin(&rth->rt_dest);
+			dest = satosin(rth->rt_dest);
 			cp2 = (const char *)&dest->sin_addr.s_addr;
-			netmask = satosin(&rth->rt_netmask);
+			netmask = satosin(rth->rt_netmask);
 			cp3 = (const char *)&netmask->sin_addr.s_addr;
 			cplim = cp3 + sizeof(netmask->sin_addr.s_addr);
 			while (cp3 < cplim) {
@@ -436,7 +436,7 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 				logwarnx("%s: forcing router %s through "
 					 "interface",
 				    ifp->name,
-				    sa_addrtop(&rt->rt_gateway, buf,
+				    sa_addrtop(rt->rt_gateway, buf,
 					sizeof(buf)));
 			}
 			gateway->sin_addr.s_addr = INADDR_ANY;
@@ -449,22 +449,22 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 			ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
 			logwarnx("%s: router %s requires a host route",
 			    ifp->name,
-			    sa_addrtop(&rt->rt_gateway, buf, sizeof(buf)));
+			    sa_addrtop(rt->rt_gateway, buf, sizeof(buf)));
 		}
 
 		if ((rth = rt_new(ifp)) == NULL)
 			return -1;
 		rth->rt_flags |= RTF_HOST;
-		sa_in_init(&rth->rt_dest, &gateway->sin_addr);
+		sa_in_init(rth->rt_dest, &gateway->sin_addr);
 		in.s_addr = INADDR_BROADCAST;
-		sa_in_init(&rth->rt_netmask, &in);
+		sa_in_init(rth->rt_netmask, &in);
 		in.s_addr = INADDR_ANY;
-		sa_in_init(&rth->rt_gateway, &in);
+		sa_in_init(rth->rt_gateway, &in);
 		rth->rt_mtu = dhcp_get_mtu(ifp);
 		if (state->addr != NULL)
-			sa_in_init(&rth->rt_ifa, &state->addr->addr);
+			sa_in_init(rth->rt_ifa, &state->addr->addr);
 		else
-			rth->rt_ifa.sa_family = AF_UNSPEC;
+			rth->rt_ifa->sa_family = AF_UNSPEC;
 
 		/* We need to insert the host route just before the router. */
 		while ((rtp = RB_TREE_MAX(routes)) != NULL) {

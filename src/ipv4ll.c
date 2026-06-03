@@ -102,12 +102,12 @@ ipv4ll_subnetroute(rb_tree_t *routes, struct interface *ifp)
 		return -1;
 
 	in.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
-	sa_in_init(&rt->rt_dest, &in);
+	sa_in_init(rt->rt_dest, &in);
 	in.s_addr = state->addr->mask.s_addr;
-	sa_in_init(&rt->rt_netmask, &in);
+	sa_in_init(rt->rt_netmask, &in);
 	in.s_addr = INADDR_ANY;
-	sa_in_init(&rt->rt_gateway, &in);
-	sa_in_init(&rt->rt_ifa, &state->addr->addr);
+	sa_in_init(rt->rt_gateway, &in);
+	sa_in_init(rt->rt_ifa, &state->addr->addr);
 	rt->rt_dflags |= RTDF_IPV4LL;
 	return rt_proto_add(routes, rt) ? 1 : 0;
 }
@@ -117,7 +117,7 @@ ipv4ll_defaultroute(rb_tree_t *routes, struct interface *ifp)
 {
 	struct ipv4ll_state *state;
 	struct rt *rt;
-	struct in_addr in;
+	struct in_addr in = { .s_addr = INADDR_ANY };
 
 	assert(ifp != NULL);
 	if ((state = IPV4LL_STATE(ifp)) == NULL || state->addr == NULL)
@@ -126,11 +126,10 @@ ipv4ll_defaultroute(rb_tree_t *routes, struct interface *ifp)
 	if ((rt = rt_new(ifp)) == NULL)
 		return -1;
 
-	in.s_addr = INADDR_ANY;
-	sa_in_init(&rt->rt_dest, &in);
-	sa_in_init(&rt->rt_netmask, &in);
-	sa_in_init(&rt->rt_gateway, &in);
-	sa_in_init(&rt->rt_ifa, &state->addr->addr);
+	sa_in_init(rt->rt_dest, &in);
+	sa_in_init(rt->rt_netmask, &in);
+	sa_in_init(rt->rt_gateway, &in);
+	sa_in_init(rt->rt_ifa, &state->addr->addr);
 	rt->rt_dflags |= RTDF_IPV4LL;
 #ifdef HAVE_ROUTE_METRIC
 	rt->rt_metric += RTMETRIC_IPV4LL;
@@ -510,7 +509,7 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 	struct interface *ifp;
 
 	/* Only interested in default route changes. */
-	if (sa_is_unspecified(&rt->rt_dest))
+	if (!sa_is_unspecified(rt->rt_dest))
 		return 0;
 
 	/* If any interface is running IPv4LL, rebuild our routing table. */

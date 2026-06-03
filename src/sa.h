@@ -33,13 +33,6 @@
 
 #include <netinet/in.h>
 
-union sa_ss {
-	struct sockaddr sa;
-	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
-//	struct sockaddr_storage ss; /* avoids memory overrun */
-};
-
 #ifdef BSD
 #define HAVE_SA_LEN
 #endif

@@ -85,17 +85,21 @@
 #endif
 
 struct rt {
-	union sa_ss rt_ss_dest;
-#define rt_dest rt_ss_dest.sa
-	union sa_ss rt_ss_netmask;
-#define rt_netmask rt_ss_netmask.sa
-	union sa_ss rt_ss_gateway;
-#define rt_gateway rt_ss_gateway.sa
+	struct sockaddr *rt_dest;
+	struct sockaddr *rt_netmask;
+	struct sockaddr *rt_gateway;
 	struct interface *rt_ifp;
-	union sa_ss rt_ss_ifa;
-#define rt_ifa rt_ss_ifa.sa
+	struct sockaddr *rt_ifa;
+
+	/* Storage for the above sockaddrs */
+	struct sockaddr_storage rt_ss_dest;
+	struct sockaddr_storage rt_ss_netmask;
+	struct sockaddr_storage rt_ss_gateway;
+	struct sockaddr_storage rt_ss_ifa;
+
 	unsigned int rt_flags;
 	unsigned int rt_mtu;
+
 #ifdef HAVE_ROUTE_METRIC
 	unsigned int rt_metric;
 #endif
@@ -108,6 +112,7 @@ struct rt {
 #define RTMETRIC_WIRELESS 2000U
 #define RTMETRIC_IPV4LL	  1000000U
 #define RTMETRIC_ROAM	  2000000U
+
 #ifdef HAVE_ROUTE_PREF
 	int rt_pref;
 #endif
@@ -116,6 +121,7 @@ struct rt {
 #define RTPREF_LOW	(-1)
 #define RTPREF_RESERVED (-2)
 #define RTPREF_INVALID	(-3) /* internal */
+
 	unsigned int rt_dflags;
 #define RTDF_IFA_ROUTE 0x01 /* Address generated route */
 #define RTDF_FAKE      0x02 /* Maybe us on lease reboot */
@@ -124,8 +130,10 @@ struct rt {
 #define RTDF_DHCP      0x10 /* DHCP route */
 #define RTDF_STATIC    0x20 /* Configured in dhcpcd */
 #define RTDF_GATELINK  0x40 /* Gateway is on link */
+
 	size_t rt_order;
 	rb_node_t rt_tree;
+
 #ifdef HAVE_ROUTE_LIFETIME
 	struct timespec rt_aquired; /* timestamp of aquisition */
 	uint32_t rt_lifetime;	    /* current lifetime of route */
@@ -136,7 +144,7 @@ struct rt {
 extern const rb_tree_ops_t rt_compare_list_ops;
 extern const rb_tree_ops_t rt_compare_proto_ops;
 
-void rt_init(struct dhcpcd_ctx *);
+void rt_init_routes(struct dhcpcd_ctx *);
 void rt_dispose(struct dhcpcd_ctx *);
 void rt_free(struct rt *);
 void rt_freeif(struct interface *);
@@ -144,6 +152,8 @@ bool rt_is_default(const struct rt *);
 void rt_headclear0(struct dhcpcd_ctx *, rb_tree_t *, int);
 void rt_headclear(rb_tree_t *, int);
 void rt_headfreeif(rb_tree_t *);
+void rt_init(struct rt *);
+void rt_copy(struct rt *, const struct rt *);
 struct rt *rt_new0(struct dhcpcd_ctx *);
 void rt_setif(struct rt *, struct interface *);
 struct rt *rt_new(struct interface *);

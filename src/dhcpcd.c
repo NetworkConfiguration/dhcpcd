@@ -2201,7 +2201,7 @@ main(int argc, char **argv, char **envp)
 	ctx.ifc = argc - optind;
 	ctx.ifv = argv + optind;
 
-	rt_init(&ctx);
+	rt_init_routes(&ctx);
 
 	ifo = read_config(&ctx, NULL, NULL, NULL);
 	if (ifo == NULL) {

@@ -281,11 +281,12 @@ sa_toprefix(const struct sockaddr *sa)
 #ifndef NDEBUG
 	/* Ensure the calculation is correct */
 	if (!sa_inprefix) {
-		union sa_ss ss = { .sa = { .sa_family = sa->sa_family } };
+		struct sockaddr_storage ss = { .ss_family = sa->sa_family };
+		struct sockaddr *ss_sa = (struct sockaddr *)&ss;
 
 		sa_inprefix = true;
-		sa_fromprefix(&ss.sa, prefix);
-		assert(sa_cmp(sa, &ss.sa) == 0);
+		sa_fromprefix(ss_sa, prefix);
+		assert(sa_cmp(sa, ss_sa) == 0);
 		sa_inprefix = false;
 	}
 #endif
