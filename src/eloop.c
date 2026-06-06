@@ -1001,7 +1001,7 @@ eloop_closefdwaiter(struct eloop *eloop)
 #if defined(USE_KQUEUE) || defined(USE_EPOLL)
 	int err;
 
-        if (eloop->waitfd == -1) {
+	if (eloop->waitfd == -1) {
 		errno = EBADF;
 		return -1;
 	}

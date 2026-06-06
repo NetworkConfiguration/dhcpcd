@@ -838,6 +838,7 @@ int
 dhcp_set_leasefile(char *leasefile, size_t len, int family,
     const struct interface *ifp)
 {
+	char ifname[(sizeof(ifp->name) * 4) + 1];
 	char ssid[1 + (IF_SSIDLEN * 4) + 1]; /* - prefix and NUL terminated. */
 
 	if (ifp->name[0] == '\0') {
@@ -854,14 +855,19 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 		return -1;
 	}
 
+	if (print_string(ifname, sizeof(ifname), OT_ESCFILE, ifp->name,
+		strlen(ifp->name)) == -1)
+		return -1;
+
 	if (ifp->wireless) {
 		ssid[0] = '-';
-		print_string(ssid + 1, sizeof(ssid) - 1, OT_ESCFILE,
-		    ifp->ssid, ifp->ssid_len);
+		if (print_string(ssid + 1, sizeof(ssid) - 1, OT_ESCFILE,
+			ifp->ssid, ifp->ssid_len) == -1)
+			return -1;
 	} else
 		ssid[0] = '\0';
 	return snprintf(leasefile, len,
-	    family == AF_INET ? LEASEFILE : LEASEFILE6, ifp->name, ssid);
+	    family == AF_INET ? LEASEFILE : LEASEFILE6, ifname, ssid);
 }
 
 void

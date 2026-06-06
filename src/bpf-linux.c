@@ -28,11 +28,10 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <errno.h>
+#include <linux/filter.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <linux/filter.h>
-
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -184,7 +183,8 @@ bpf_setfilter(const struct bpf *bpf, void *filter, unsigned int filter_len)
 }
 
 int
-bpf_setwfilter(__unused const struct bpf *bpf, __unused void *filter, __unused unsigned int filter_len)
+bpf_setwfilter(__unused const struct bpf *bpf, __unused void *filter,
+    __unused unsigned int filter_len)
 {
 #warning A compromised PF_PACKET socket can be used as a raw socket
 
@@ -220,4 +220,3 @@ bpf_close(struct bpf *bpf)
 	free(bpf->bpf_buffer);
 	free(bpf);
 }
-

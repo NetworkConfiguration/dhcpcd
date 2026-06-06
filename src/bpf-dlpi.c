@@ -27,6 +27,7 @@
  */
 
 #include <sys/types.h>
+
 #include <net/if.h>
 #include <netinet/if_ether.h>
 
@@ -35,8 +36,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bpf.h"
 #include "bpf-dlpi.h"
+#include "bpf.h"
 
 struct bpf_dlpi {
 	dlpi_handle_t bd_handle;
