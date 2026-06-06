@@ -93,10 +93,16 @@
 #define PS_START 0x4000
 #define PS_STOP	 0x8000
 
+#ifdef INET6
+#define PS_BUFLEN6	CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int))
+#else
+#define PS_BUFLEN6	0
+#endif
+
 /* Max INET message size + meta data for IPC */
 #define PS_BUFLEN                                                         \
 	((64 * 1024) + sizeof(struct ps_msghdr) + sizeof(struct msghdr) + \
-	    CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int)))
+	    PS_BUFLEN6)
 
 #define PSP_NAMESIZE 16 + INET_MAX_ADDRSTRLEN
 
