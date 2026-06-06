@@ -931,10 +931,8 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		/* drain the log */
 		if (ctx->ps_log_root_fd != -1) {
 			ssize_t loglen;
-			struct pollfd pfd = {
-				.fd = ctx->ps_log_root_fd,
-				.events = POLLIN
-			};
+			struct pollfd pfd = { .fd = ctx->ps_log_root_fd,
+				.events = POLLIN };
 			int n;
 
 			/* the socket is blocking and we may not be able to

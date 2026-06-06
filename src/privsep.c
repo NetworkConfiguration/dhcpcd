@@ -1108,8 +1108,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 		return len;
 	}
 
-	cmsg_padlen = CALC_CMSG_PADLEN(psm.ps_controllen,
-	    psm.ps_namelen);
+	cmsg_padlen = CALC_CMSG_PADLEN(psm.ps_controllen, psm.ps_namelen);
 	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen +
 	    psm.ps_datalen;
 	if (dlen != 0) {

@@ -702,7 +702,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			sa = rt->rt_dest;
 			break;
 		case RTA_SRC: {
-			struct sockaddr_storage ss;	
+			struct sockaddr_storage ss;
 			struct sockaddr *psa = (struct sockaddr *)&ss;
 			socklen_t salen;
 

@@ -855,13 +855,14 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 		return -1;
 	}
 
-	if (print_string(ifname, sizeof(ifname), OT_ESCFILE, ifp->name, strlen(ifp->name)) == -1)
+	if (print_string(ifname, sizeof(ifname), OT_ESCFILE, ifp->name,
+		strlen(ifp->name)) == -1)
 		return -1;
 
 	if (ifp->wireless) {
 		ssid[0] = '-';
 		if (print_string(ssid + 1, sizeof(ssid) - 1, OT_ESCFILE,
-		    ifp->ssid, ifp->ssid_len) == -1)
+			ifp->ssid, ifp->ssid_len) == -1)
 			return -1;
 	} else
 		ssid[0] = '\0';

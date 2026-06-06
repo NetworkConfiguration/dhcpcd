@@ -27,8 +27,6 @@
  */
 
 /* Stop sunos headers including the system queue ... */
-#include "queue.h"
-
 #include <sys/ioctl.h>
 #include <sys/mac.h>
 #include <sys/pfmod.h>
@@ -38,9 +36,9 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
-#include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
+#include <netinet/if_ether.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -54,6 +52,8 @@
 #include <string.h>
 #include <stropts.h>
 #include <unistd.h>
+
+#include "queue.h"
 
 /* Private libsocket interface we can hook into to get
  * a better getifaddrs(3).

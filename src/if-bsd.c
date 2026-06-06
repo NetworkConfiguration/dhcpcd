@@ -104,8 +104,9 @@ struct vlanreq {
 
 #ifndef RT_ROUNDUP
 #ifdef __APPLE__
-#define RT_ROUNDUP(a) \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(uint32_t) - 1))) : sizeof(uint32_t))
+#define RT_ROUNDUP(a)                                           \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(uint32_t) - 1))) : \
+		   sizeof(uint32_t))
 #else
 #define RT_ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
@@ -834,7 +835,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 			if_copysa(gsa, rt->rt_gateway);
 #ifdef INET6
 			if (gss.ss_family == AF_INET6)
-				ipv6_setscope((struct sockaddr_in6 *)&gss, rt->rt_ifp->index);
+				ipv6_setscope((struct sockaddr_in6 *)&gss,
+				    rt->rt_ifp->index);
 #endif
 			ADDSA(gsa);
 		}
@@ -1337,7 +1339,8 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	    (rt.rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
 	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK))) {
 		bool reachable;
-		struct sockaddr_in6 *dest = (struct sockaddr_in6 *)&rt.rt_ss_dest;
+		struct sockaddr_in6 *dest =
+		    (struct sockaddr_in6 *)&rt.rt_ss_dest;
 
 		reachable = (rtm->rtm_type == RTM_ADD ||
 				rtm->rtm_type == RTM_CHANGE) &&

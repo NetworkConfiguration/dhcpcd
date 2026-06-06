@@ -2289,7 +2289,8 @@ main(int argc, char **argv, char **envp)
 			default:
 				per = "";
 			}
-			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") == -1) {
+			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") ==
+			    -1) {
 				logerr("%s: asprintf", __func__);
 				goto exit_failure;
 			}
