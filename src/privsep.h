@@ -94,9 +94,9 @@
 #define PS_STOP	 0x8000
 
 #ifdef INET6
-#define PS_BUFLEN6	CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int))
+#define PS_BUFLEN6 CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int))
 #else
-#define PS_BUFLEN6	0
+#define PS_BUFLEN6 0
 #endif
 
 /* Max INET message size + meta data for IPC */
