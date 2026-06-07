@@ -206,8 +206,9 @@ int if_nametospec(const char *, struct if_spec *);
 
 /* The below functions are provided by if-KERNEL.c */
 int os_init(void);
-int if_conf(struct interface *);
-int if_init(struct interface *);
+int if_init(struct interface *);    /* init interface from kernel */
+int if_init_os(struct interface *); /* init kernel from interface */
+int if_conf(struct interface *);    /* finish configuration from kernel */
 int if_getssid(struct interface *);
 int if_ignoregroup(int, const char *);
 bool if_ignore(struct dhcpcd_ctx *, const char *);

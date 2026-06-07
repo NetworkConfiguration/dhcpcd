@@ -300,6 +300,33 @@ if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 int
 if_init(struct interface *ifp)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct ifreq ifr = { .ifr_flags = 0 };
+	int err = 0;
+
+	if (ifp->index != 0)
+		return 0;
+
+	/* This is a huge bug in getifaddrs(3) as there
+	 * is no reason why this can't be returned in
+	 * ifa_addr. */
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(ctx->pf_inet_fd, SIOCGIFHWADDR, &ifr) == -1) {
+		logerr("%s: SIOCGIFHWADDR", ifp->name);
+		err = -1;
+	} else
+		ifp->hwtype = ifr.ifr_hwaddr.sa_family;
+	if (ioctl(ctx->pf_inet_fd, SIOCGIFINDEX, &ifr) == -1) {
+		logerr("%s: SIOCGIFINDEX", ifp->name);
+		err = -1;
+	} else
+		ifp->index = (unsigned int)ifr.ifr_ifindex;
+	return err;
+}
+
+int
+if_init_os(struct interface *ifp)
+{
 	char path[sizeof(PROC_PROMOTE) + IF_NAMESIZE];
 	int n;
 

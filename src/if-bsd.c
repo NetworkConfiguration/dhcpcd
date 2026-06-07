@@ -139,6 +139,13 @@ os_init(void)
 int
 if_init(__unused struct interface *iface)
 {
+	/* No extra init needed. */
+	return 0;
+}
+
+int
+if_init_os(__unused struct interface *iface)
+{
 	/* BSD promotes secondary address by default */
 	return 0;
 }
