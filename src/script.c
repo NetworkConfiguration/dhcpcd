@@ -59,9 +59,9 @@
 
 #define DEFAULT_PATH "/usr/bin:/usr/sbin:/bin:/sbin"
 
-static const char *const if_params[] = { "interface", "protocol", "reason",
-	"pid", "ifcarrier", "ifmetric", "ifwireless", "ifflags", "ssid",
-	"profile", "interface_order", NULL };
+static const char *const if_params[] = { "interface", "ifxname", "protocol",
+	"reason", "pid", "ifcarrier", "ifmetric", "ifwireless", "ifflags",
+	"ssid", "profile", "interface_order", NULL };
 
 static const char *true_str = "true";
 static const char *false_str = "false";
@@ -331,9 +331,21 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 #endif
 
 	if (!is_stdin) {
-		print_string(if_name, sizeof(if_name), OT_ESCFILE, ifp->name,
-		    strlen(ifp->name));
+		/*
+		 * $interface is used to create files.
+		 * $ifxname is used to reference the actual interface.
+		 * The distinction is important as the actual interface name
+		 * could contain a path separator or an invalid path character.
+		 */
+		if (print_string(if_name, sizeof(if_name), OT_ESCFILE,
+			ifp->name, strlen(ifp->name)) == -1)
+			goto eexit;
 		if (efprintf(fp, "interface=%s", if_name) == -1)
+			goto eexit;
+		if (print_string(if_name, sizeof(if_name), OT_ESCSTRING,
+			ifp->name, strlen(ifp->name)) == -1)
+			goto eexit;
+		if (efprintf(fp, "ifxname=%s", if_name) == -1)
 			goto eexit;
 		if (protocols[protocol] != NULL) {
 			if (efprintf(fp, "protocol=%s", protocols[protocol]) ==
@@ -390,8 +402,9 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		goto eexit;
 	RB_TREE_FOREACH(rt, &ifaces)
 	{
-		print_string(if_name, sizeof(if_name), OT_ESCFILE,
-		    rt->rt_ifp->name, strlen(rt->rt_ifp->name));
+		if (print_string(if_name, sizeof(if_name), OT_ESCFILE,
+			rt->rt_ifp->name, strlen(rt->rt_ifp->name)) == -1)
+			goto eexit;
 		if (rt != RB_TREE_MIN(&ifaces) && fprintf(fp, "%s", " ") == -1)
 			goto eexit;
 		if (fprintf(fp, "%s", if_name) == -1)
