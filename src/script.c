@@ -59,9 +59,9 @@
 
 #define DEFAULT_PATH "/usr/bin:/usr/sbin:/bin:/sbin"
 
-static const char *const if_params[] = { "interface", "protocol", "reason",
-	"pid", "ifcarrier", "ifmetric", "ifwireless", "ifflags", "ssid",
-	"profile", "interface_order", NULL };
+static const char *const if_params[] = { "interface", "ifxname", "protocol",
+	"reason", "pid", "ifcarrier", "ifmetric", "ifwireless", "ifflags",
+	"ssid", "profile", "interface_order", NULL };
 
 static const char *true_str = "true";
 static const char *false_str = "false";
