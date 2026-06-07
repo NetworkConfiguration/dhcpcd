@@ -205,8 +205,13 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 
 	/* Only allow these ioctls */
 	switch (req) {
+#ifdef SIOCSIFADDR
+	case SIOCSIFADDR: /* FALLTHROUGH */
+#endif
 #ifdef SIOCAIFADDR
 	case SIOCAIFADDR: /* FALLTHROUGH */
+#endif
+#ifdef SIOCDIFADDR
 	case SIOCDIFADDR: /* FALLTHROUGH */
 #endif
 #ifdef SIOCSIFHWADDR
