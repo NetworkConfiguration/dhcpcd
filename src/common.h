@@ -31,10 +31,10 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 /* Define eloop queues here, as other apps share eloop.h */
 #define ELOOP_DHCPCD	    1 /* default queue */
