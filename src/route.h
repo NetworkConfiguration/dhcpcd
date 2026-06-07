@@ -73,6 +73,10 @@
 #endif
 #endif
 
+#if defined(BSD)
+#define HAVE_RT_MISSFILTER
+#endif
+
 #if defined(__OpenBSD__) || defined(__sun)
 #define ROUTE_PER_GATEWAY
 /* XXX dhcpcd doesn't really support this yet.

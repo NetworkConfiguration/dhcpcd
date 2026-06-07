@@ -802,7 +802,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		goto getfail;
 #endif
 
-#ifdef BSD
+#ifdef HAVE_RT_MISSFILTER
 	/* Rewind the miss filter */
 	ctx->rt_missfilterlen = 0;
 #endif
@@ -814,7 +814,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 				continue;
 		} else if (!(ctx->options & DHCPCD_CONFIGURE))
 			continue;
-#ifdef BSD
+#ifdef HAVE_RT_MISSFILTER
 		if (rt_is_default(rt) &&
 		    if_missfilter(rt->rt_ifp, rt->rt_gateway) == -1)
 			logerr("if_missfilter");
@@ -837,7 +837,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		}
 	}
 
-#ifdef BSD
+#ifdef HAVE_RT_MISSFILTER
 	if (!(ctx->options & DHCPCD_EXITING) &&
 	    if_missfilter_apply(ctx) == -1 && errno != ENOTSUP)
 		logerr("if_missfilter_apply");
