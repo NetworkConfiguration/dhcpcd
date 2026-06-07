@@ -117,6 +117,12 @@ os_init(void)
 int
 if_init(struct interface *ifp)
 {
+	return 0;
+}
+
+int
+if_init_os(struct interface *ifp)
+{
 #ifdef INET
 	if (if_plumb(RTM_NEWADDR, ifp->ctx, AF_INET, ifp->name) == -1 &&
 	    errno != EEXIST)
