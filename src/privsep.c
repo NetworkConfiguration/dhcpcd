@@ -517,6 +517,7 @@ int
 ps_start(struct dhcpcd_ctx *ctx)
 {
 	pid_t pid;
+	uint32_t rnd;
 
 	TAILQ_INIT(&ctx->ps_processes);
 
@@ -556,11 +557,10 @@ started_net:
 		}
 	}
 
-#ifdef ARC4RANDOM_H
-	/* Seed the random number generator early incase it needs /dev/urandom
-	 * which won't be available in the chroot. */
-	arc4random();
-#endif
+	/* Seed the random number generator early incase it needs
+	 * to cache /dev/urandom which won't be available in the chroot. */
+	rnd = arc4random();
+	UNUSED(rnd);
 
 	return 1;
 }
