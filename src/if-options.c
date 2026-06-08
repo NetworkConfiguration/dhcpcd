@@ -459,7 +459,7 @@ splitv(int *argc, char **argv, const char *arg)
 
 #ifdef INET
 static int
-parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
+parse_addr(struct in_addr *addr, struct in_addr *net, char *arg)
 {
 	char *p;
 
@@ -496,7 +496,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 #else
 static int
 parse_addr(__unused struct in_addr *addr, __unused struct in_addr *net,
-    __unused const char *arg)
+    __unused char *arg)
 {
 	logerrx("No IPv4 support");
 	return -1;
@@ -610,7 +610,7 @@ strskipwhite(const char *s)
 #ifdef AUTH
 /* Find the end pointer of a string. */
 static char *
-strend(const char *s)
+strend(char *s)
 {
 	s = strskipwhite(s);
 	if (s == NULL)
@@ -626,13 +626,13 @@ strend(const char *s)
 				return NULL;
 		}
 	}
-	return UNCONST(++s);
+	return ++s;
 }
 #endif
 
 static int
 parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
-    int opt, const char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
+    int opt, char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
 {
 	int e, i, t;
 	long l;
