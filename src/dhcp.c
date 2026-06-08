@@ -779,6 +779,7 @@ rfc3396_zero(struct rfc3396_ctx *ctx)
 static ssize_t
 make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct bootp *bootp;
 	uint8_t *lp, *p, *e;
 	uint8_t *n_params = NULL;
@@ -955,8 +956,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		*p++ = DHO_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-		for (i = 0, opt = ifp->ctx->dhcp_opts;
-		    i < ifp->ctx->dhcp_opts_len; i++, opt++) {
+		for (i = 0, opt = ctx->dhcp_opts; i < ctx->dhcp_opts_len;
+		    i++, opt++) {
 			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
 				continue;
 			if (type == DHCP_INFORM &&
@@ -1022,7 +1023,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		p += ifo->vendorclassid[0] + 1;
 	}
 
-	if (type == DHCP_DISCOVER && !(ifp->ctx->options & DHCPCD_TEST) &&
+	if (type == DHCP_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask, ifo->nomask, DHO_RAPIDCOMMIT)) {
 		/* RFC 4039 Section 3 */
 		AREA_CHECK(0);
@@ -1031,7 +1032,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (DHCP_DIR(type)) {
-		hostname = dhcp_get_hostname(hbuf, sizeof(hbuf), ifo);
+		hostname = dhcp_get_hostname(ctx, hbuf, sizeof(hbuf), ifo);
 
 		/*
 		 * RFC4702 3.1 States that if we send the Client FQDN option
@@ -1083,7 +1084,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	auth = NULL; /* appease GCC */
 	auth_len = 0;
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		ssize_t alen = dhcp_auth_encode(ifp->ctx, &ifo->auth,
+		ssize_t alen = dhcp_auth_encode(ctx, &ifo->auth,
 		    state->auth.token, NULL, 0, 4, type, NULL, 0);
 		if (alen != -1 && alen > UINT8_MAX) {
 			errno = ERANGE;
@@ -1216,7 +1217,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 #ifdef AUTH
 	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0)
-		dhcp_auth_encode(ifp->ctx, &ifo->auth, state->auth.token,
+		dhcp_auth_encode(ctx, &ifo->auth, state->auth.token,
 		    (uint8_t *)bootp, len, 4, type, auth, auth_len);
 #endif
 

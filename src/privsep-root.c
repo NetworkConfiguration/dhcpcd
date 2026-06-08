@@ -571,6 +571,15 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		}
 		break;
 #endif
+#ifdef PRIVSEP_GETHOSTNAME
+	case PS_GETHOSTNAME:
+		err = gethostname((char *)buf, sizeof(buf));
+		if (err != -1) {
+			rdata = buf;
+			rlen = strlen((char *)buf) + 1;
+		}
+		break;
+#endif
 #ifdef PRIVSEP_GETIFADDRS
 	case PS_GETIFADDRS:
 		err = ps_root_dogetifaddrs(&rdata, &rlen);
@@ -1083,6 +1092,16 @@ ps_root_logreopen(struct dhcpcd_ctx *ctx)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
+
+#ifdef PRIVSEP_GETHOSTNAME
+int
+ps_root_gethostname(struct dhcpcd_ctx *ctx, char *hname, size_t hnamelen)
+{
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_GETHOSTNAME, 0, NULL, 0) == -1)
+		return -1;
+	return (int)ps_root_readerror(ctx, hname, hnamelen);
+}
+#endif
 
 #ifdef PRIVSEP_GETIFADDRS
 int

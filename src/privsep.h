@@ -70,6 +70,7 @@
 #define PS_GETIFADDRS	 0x0205
 #define PS_IFIGNOREGRP	 0x0206
 #define PS_SYSCTL	 0x0207
+#define PS_GETHOSTNAME	 0x0208
 
 /* Dev Commands */
 #define PS_DEV_LISTENING 0x1001

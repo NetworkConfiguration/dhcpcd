@@ -693,6 +693,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 static int
 dhcp6_makemessage(struct interface *ifp)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct dhcp6_state *state;
 	struct dhcp6_message *m;
 	struct dhcp6_option o;
@@ -774,7 +775,7 @@ dhcp6_makemessage(struct interface *ifp)
 		fqdn = FQDN_BOTH;
 	}
 	if (fqdn != FQDN_DISABLE)
-		hostname = dhcp_get_hostname(hbuf, sizeof(hbuf), ifo);
+		hostname = dhcp_get_hostname(ctx, hbuf, sizeof(hbuf), ifo);
 	else
 		hostname = NULL; /* appearse gcc */
 
@@ -784,8 +785,8 @@ dhcp6_makemessage(struct interface *ifp)
 	si = NULL;
 	hl = 0; /* Appease gcc */
 	if (state->state != DH6S_RELEASE && state->state != DH6S_DECLINE) {
-		for (l = 0, opt = ifp->ctx->dhcp6_opts;
-		    l < ifp->ctx->dhcp6_opts_len; l++, opt++) {
+		for (l = 0, opt = ctx->dhcp6_opts; l < ctx->dhcp6_opts_len;
+		    l++, opt++) {
 			for (n = 0, opt2 = ifo->dhcp6_override;
 			    n < ifo->dhcp6_override_len; n++, opt2++) {
 				if (opt->option == opt2->option)
@@ -839,7 +840,7 @@ dhcp6_makemessage(struct interface *ifp)
 		duid_len = duid_make(duid, ifp, DUID_LL);
 		len += sizeof(o) + duid_len;
 	} else {
-		len += sizeof(o) + ifp->ctx->duid_len;
+		len += sizeof(o) + ctx->duid_len;
 	}
 
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
@@ -919,8 +920,7 @@ dhcp6_makemessage(struct interface *ifp)
 		IA = 0;
 	}
 
-	if (state->state == DH6S_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
+	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
@@ -947,7 +947,7 @@ dhcp6_makemessage(struct interface *ifp)
 	/* In non manager mode we listen and send from fixed addresses.
 	 * We should try and match an address we have to unicast to,
 	 * but for now this is the safest policy. */
-	if (unicast != NULL && !(ifp->ctx->options & DHCPCD_MANAGER)) {
+	if (unicast != NULL && !(ctx->options & DHCPCD_MANAGER)) {
 		logdebugx("%s: ignoring unicast option as not manager",
 		    ifp->name);
 		unicast = NULL;
@@ -956,7 +956,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifdef AUTH
 	auth_len = 0;
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		ssize_t alen = dhcp_auth_encode(ifp->ctx, &ifo->auth,
+		ssize_t alen = dhcp_auth_encode(ctx, &ifo->auth,
 		    state->auth.token, NULL, 0, 6, type, NULL, 0);
 		if (alen != -1 && alen > UINT16_MAX) {
 			errno = ERANGE;
@@ -1009,8 +1009,7 @@ dhcp6_makemessage(struct interface *ifp)
 	if (ifo->options & DHCPCD_ANONYMOUS)
 		COPYIN(D6_OPTION_CLIENTID, duid, (uint16_t)duid_len);
 	else
-		COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid,
-		    (uint16_t)ifp->ctx->duid_len);
+		COPYIN(D6_OPTION_CLIENTID, ctx->duid, (uint16_t)ctx->duid_len);
 
 	if (si != NULL)
 		COPYIN(D6_OPTION_SERVERID, si, si_len);
@@ -1117,8 +1116,8 @@ dhcp6_makemessage(struct interface *ifp)
 		o_lenp = NEXTLEN(p);
 		o.len = 0;
 		COPYIN1(D6_OPTION_ORO, 0);
-		for (l = 0, opt = ifp->ctx->dhcp6_opts;
-		    l < ifp->ctx->dhcp6_opts_len; l++, opt++) {
+		for (l = 0, opt = ctx->dhcp6_opts; l < ctx->dhcp6_opts_len;
+		    l++, opt++) {
 #ifndef SMALL
 			for (n = 0, opt2 = ifo->dhcp6_override;
 			    n < ifo->dhcp6_override_len; n++, opt2++) {
@@ -1159,8 +1158,7 @@ dhcp6_makemessage(struct interface *ifp)
 	si_len = 0;
 	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
 
-	if (state->state == DH6S_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
+	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
 		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
