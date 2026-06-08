@@ -644,12 +644,14 @@ ps_root_startcb(struct ps_process *psp)
 {
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 
+#ifdef HAVE_SETPROCTITLE
 	if (ctx->options & DHCPCD_MANAGER)
 		setproctitle("[privileged proxy]");
 	else
 		setproctitle("[privileged proxy] %s%s%s", ctx->ifv[0],
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
+#endif
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
 	if (if_opensockets(ctx) == -1)
