@@ -3578,8 +3578,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom, struct dhcp6_message *r,
 #endif
 			logerrx("%s: unauthenticated %s from %s", ifp->name, op,
 			    sfrom);
-			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE)
-				return;
+			return;
 #ifdef AUTH
 		}
 		loginfox("%s: %s from %s", ifp->name, op, sfrom);
