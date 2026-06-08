@@ -184,8 +184,10 @@ dhcp_vendor(char *str, size_t len)
 	l = if_machinearch(p + 1, len - 1);
 	if (l == -1 || (size_t)(l + 1) > len)
 		return -1;
-	*p = ':';
-	p += l;
+	if (l != 0) {
+		*p = ':';
+		p += l;
+	}
 	return p - str;
 }
 
