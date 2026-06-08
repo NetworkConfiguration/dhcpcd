@@ -46,10 +46,20 @@
 #include "script.h"
 
 const char *
-dhcp_get_hostname(char *buf, size_t buf_len, const struct if_options *ifo)
+dhcp_get_hostname(struct dhcpcd_ctx *ctx, char *buf, size_t buf_len,
+    const struct if_options *ifo)
 {
+#ifndef PRIVSEP_GETHOSTNAME
+	UNUSED(ctx);
+#endif
 	if (ifo->hostname[0] == '\0') {
-		if (gethostname(buf, buf_len) != 0)
+#ifdef PRIVSEP_GETHOSTNAME
+		if (IN_PRIVSEP(ctx)) {
+			if (ps_root_gethostname(ctx, buf, buf_len) == -1)
+				return NULL;
+		} else
+#endif
+		    if (gethostname(buf, buf_len) != 0)
 			return NULL;
 		buf[buf_len - 1] = '\0';
 	} else

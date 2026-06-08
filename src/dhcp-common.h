@@ -104,7 +104,8 @@ struct dhcp_opt {
 	size_t encopts_len;
 };
 
-const char *dhcp_get_hostname(char *, size_t, const struct if_options *);
+const char *dhcp_get_hostname(struct dhcpcd_ctx *, char *, size_t,
+    const struct if_options *);
 struct dhcp_opt *vivso_find(uint32_t, const void *);
 
 ssize_t dhcp_vendor(char *, size_t);

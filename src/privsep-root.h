@@ -52,6 +52,9 @@ ssize_t ps_root_logreopen(struct dhcpcd_ctx *);
 ssize_t ps_root_script(struct dhcpcd_ctx *, const void *, size_t);
 ssize_t ps_root_stopprocesses(struct dhcpcd_ctx *);
 int ps_root_getauthrdm(struct dhcpcd_ctx *, uint64_t *);
+#ifdef PRIVSEP_GETHOSTNAME
+int ps_root_gethostname(struct dhcpcd_ctx *, char *, size_t);
+#endif
 #ifdef PRIVSEP_GETIFADDRS
 int ps_root_getifaddrs(struct dhcpcd_ctx *, struct ifaddrs **);
 #endif
