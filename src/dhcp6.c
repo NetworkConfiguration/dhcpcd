@@ -2572,6 +2572,8 @@ dhcp6_deprecatedele(struct ipv6_addr *ia)
 
 		/* Delete it from the interface. */
 		state = D6_STATE(da->iface);
+		if (state == NULL)
+			continue;
 		TAILQ_FOREACH(dda, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&dda->addr, &da->addr))
 				break;
