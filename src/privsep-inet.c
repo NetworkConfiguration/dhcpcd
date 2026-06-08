@@ -120,6 +120,7 @@ ps_inet_startcb(struct ps_process *psp)
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 	int ret = 0;
 
+#ifdef HAVE_SETPROCTITLE
 	if (ctx->options & DHCPCD_MANAGER)
 		setproctitle("[network proxy]");
 	else
@@ -127,6 +128,7 @@ ps_inet_startcb(struct ps_process *psp)
 		    ctx->ifc != 0 ? ctx->ifv[0] : "",
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
+#endif
 
 	/* This end is the main engine, so it's useless for us. */
 	close(ctx->ps_data_fd);
@@ -392,10 +394,12 @@ static int
 ps_inet_listenin(struct ps_process *psp)
 {
 	struct in_addr *ia = &psp->psp_id.psi_addr.psa_in_addr;
+#ifdef HAVE_SETPROCTITLE
 	char buf[INET_ADDRSTRLEN];
 
 	inet_ntop(AF_INET, ia, buf, sizeof(buf));
 	setproctitle("[%s proxy] %s", psp->psp_protostr, buf);
+#endif
 
 	psp->psp_work_fd = dhcp_openudp(ia);
 	if (psp->psp_work_fd == -1) {
@@ -432,7 +436,9 @@ ps_inet_recvin6nd(void *arg)
 static int
 ps_inet_listennd(struct ps_process *psp)
 {
+#ifdef HAVE_SETPROCTITLE
 	setproctitle("[ND network proxy]");
+#endif
 
 	psp->psp_work_fd = ipv6nd_open(&psp->psp_ifp);
 	if (psp->psp_work_fd == -1) {
@@ -471,10 +477,12 @@ static int
 ps_inet_listenin6(struct ps_process *psp)
 {
 	struct in6_addr *ia = &psp->psp_id.psi_addr.psa_in6_addr;
+#ifdef HAVE_SETPROCTITLE
 	char buf[INET6_ADDRSTRLEN];
 
 	inet_ntop(AF_INET6, ia, buf, sizeof(buf));
 	setproctitle("[%s proxy] %s", psp->psp_protostr, buf);
+#endif
 
 	psp->psp_work_fd = dhcp6_openudp(psp->psp_id.psi_ifindex, ia);
 	if (psp->psp_work_fd == -1) {

@@ -2548,7 +2548,9 @@ main(int argc, char **argv, char **envp)
 		}
 		break;
 	default:
+#ifdef HAVE_SETPROCTITLE
 		setproctitle("[launcher]");
+#endif
 		ctx.options |= DHCPCD_FORKED | DHCPCD_LAUNCHER;
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
@@ -2636,10 +2638,12 @@ start_manager:
 		dev_start(&ctx, dhcpcd_handleinterface);
 #endif
 
+#ifdef HAVE_SETPROCTITLE
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MANAGER ? "[manager]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
 	    ctx.options & DHCPCD_IPV6 ? " [ip6]" : "");
+#endif
 
 	if (if_opensockets(&ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
