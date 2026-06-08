@@ -2024,8 +2024,10 @@ dhcp_expire(void *arg)
 		state->added |= STATE_EXPIRED;
 	} else {
 		logerrx("%s: DHCP lease expired", ifp->name);
-		dhcp_drop(ifp, "EXPIRE");
-		dhcp_unlink(ifp->ctx, state->leasefile);
+		if (!(ifp->ctx->options & DHCPCD_TEST)) {
+			dhcp_drop(ifp, "EXPIRE");
+			dhcp_unlink(ifp->ctx, state->leasefile);
+		}
 	}
 	state->interval = 0;
 	dhcp_discover(ifp);
