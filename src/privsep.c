@@ -46,6 +46,10 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#ifdef __GNU__
+#undef AF_LINK
+#endif
+
 #ifdef AF_LINK
 #include <net/if_dl.h>
 #endif

@@ -31,7 +31,13 @@
 
 #include <net/if.h>
 #include <netinet/in.h>
+
+#ifdef __GNU__
+#include <net/ethernet.h>
+#include <net/if_arp.h>
+#else
 #include <netinet/if_ether.h>
+#endif
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -43,6 +49,8 @@
 #include "config.h"
 #ifdef USE_LIBPCAP
 #include <pcap/bpf.h>
+#elif defined(__GNU__)
+#include <device/bpf.h>
 #elif defined(__linux__)
 #include <linux/filter.h>
 #define bpf_insn sock_filter
@@ -266,11 +274,16 @@ static const struct bpf_insn bpf_arp_ether[] = {
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPHRD_ETHER, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 
+	/* GNU Mach kernel has a small maximum filter size.
+	 * Ethernet is a fixed header size so omitting this should be safe.
+	 * It also checked after BPF happens so doubly safe. */
+#ifndef __GNU__
 	/* Make sure the hardware length matches. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, offsetof(struct arphdr, ar_hln)),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
 	    sizeof(((struct ether_header *)0)->ether_shost), 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
+#endif
 };
 #define BPF_ARP_ETHER_LEN __arraycount(bpf_arp_ether)
 

@@ -39,8 +39,11 @@
 
 #include <fcntl.h> /* Needs to be here for old Linux */
 
-#include "config.h"
-#ifdef AF_LINK
+#ifdef __GNU__
+#undef AF_LINK
+#endif
+
+#if defined(AF_LINK)
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <netinet/in_var.h>

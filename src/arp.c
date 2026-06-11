@@ -31,7 +31,13 @@
 
 #include <net/if.h>
 #include <netinet/in.h>
+
+#ifdef __GNU__
+#include <net/ethernet.h>
+#include <net/if_arp.h>
+#else
 #include <netinet/if_ether.h>
+#endif
 
 #include <arpa/inet.h>
 #include <errno.h>

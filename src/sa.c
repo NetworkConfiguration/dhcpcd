@@ -29,6 +29,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#ifdef __GNU__
+#undef AF_LINK
+#endif
+
 #include <arpa/inet.h>
 #ifdef AF_LINK
 #include <net/if_dl.h>

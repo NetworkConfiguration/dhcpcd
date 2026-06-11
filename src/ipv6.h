@@ -36,7 +36,7 @@
 #include "config.h"
 #include "if.h"
 
-#ifndef __linux__
+#if !defined(__linux__) && !defined(__GNU__)
 #if !defined(__QNX__) && !defined(__sun)
 #include <sys/endian.h>
 #endif
