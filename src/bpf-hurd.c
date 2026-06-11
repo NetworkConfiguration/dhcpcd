@@ -162,7 +162,7 @@ bpf_hurd_recv(void *arg)
 		pthread_mutex_lock(&bh->bh_mutex);
 		STAILQ_INSERT_TAIL(&bh->bh_msgs, bh->bh_msg, bm_next);
 		pthread_mutex_unlock(&bh->bh_mutex);
-	
+
 		/* malloc a new msg buffer for the next mach_msg.
 		 * We don't need to do this under a mutex becuase the main
 		 * thread never looks at it while we are running.

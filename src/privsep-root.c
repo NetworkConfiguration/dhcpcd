@@ -34,7 +34,7 @@
 #include <sys/wait.h>
 
 #ifdef __GNU__
-#undef  SIOCAIFADDR
+#undef SIOCAIFADDR
 #endif
 
 #include <assert.h>

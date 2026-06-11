@@ -53,7 +53,7 @@ if_machinearch(__unused char *str, __unused size_t len)
 int
 if_opensockets_os(__unused struct dhcpcd_ctx *ctx)
 {
-	#warning OS has no mechanism of reporting interface, address or route changes
+#warning OS has no mechanism of reporting interface, address or route changes
 	/* Hurd not not have any mechanism like route(4) yet */
 	ctx->link_fd = -1;
 	return 0;

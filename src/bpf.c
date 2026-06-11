@@ -274,9 +274,9 @@ static const struct bpf_insn bpf_arp_ether[] = {
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPHRD_ETHER, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 
-	/* GNU Mach kernel has a small maximum filter size.
-	 * Ethernet is a fixed header size so omitting this should be safe.
-	 * It also checked after BPF happens so doubly safe. */
+/* GNU Mach kernel has a small maximum filter size.
+ * Ethernet is a fixed header size so omitting this should be safe.
+ * It also checked after BPF happens so doubly safe. */
 #ifndef __GNU__
 	/* Make sure the hardware length matches. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, offsetof(struct arphdr, ar_hln)),
