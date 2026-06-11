@@ -1,5 +1,5 @@
 /*
- * Solaris interface driver for dhcpcd
+ * Hurd interface driver for dhcpcd
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2026 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -46,7 +46,7 @@ os_init(void)
 int
 if_machinearch(__unused char *str, __unused size_t len)
 {
-	/* nohting more beyond uname by the looks of it. */
+	/* nothing more beyond uname by the looks of it. */
 	return 0;
 }
 
@@ -54,7 +54,7 @@ int
 if_opensockets_os(__unused struct dhcpcd_ctx *ctx)
 {
 #warning OS has no mechanism of reporting interface, address or route changes
-	/* Hurd not not have any mechanism like route(4) yet */
+	/* Hurd does not have any mechanism like route(4) yet */
 	ctx->link_fd = -1;
 	return 0;
 }
@@ -104,7 +104,7 @@ if_init_os(__unused struct interface *ifp)
 int
 if_handlelink(__unused struct dhcpcd_ctx *ctx)
 {
-	return ENOSYS;
+	errno = ENOSYS;
 	return -1;
 }
 

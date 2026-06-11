@@ -197,12 +197,17 @@ bpf_hurd_open(struct bpf *bpf)
 	int err, fd[2];
 
 	port = file_name_lookup(bpf->bpf_ifp->name, O_READ | O_WRITE, 0);
-	if (port == MACH_PORT_NULL)
+	if (port == MACH_PORT_NULL) {
+		logerr("%s: file_name_lookup", __func__);
 		return NULL;
+	}
 
 	bh = malloc(sizeof(*bh));
-	if (bh == NULL)
+	if (bh == NULL) {
+		logerr("%s: malloc", __func__);
+		mach_port_deallocate(mach_task_self(), port);
 		return NULL;
+	}
 
 	bh->bh_bpf = bpf;
 	bh->bh_dev = MACH_PORT_NULL;

@@ -1,7 +1,7 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * libpcap interface driver for dhcpcd
- * Copyright (c) 2025 Joan Lledó <jlledom@member.fsf.org>
+ * Privilege Separation for dhcpcd, hurd driver
+ * SPDX-License-Identifier: BSD-2-Clause
+ * Copyright (c) 2026 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
