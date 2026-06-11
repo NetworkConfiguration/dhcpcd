@@ -280,6 +280,7 @@ bpf_open(const struct interface *ifp,
 	mtu = ifp->mtu ? ifp->mtu : ETH_DATA_LEN;
 	bpf->bpf_ifp = ifp;
 	bpf->bpf_size = bpf_frame_header_len(ifp) + (size_t)mtu;
+	bpf->bpf_fd = -1;
 
 	bpf->bpf_buffer = malloc(bpf->bpf_size);
 	if (bpf->bpf_buffer == NULL) {
@@ -440,6 +441,8 @@ bpf_close(struct bpf *bpf)
 {
 	if (bpf->bpf_handle != NULL)
 		bpf_hurd_free(bpf->bpf_handle);
+	if (bpf->bpf_fd != -1)
+		close(bpf->bpf_fd);
 	free(bpf->bpf_buffer);
 	free(bpf);
 }
