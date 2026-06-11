@@ -88,8 +88,8 @@ bpf_open(const struct interface *ifp,
 	PCAP_CHECK(pcap_set_promisc(handle, 0), "pcap_set_promisc");
 #ifdef HAVE_PCAP_SET_IMMEDIATE_MODE
 	PCAP_CHECK(pcap_set_immediate_mode(handle, 1),
-#endif
 	    "pcap_set_immediate_mode");
+#endif
 
 	err = pcap_activate(handle);
 	if (err != 0) {
