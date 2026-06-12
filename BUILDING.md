@@ -147,6 +147,14 @@ An upstream PR has been submitted to add `pcap_setwritefilter()` and
 `pcap_lockfilter()` to libpcap:
     https://github.com/the-tcpdump-group/libpcap/pull/1683
 
+GNU/Hurd support is basic at best.
+There seems to be an issue where dhcpcd will exit and a
+diagnostic about destroying bogus port X will be logged.
+I suspect this is something in libc as I get the error with
+BPF disabled which is the only part that uses Mach ports directly.
+CMSG handling for received messages looks broken.
+This means RENEW will fail and we will REBIND at some point.
+
 ## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then

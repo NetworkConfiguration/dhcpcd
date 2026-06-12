@@ -33,6 +33,10 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+#ifdef __GNU__
+#undef SIOCAIFADDR
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

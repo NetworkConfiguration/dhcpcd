@@ -33,10 +33,9 @@
 #include <inttypes.h>
 #include <string.h>
 
-#ifdef __GLIBC__
+#if defined(__GLIBC__) || defined(__GNU__)
 #  include <endian.h>
-#endif
-#if defined(BSD) || defined(__APPLE__)
+#elif defined(BSD) || defined(__APPLE__)
 #  ifndef __QNX__
 #    include <sys/endian.h>
 #  endif

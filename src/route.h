@@ -73,7 +73,7 @@
 #endif
 #endif
 
-#if defined(BSD)
+#if defined(BSD) && !defined(__GNU__)
 #define HAVE_RT_MISSFILTER
 #endif
 

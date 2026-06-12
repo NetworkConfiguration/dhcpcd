@@ -10,7 +10,7 @@
 #if (defined(__unix__) || defined(unix)) && !defined(USG)
 #include <sys/param.h>
 #endif
-#ifdef BSD
+#if defined(BSD) && !defined(__GNU__)
 #include <sys/queue.h>
 /* Dragonfly BSD needs this :( */
 #if !defined(TAILQ_FOREACH_SAFE) && defined(TAILQ_FOREACH_MUTABLE)

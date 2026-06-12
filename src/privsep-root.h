@@ -31,8 +31,13 @@
 
 #include "if.h"
 
-#if defined(PRIVSEP) && (defined(HAVE_CAPSICUM) || defined(__linux__))
+#ifdef PRIVSEP
+#if defined(HAVE_CAPSICUM) || defined(__linux__)
 #define PRIVSEP_GETIFADDRS
+#endif
+#ifdef __GNU__
+#define PRIVSEP_GETHOSTNAME
+#endif
 #endif
 
 pid_t ps_root_start(struct dhcpcd_ctx *ctx);

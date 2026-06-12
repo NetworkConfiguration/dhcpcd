@@ -34,7 +34,13 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+
+#ifdef __GNU__
+#undef AF_LINK
+#include <net/ethernet.h>
+#else
 #include <netinet/if_ether.h>
+#endif
 
 #include <arpa/inet.h>
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */

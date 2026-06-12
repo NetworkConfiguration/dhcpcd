@@ -32,7 +32,8 @@
 #include <net/if.h>
 #include <net/route.h> /* for RTM_ADD et all */
 #include <netinet/in.h>
-#ifdef BSD
+
+#if defined(BSD) && !defined(__GNU__)
 #include <netinet/in_var.h> /* for IN_IFF_TENTATIVE et all */
 #endif
 
@@ -231,6 +232,10 @@ int if_setmac(struct interface *ifp, void *, uint8_t);
 #define RTM_DELETE 0x2 /* Delete Route */
 #define RTM_CHANGE 0x3 /* Change Metrics or flags */
 #define RTM_GET	   0x4 /* Report Metrics */
+#endif
+#ifndef RTM_NEWADDR
+#define RTM_NEWADDR 0xc /* Add address */
+#define RTM_DELADDR 0xd /* Remove address */
 #endif
 
 /* Define SOCK_CLOEXEC and SOCK_NONBLOCK for systems that lack it.

@@ -244,6 +244,10 @@ if [ -z "$OS" ]; then
 		if [ "$VENDOR" != "$REST" ]; then
 			# Use kernel if given, otherwise os
 			OS=${REST%%-*}
+			if [ "$OS" = unknown ]; then
+				# CPU had a - in
+				OS=${REST#*-}
+			fi
 		else
 			# 2 tupple
 			OS=$VENDOR
@@ -268,7 +272,7 @@ if [ -z "$OS" ]; then
 		# This means /usr HAS to be mounted not via dhcpcd
 		: ${LIBEXECDIR:=${PREFIX:-/usr}/libexec}
 		;;
-	gnu*) OS=hurd;; # No HURD support as yet
+	gnu*) OS=hurd;;
 	esac
 fi
 
@@ -380,7 +384,7 @@ else
 	ALLOW_USR_LIBS=true
 fi
 case "$OS" in
-darwin*|linux*|solaris*|sunos*|kfreebsd*|dragonfly*|freebsd*) ;;
+darwin*|hurd*|linux*|solaris*|sunos*|kfreebsd*|dragonfly*|freebsd*) ;;
 *)
 	# There might be more than one ...
 	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
@@ -492,6 +496,13 @@ netbsd*)
 	# reallocarray(3) is guarded by _OPENBSD_SOURCE
 	echo "CPPFLAGS+=	-D_OPENBSD_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
+	;;
+hurd*)
+	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-hurd.c" >>$CONFIG_MK
+	BPF_OS="bpf-hurd.c"
+	# No INET6 support
+	INET6=no
 	;;
 linux*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
@@ -618,6 +629,7 @@ if [ "$PRIVSEP" = yes ]; then
 		echo "PRIVSEP_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
 	fi
 	case "$OS" in
+	hurd*)		echo "PRIVSEP_SRCS+=	privsep-hurd.c" >>$CONFIG_MK;;
 	linux*)
 			 echo "PRIVSEP_SRCS+=	privsep-linux.c" >>$CONFIG_MK
 			 if [ -n "$SECCOMP" ] && [ "$SECCOMP" = no ]; then
@@ -1933,6 +1945,10 @@ if [ "$NTP" = yes ]; then
 	# --enable-ntp
 	echo "UNCOMMENT_NTP=	yes" >>$CONFIG_MK
 fi
+
+case "$OS" in
+hurd*) HOOKS="$HOOKS${HOOKS:+ }10-pfinet"
+esac
 
 echo >>$CONFIG_H
 echo "#endif /*CONFIG_H*/">>$CONFIG_H

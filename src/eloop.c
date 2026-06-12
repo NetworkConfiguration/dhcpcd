@@ -36,7 +36,7 @@
  * On Linux use epoll(7)
  * Everywhere else use ppoll(2)
  */
-#if defined(BSD) || defined(__APPLE__)
+#if (defined(BSD) || defined(__APPLE__)) && !defined(__GNU__)
 #include <sys/event.h>
 #define USE_KQUEUE
 #if defined(__NetBSD__)
