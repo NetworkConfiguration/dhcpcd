@@ -54,6 +54,15 @@
 #define DEFAULT_REQUEST	 180 /* secs to request, mirror DHCP6 */
 #define DEFAULT_FALLBACK 5   /* secs until fallback */
 #define DEFAULT_IPV4LL	 5   /* secs until ipv4ll */
+/* DHCPv4 retransmission backoff defaults (RFC 2131); DHCPv4-only. */
+#define DEFAULT_INITIAL_INTERVAL 4    /* DHCP_BASE per RFC 2131 */
+#define DEFAULT_BACKOFF_CUTOFF	 64   /* DHCP_MAX per RFC 2131 */
+#define DEFAULT_BACKOFF_JITTER	 1000 /* +/- milliseconds */
+
+/* Upper bounds to keep the retransmit timeout arithmetic well within range. */
+#define MAX_INITIAL_INTERVAL 4	  /* DHCP_BASE per RFC 2131 */
+#define MAX_BACKOFF_CUTOFF   64	  /* DHCP_MAX per RFC 2131 */
+#define MAX_BACKOFF_JITTER   1000 /* +/- milliseconds, per RFC 2131 */
 
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN 250 /* 255 - 3 (FQDN) - 2 (DNS enc) */
@@ -191,6 +200,9 @@
 #define O_VSIO		     O_BASE + 57
 #define O_VSIO6		     O_BASE + 58
 #define O_NOSYSLOG	     O_BASE + 59
+#define O_INITIAL_INTERVAL   O_BASE + 60
+#define O_BACKOFF_CUTOFF     O_BASE + 61
+#define O_BACKOFF_JITTER     O_BASE + 62
 
 extern const struct option cf_options[];
 
@@ -258,6 +270,9 @@ struct if_options {
 	uint32_t request_time;
 	uint32_t fallback_time;
 	uint32_t ipv4ll_time;
+	uint32_t initial_interval;
+	uint32_t backoff_cutoff;
+	uint32_t backoff_jitter;
 	unsigned long long options;
 	bool randomise_hwaddr;
 
