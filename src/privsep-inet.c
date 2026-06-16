@@ -427,7 +427,7 @@ static int
 ps_inet_listennd(struct ps_process *psp)
 {
 #ifdef HAVE_SETPROCTITLE
-	setproctitle("[ND proxy] %s", psp->psp_protostr, psp->psp_ifname);
+	setproctitle("[%s proxy] %s", psp->psp_protostr, psp->psp_ifname);
 #endif
 
 	psp->psp_work_fd = ipv6nd_openif(psp->psp_ifindex);

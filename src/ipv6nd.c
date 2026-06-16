@@ -401,6 +401,8 @@ ipv6nd_sendrsprobe(void *arg)
 		if (eloop_event_add(ifp->ctx->eloop, state->nd_fd, ELE_READ,
 			ipv6nd_handledata, ifp) == -1) {
 			logerr(__func__);
+			close(state->nd_fd);
+			state->nd_fd = -1;
 			return;
 		}
 	}
@@ -2004,7 +2006,7 @@ ipv6nd_startrs2(void *arg)
 #ifdef __sun
 		state->nd_fd = -1;
 #ifdef PRIVSEP
-		if (ps_inet_opennd(ifp) == -1) {
+		if (IN_PRIVSEP(ifp->ctx) && ps_inet_opennd(ifp) == -1) {
 			logerr("%s: ps_inet_opennd", ifp->name);
 			return;
 		}

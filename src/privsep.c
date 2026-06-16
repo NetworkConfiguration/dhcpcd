@@ -128,14 +128,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	int fd_out = ctx->options & DHCPCD_DUMPLEASE ? STDOUT_FILENO :
 						       STDERR_FILENO;
 
-#ifdef __sun
-#warning not dropping any privileges on this platform .... eek!
-	if (ctx->options & DHCPCD_LAUNCHER)
-		logwarnx(
-		    "not dropping any privileges on this platform .... eek!");
-	return 0;
-#endif
-
 	if (ctx->options & DHCPCD_LAUNCHER)
 #ifdef ASAN
 		logwarnx("not chrooting as compiled for ASAN");
@@ -153,16 +145,20 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
+#ifdef __sun
+#warning not dropping any privileges on this platform .... eek!
+#else
 	if ((setgroups(1, &pw->pw_gid) == -1 || setgid(pw->pw_gid) == -1 ||
 		setuid(pw->pw_uid) == -1) &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED)) {
 		logerr("failed to drop privileges");
 		return -1;
 	}
+#endif
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
-#ifndef __sun
+#ifndef __sun /* RLIMIT_NOFILE and ppoll don't mix */
 	/* Prohibit new files, sockets, etc
 	 * The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
@@ -1199,7 +1195,7 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 		psp->psp_ifindex = psid->psi_ifindex;
 		if_indextoname(psid->psi_ifindex, psp->psp_ifname);
 	} else {
-		if (!(ctx->options & DHCPCD_MANAGER))
+		if (!(ctx->options & DHCPCD_MANAGER) && ctx->ifc != 0)
 			strlcpy(psp->psp_ifname, ctx->ifv[0],
 			    sizeof(psp->psp_ifname));
 	}
