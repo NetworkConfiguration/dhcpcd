@@ -646,8 +646,10 @@ ps_root_startcb(struct ps_process *psp)
 #endif
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
-	if (if_opensockets(ctx) == -1)
+	if (if_opensockets(ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
+		return -1;
+	}
 
 	/* Open network sockets for sending.
 	 * This is a small bit wasteful for non sandboxed OS's
