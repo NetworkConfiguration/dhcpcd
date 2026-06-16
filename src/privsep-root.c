@@ -199,9 +199,11 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result, void *data,
 }
 
 static ssize_t
-ps_root_doioctl(unsigned long req, void *data, size_t len)
+ps_root_doioctl(int fd, unsigned long req, void *data, size_t len)
 {
-	int s, err;
+#ifdef IOCTL_REQUEST_TYPE
+	ioctl_request_t reqt;
+#endif
 
 	/* Only allow these ioctls */
 	switch (req) {
@@ -228,23 +230,12 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 		return -1;
 	}
 
-	s = xsocket(PF_INET, SOCK_DGRAM, 0);
-	if (s != -1)
 #ifdef IOCTL_REQUEST_TYPE
-	{
-		ioctl_request_t reqt;
-
-		memcpy(&reqt, &req, sizeof(reqt));
-		err = ioctl(s, reqt, data, len);
-	}
+	memcpy(&reqt, &req, sizeof(reqt));
+	return ioctl(fd, reqt, data, len);
 #else
-		err = ioctl(s, req, data, len);
+	return ioctl(fd, req, data, len);
 #endif
-	else
-		err = -1;
-	if (s != -1)
-		close(s);
-	return err;
 }
 
 static ssize_t
@@ -513,7 +504,8 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 	switch (psm->ps_cmd) {
 	case PS_IOCTL:
-		err = ps_root_doioctl(psm->ps_flags, data, len);
+		err = ps_root_doioctl(ctx->pf_inet_fd, psm->ps_flags, data,
+		    len);
 		if (err != -1) {
 			rdata = data;
 			rlen = len;
@@ -654,8 +646,10 @@ ps_root_startcb(struct ps_process *psp)
 #endif
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
-	if (if_opensockets(ctx) == -1)
+	if (if_opensockets(ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
+		return -1;
+	}
 
 	/* Open network sockets for sending.
 	 * This is a small bit wasteful for non sandboxed OS's
