@@ -274,43 +274,31 @@ eexit:
 
 #ifdef __sun
 int
-ipv6nd_openif(struct interface *ifp)
+ipv6nd_openif(unsigned int ifindex)
 {
 	int fd;
 	struct ipv6_mreq mreq = {
 		.ipv6mr_multiaddr = IN6ADDR_LINKLOCAL_ALLNODES_INIT,
-		.ipv6mr_interface = ifp->index
+		.ipv6mr_interface = ifindex,
 	};
-	struct rs_state *state = RS_STATE(ifp);
-	uint_t ifindex = ifp->index;
-
-	if (state->nd_fd != -1)
-		return state->nd_fd;
 
 	fd = ipv6nd_open(true);
 	if (fd == -1)
 		return -1;
 
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_BOUND_IF, &ifindex,
-		sizeof(ifindex)) == -1) {
-		close(fd);
-		return -1;
-	}
+		sizeof(ifindex)) == -1)
+		goto err;
 
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
-		sizeof(mreq)) == -1) {
-		close(fd);
-		return -1;
-	}
+		sizeof(mreq)) == -1)
+		goto err;
 
-	if (eloop_event_add(ifp->ctx->eloop, fd, ELE_READ, ipv6nd_handledata,
-		ifp) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	state->nd_fd = fd;
 	return fd;
+
+err:
+	close(fd);
+	return -1;
 }
 #endif
 
@@ -405,7 +393,13 @@ ipv6nd_sendrsprobe(void *arg)
 #endif
 #ifdef __sun
 	if (state->nd_fd == -1) {
-		if (ipv6nd_openif(ifp) == -1) {
+		state->nd_fd = ipv6nd_openif(ifp->index);
+		if (state->nd_fd == -1) {
+			logerr(__func__);
+			return;
+		}
+		if (eloop_event_add(ifp->ctx->eloop, state->nd_fd, ELE_READ,
+			ipv6nd_handledata, ifp) == -1) {
 			logerr(__func__);
 			return;
 		}
@@ -2009,6 +2003,12 @@ ipv6nd_startrs2(void *arg)
 		}
 #ifdef __sun
 		state->nd_fd = -1;
+#ifdef PRIVSEP
+		if (ps_inet_opennd(ifp) == -1) {
+			logerr("%s: ps_inet_opennd", ifp->name);
+			return;
+		}
+#endif
 #endif
 	}
 

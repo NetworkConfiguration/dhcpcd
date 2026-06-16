@@ -578,15 +578,7 @@ if [ -z "$AUTH" ] || [ "$AUTH" = yes ]; then
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
 fi
 
-if [ -z "$PRIVSEP" ]; then
-	# privilege separation works fine .... except on Solaris
-	case "$OS" in
-	solaris*|sunos*)	PRIVSEP=no;;
-	*)			PRIVSEP=yes;;
-	esac
-fi
-
-if [ "$PRIVSEP" = yes ]; then
+if [ -z "$PRIVSEP" ] || [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Privilege Separation"
 
 	# Try and work out system user
