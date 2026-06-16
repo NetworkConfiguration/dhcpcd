@@ -167,7 +167,7 @@ ps_bpf_start_bpf(struct ps_process *psp)
 
 	psp->psp_bpf = bpf_open(&psp->psp_ifp, psp->psp_filter, ia);
 #ifdef DEBUG_FD
-	logdebugx("pid %d bpf_fd=%d", getpid(), psp->psp_bpf->bpf_fd);
+	logdebugx("pid %ld bpf_fd=%d", (long)getpid(), psp->psp_bpf->bpf_fd);
 #endif
 	if (psp->psp_bpf == NULL)
 		logerr("%s: bpf_open", __func__);
@@ -273,8 +273,8 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_entersandbox("stdio", NULL);
 		break;
 	default:
-		logdebugx("%s: spawned %s on PID %d", psp->psp_ifname,
-		    psp->psp_name, psp->psp_pid);
+		logdebugx("%s: spawned %s on PID %ld", psp->psp_ifname,
+		    psp->psp_name, (long)psp->psp_pid);
 		break;
 	}
 	return start;

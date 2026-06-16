@@ -66,11 +66,10 @@ static void
 ps_inet_recvra(void *arg, unsigned short events)
 {
 #ifdef __sun
-	struct interface *ifp = arg;
-	struct rs_state *state = RS_STATE(ifp);
-	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct ps_process *psp = arg;
 
-	if (ps_recvmsg(state->nd_fd, events, PS_ND, ctx->ps_inet->psp_fd) == -1)
+	if (ps_recvmsg(psp->psp_work_fd, events, PS_ND,
+		psp->psp_ctx->ps_data_fd) == -1)
 		logerr(__func__);
 #else
 	struct dhcpcd_ctx *ctx = arg;
@@ -424,23 +423,14 @@ ps_inet_listenin(struct ps_process *psp)
 #endif
 
 #if defined(INET6) && defined(__sun)
-static void
-ps_inet_recvin6nd(void *arg)
-{
-	struct ps_process *psp = arg;
-
-	if (ps_recvmsg(psp->psp_work_fd, PS_ND, psp->psp_ctx->ps_data_fd) == -1)
-		logerr(__func__);
-}
-
 static int
 ps_inet_listennd(struct ps_process *psp)
 {
 #ifdef HAVE_SETPROCTITLE
-	setproctitle("[ND network proxy]");
+	setproctitle("[%s proxy] %s", psp->psp_protostr, psp->psp_ifname);
 #endif
 
-	psp->psp_work_fd = ipv6nd_open(&psp->psp_ifp);
+	psp->psp_work_fd = ipv6nd_openif(psp->psp_ifindex);
 	if (psp->psp_work_fd == -1) {
 		logerr(__func__);
 		return -1;
@@ -453,8 +443,8 @@ ps_inet_listennd(struct ps_process *psp)
 	}
 #endif
 
-	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
-		ps_inet_recvin6nd, psp) == -1) {
+	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd, ELE_READ,
+		ps_inet_recvra, psp) == -1) {
 		logerr(__func__);
 		return -1;
 	}
@@ -506,13 +496,36 @@ ps_inet_listenin6(struct ps_process *psp)
 }
 #endif
 
+static ssize_t
+ps_inet_recvmsgpspcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
+{
+	struct ps_process *psp = arg;
+
+#ifdef PRIVSEP_DEBUG
+	logerrx("%s: IN cmd %x, psp %p", __func__, psm->ps_cmd, psp);
+#endif
+
+	switch (psm->ps_cmd) {
+	case PS_ND:
+		if (!ps_inet_validnd(msg))
+			return -1;
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	return sendmsg(psp->psp_work_fd, msg, 0);
+}
+
 static void
 ps_inet_recvmsgpsp(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
 	/* Receive shutdown. */
-	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events, NULL, NULL) == -1)
+	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events,
+		ps_inet_recvmsgpspcb, psp) == -1)
 		logerr(__func__);
 }
 
@@ -524,7 +537,7 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	int (*start_func)(struct ps_process *);
 	pid_t start;
 	struct ps_addr *psa = &psm->ps_id.psi_addr;
-	void *ia;
+	void *ia = NULL;
 	char buf[INET_MAX_ADDRSTRLEN];
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
@@ -567,7 +580,6 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	case PS_ND:
 		start_func = ps_inet_listennd;
 		psp->psp_protostr = "ND";
-		ia = &psa->psa_in6_addr;
 		break;
 #endif
 #ifdef DHCP6
@@ -584,9 +596,9 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		return -1;
 	}
 
-	snprintf(psp->psp_name, sizeof(psp->psp_name), "%s proxy %s",
-	    psp->psp_protostr,
-	    inet_ntop(psa->psa_family, ia, buf, sizeof(buf)));
+	snprintf(psp->psp_name, sizeof(psp->psp_name), "%s proxy%s%s",
+	    psp->psp_protostr, ia != NULL ? " " : "",
+	    ia != NULL ? inet_ntop(psa->psa_family, ia, buf, sizeof(buf)) : "");
 	start = ps_startprocess(psp, ps_inet_recvmsgpsp, NULL, start_func,
 	    PSF_DROPPRIVS);
 	switch (start) {
@@ -597,8 +609,8 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_entersandbox("stdio", NULL);
 		break;
 	default:
-		logdebugx("%s: spawned %s on PID %d", psp->psp_ifname,
-		    psp->psp_name, psp->psp_pid);
+		logdebugx("%s: spawned %s on PID %ld", psp->psp_ifname,
+		    psp->psp_name, (long)psp->psp_pid);
 		break;
 	}
 	return start;

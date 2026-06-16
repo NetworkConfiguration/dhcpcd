@@ -131,6 +131,9 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_LAUNCHER)
 #ifdef ASAN
 		logwarnx("not chrooting as compiled for ASAN");
+#elif defined(__sun)
+		/* libdpli complains */
+		logwarnx("not chrooting on sun");
 #else
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
 
@@ -142,21 +145,27 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
+#ifdef __sun
+#warning not dropping any privileges on this platform .... eek!
+#else
 	if ((setgroups(1, &pw->pw_gid) == -1 || setgid(pw->pw_gid) == -1 ||
 		setuid(pw->pw_uid) == -1) &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED)) {
 		logerr("failed to drop privileges");
 		return -1;
 	}
+#endif
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
+#ifndef __sun /* RLIMIT_NOFILE and ppoll don't mix */
 	/* Prohibit new files, sockets, etc
 	 * The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
 		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 	}
+#endif
 
 #define DHC_NOCHKIO (DHCPCD_STARTED | DHCPCD_DAEMONISE)
 	/* Prohibit writing to files.
@@ -528,7 +537,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	case 0:
 		return 0;
 	default:
-		logdebugx("spawned privileged proxy on PID %d", pid);
+		logdebugx("spawned privileged proxy on PID %ld", (long)pid);
 	}
 
 	/* No point in spawning the generic network listener if we're
@@ -542,7 +551,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	case 0:
 		return 0;
 	default:
-		logdebugx("spawned network proxy on PID %d", pid);
+		logdebugx("spawned network proxy on PID %ld", (long)pid);
 	}
 
 started_net:
@@ -553,7 +562,8 @@ started_net:
 		case 0:
 			return 0;
 		default:
-			logdebugx("spawned controller proxy on PID %d", pid);
+			logdebugx("spawned controller proxy on PID %ld",
+			    (long)pid);
 		}
 	}
 
@@ -589,7 +599,11 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 	return ps_seccomp_enter();
 #else
 	if (sandbox != NULL)
+#ifdef __sun
+		*sandbox = "none";
+#else
 		*sandbox = "posix resource limited";
+#endif
 	return 0;
 #endif
 }
@@ -1177,8 +1191,14 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	psp->psp_pfd = -1;
 #endif
 
-	if (!(ctx->options & DHCPCD_MANAGER))
-		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_ifname));
+	if (psid->psi_ifindex != 0) {
+		psp->psp_ifindex = psid->psi_ifindex;
+		if_indextoname(psid->psi_ifindex, psp->psp_ifname);
+	} else {
+		if (!(ctx->options & DHCPCD_MANAGER) && ctx->ifc != 0)
+			strlcpy(psp->psp_ifname, ctx->ifv[0],
+			    sizeof(psp->psp_ifname));
+	}
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }

@@ -27,6 +27,10 @@
  */
 
 /* Stop sunos headers including the system queue ... */
+#if 1
+#include "queue.h"
+#endif
+
 #include <sys/ioctl.h>
 #include <sys/mac.h>
 #include <sys/pfmod.h>
@@ -52,8 +56,6 @@
 #include <string.h>
 #include <stropts.h>
 #include <unistd.h>
-
-#include "queue.h"
 
 /* Private libsocket interface we can hook into to get
  * a better getifaddrs(3).

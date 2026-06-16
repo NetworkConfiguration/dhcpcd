@@ -455,17 +455,17 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			return ps_stopprocess(psp);
 		} else if (psm->ps_cmd & PS_START) {
 			/* Process has already started .... */
-			logdebugx("%s%sprocess %s already started on pid %d",
+			logdebugx("%s%sprocess %s already started on pid %ld",
 			    psp->psp_ifname,
 			    psp->psp_ifname[0] != '\0' ? ": " : "",
-			    psp->psp_name, psp->psp_pid);
+			    psp->psp_name, (long)psp->psp_pid);
 			return 0;
 		}
 
 		err = ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
 		if (err == -1) {
-			logerr("%s: failed to send message to pid %d", __func__,
-			    psp->psp_pid);
+			logerr("%s: failed to send message to pid %ld",
+			    __func__, (long)psp->psp_pid);
 			ps_freeprocess(psp);
 		}
 		return 0;
@@ -672,7 +672,7 @@ ps_root_startcb(struct ps_process *psp)
 			logerr("%s: setsockopt SO_RCVBUF DHCP", __func__);
 	}
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(__sun)
 	if (ctx->options & DHCPCD_IPV6) {
 		int buflen = 1;
 
@@ -734,18 +734,18 @@ ps_root_signalcb(int sig, void *arg)
 		}
 
 		if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-			logerrx("%s%s%s exited unexpectedly from PID %d,"
+			logerrx("%s%s%s exited unexpectedly from PID %ld,"
 				" code=%d",
-			    ifname, ifname[0] != '\0' ? ": " : "", name, pid,
-			    WEXITSTATUS(status));
+			    ifname, ifname[0] != '\0' ? ": " : "", name,
+			    (long)pid, WEXITSTATUS(status));
 		else if (WIFSIGNALED(status))
-			logerrx("%s%s%s exited unexpectedly from PID %d,"
+			logerrx("%s%s%s exited unexpectedly from PID %ld,"
 				" signal=%s",
-			    ifname, ifname[0] != '\0' ? ": " : "", name, pid,
-			    strsignal(WTERMSIG(status)));
+			    ifname, ifname[0] != '\0' ? ": " : "", name,
+			    (long)pid, strsignal(WTERMSIG(status)));
 		else
-			logdebugx("%s%s%s exited from PID %d", ifname,
-			    ifname[0] != '\0' ? ": " : "", name, pid);
+			logdebugx("%s%s%s exited from PID %ld", ifname,
+			    ifname[0] != '\0' ? ": " : "", name, (long)pid);
 
 		if (psp != NULL)
 			ps_freeprocess(psp);
@@ -910,7 +910,7 @@ ps_root_close(struct dhcpcd_ctx *ctx)
 		ctx->udp_wfd = -1;
 	}
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(__sun)
 	if (ctx->nd_fd != -1) {
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
@@ -980,9 +980,9 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	 * So we just log the intent to exit.
 	 * Even sending this will be a race to exit. */
 	if (psp) {
-		logdebugx("%s%s%s will exit from PID %d", psp->psp_ifname,
+		logdebugx("%s%s%s will exit from PID %ld", psp->psp_ifname,
 		    psp->psp_ifname[0] != '\0' ? ": " : "", psp->psp_name,
-		    psp->psp_pid);
+		    (long)psp->psp_pid);
 
 		if (ps_stopprocess(psp) == -1)
 			return -1;
