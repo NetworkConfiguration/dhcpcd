@@ -787,7 +787,7 @@ send_listeners:
 	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
 		if (!(fd->flags & FD_LISTEN))
 			continue;
-		if (control_queue(fd, ctx->script_buf, ctx->script_buflen) ==
+		if (control_queue(fd, ctx->script_buf, (size_t)buflen) ==
 		    -1)
 			logerr("%s: control_queue", __func__);
 		else
