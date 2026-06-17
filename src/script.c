@@ -1,4 +1,3 @@
-/*
  * dhcpcd - DHCP client daemon
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
@@ -787,8 +786,7 @@ send_listeners:
 	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
 		if (!(fd->flags & FD_LISTEN))
 			continue;
-		if (control_queue(fd, ctx->script_buf, (size_t)buflen) ==
-		    -1)
+		if (control_queue(fd, ctx->script_buf, (size_t)buflen) == -1)
 			logerr("%s: control_queue", __func__);
 		else
 			status = 1;
