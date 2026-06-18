@@ -128,7 +128,7 @@ readfile(const char *file, void **data, size_t *len)
 	if (nlen > *len) {
 		void *ndata = realloc(*data, nlen);
 		if (ndata == NULL)
-			goto out; 
+			goto out;
 		*data = ndata;
 		*len = nlen;
 	}

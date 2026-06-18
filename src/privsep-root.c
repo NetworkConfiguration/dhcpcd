@@ -567,6 +567,9 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 #ifdef PRIVSEP_GETHOSTNAME
 	case PS_GETHOSTNAME:
+		err = ps_bufalloc(ctx, _POSIX_HOST_NAME_MAX + 1);
+		if (err == -1)
+			break;
 		err = gethostname((char *)ctx->ps_buf, ctx->ps_buflen);
 		if (err != -1) {
 			rdata = ctx->ps_buf;
