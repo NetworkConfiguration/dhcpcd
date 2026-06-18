@@ -1232,10 +1232,6 @@ toobig:
 static size_t
 read_lease(struct interface *ifp, struct bootp **bootp)
 {
-	union {
-		struct bootp bootp;
-		uint8_t buf[FRAMELEN_MAX];
-	} buf;
 	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t sbytes;
 	size_t bytes;
@@ -1248,14 +1244,13 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	/* Safety */
 	*bootp = NULL;
 
-	if (state->leasefile[0] == '\0') {
+	if (state->leasefile[0] == '\0')
 		logdebugx("reading standard input");
-		sbytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
-	} else {
+	else
 		logdebugx("%s: reading lease: %s", ifp->name, state->leasefile);
-		sbytes = dhcp_readfile(ifp->ctx, state->leasefile, buf.buf,
-		    sizeof(buf.buf));
-	}
+	*bootp = NULL;
+	sbytes = dhcp_readfile(ifp->ctx, state->leasefile, (void **)bootp,
+	    NULL);
 	if (sbytes == -1) {
 		if (errno != ENOENT)
 			logerr("%s: %s", ifp->name, state->leasefile);
@@ -1277,17 +1272,17 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		goto out;
 
 	/* We may have found a BOOTP server */
-	if (get_option_uint8(ifp->ctx, &type, &buf.bootp, bytes,
-		DHO_MESSAGETYPE) == -1)
+	if (get_option_uint8(ifp->ctx, &type, *bootp, bytes, DHO_MESSAGETYPE) ==
+	    -1)
 		type = 0;
 
 #ifdef AUTH
 	/* Authenticate the message */
-	auth = get_option(ifp->ctx, &buf.bootp, bytes, DHO_AUTHENTICATION,
+	auth = get_option(ifp->ctx, *bootp, bytes, DHO_AUTHENTICATION,
 	    &auth_len);
 	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-			&buf.bootp, bytes, 4, type, auth, auth_len) == NULL) {
+			*bootp, bytes, 4, type, auth, auth_len) == NULL) {
 			logerr("%s: authentication failed", ifp->name);
 			return 0;
 		}
@@ -1304,12 +1299,6 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 #endif
 
 out:
-	*bootp = malloc(bytes);
-	if (*bootp == NULL) {
-		logerr(__func__);
-		return 0;
-	}
-	memcpy(*bootp, buf.buf, bytes);
 	return bytes;
 }
 

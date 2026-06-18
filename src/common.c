@@ -111,21 +111,32 @@ hwaddr_aton(uint8_t *buffer, const char *addr)
 }
 
 ssize_t
-readfile(const char *file, void *data, size_t len)
+readfile(const char *file, void **data, size_t *len)
 {
 	int fd;
 	ssize_t bytes;
+	struct stat st;
+	size_t nlen;
+	char *buf;
 
 	fd = open(file, O_RDONLY);
 	if (fd == -1)
 		return -1;
-	bytes = read(fd, data, len);
-	close(fd);
-	if ((size_t)bytes == len) {
-		errno = ENOBUFS;
+	if (fstat(fd, &st) == -1)
 		return -1;
+	nlen = (size_t)st.st_size + 1;
+	if (nlen > *len) {
+		void *ndata = realloc(*data, nlen);
+		if (ndata == NULL)
+			return -1;
+		*data = ndata;
+		*len = nlen;
 	}
-	return bytes;
+	bytes = read(fd, *data, *len);
+	close(fd);
+	buf = *data;
+	buf[bytes] = '\0';
+	return bytes + 1;
 }
 
 ssize_t
@@ -158,7 +169,7 @@ filemtime(const char *file, time_t *time)
  * We strip leading space and avoid comment lines, making the code that calls
  * us smaller. */
 char *
-get_line(char **__restrict buf, ssize_t *__restrict buflen)
+get_line(char **__restrict buf, size_t *__restrict buflen)
 {
 	char *p, *c;
 	bool quoted;
@@ -167,16 +178,16 @@ get_line(char **__restrict buf, ssize_t *__restrict buflen)
 		p = *buf;
 		if (*buf == NULL)
 			return NULL;
-		c = memchr(*buf, '\n', (size_t)*buflen);
+		c = memchr(*buf, '\n', *buflen);
 		if (c == NULL) {
-			c = memchr(*buf, '\0', (size_t)*buflen);
+			c = memchr(*buf, '\0', *buflen);
 			if (c == NULL)
 				return NULL;
-			*buflen = c - *buf;
+			*buflen = (size_t)(c - *buf);
 			*buf = NULL;
 		} else {
 			*c++ = '\0';
-			*buflen -= c - *buf;
+			*buflen -= (size_t)(c - *buf);
 			*buf = c;
 		}
 		for (; *p == ' ' || *p == '\t'; p++)

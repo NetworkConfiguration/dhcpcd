@@ -389,16 +389,14 @@ ssize_t
 ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
     void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
 {
-	char buf[PS_BUFLEN], *p = buf;
+	char *p = ctx->ps_buf;
 	unsigned long flags = 0;
 	size_t olen = (oldp && oldlenp) ? *oldlenp : 0, nolen;
+	size_t buflen = sizeof(namelen) + (sizeof(*name) * namelen) +
+	    sizeof(oldlenp) + sizeof(newlen) + newlen;
 
-	if (sizeof(namelen) + (sizeof(*name) * namelen) + sizeof(oldlenp) +
-		sizeof(newlen) + newlen >
-	    sizeof(buf)) {
-		errno = ENOBUFS;
+	if (ps_bufalloc(ctx, buflen) == -1)
 		return -1;
-	}
 
 	if (oldlenp)
 		flags |= PS_SYSCTL_OLEN;
@@ -417,14 +415,14 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
 		p += newlen;
 	}
 
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_SYSCTL, flags, buf,
-		(size_t)(p - buf)) == -1)
+	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_SYSCTL, flags, ctx->ps_buf,
+		(size_t)(p - (char *)ctx->ps_buf)) == -1)
 		return -1;
 
 	if (ps_root_readerror(ctx, buf, sizeof(buf)) == -1)
 		return -1;
 
-	p = buf;
+	p = ctx->ps_buf;
 	memcpy(&nolen, p, sizeof(nolen));
 	p += sizeof(nolen);
 	if (oldlenp) {
