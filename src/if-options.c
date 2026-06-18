@@ -2661,10 +2661,9 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
     const char *profile)
 {
 	struct if_options *ifo;
-	char buf[UDPLEN_MAX], *bp; /* 64k max config file size */
-	char *line, *option, *p;
-	ssize_t buflen;
-	size_t vlen;
+	char *bp, *line, *option, *p;
+	ssize_t nread;
+	size_t buflen, vlen;
 	int skip, have_profile, new_block, had_block;
 #if !defined(INET) || !defined(INET6)
 	size_t i;
@@ -2741,26 +2740,28 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 
 		/* Now load our embedded config */
 #ifdef EMBEDDED_CONFIG
-		buflen = dhcp_readfile(ctx, EMBEDDED_CONFIG, buf, sizeof(buf));
-		if (buflen == -1) {
+		nread = dhcp_readfile(ctx, EMBEDDED_CONFIG, &ctx->io_buf,
+		    &ctx->io_buflen);
+		if (nread == -1) {
 			logerr("%s: %s", __func__, EMBEDDED_CONFIG);
 			return ifo;
 		}
-		if (buf[buflen - 1] != '\0') {
-			if ((size_t)buflen < sizeof(buf) - 1)
-				buflen++;
-			buf[buflen - 1] = '\0';
-		}
+		buflen = (size_t)nread;
 #else
-		buflen = (ssize_t)strlcpy(buf, dhcpcd_embedded_conf,
-		    sizeof(buf));
-		if ((size_t)buflen >= sizeof(buf)) {
-			logerrx("%s: embedded config too big", __func__);
-			return ifo;
+		buflen = strlen(dhcpcd_embedded_conf) + 1;
+		if (ctx->io_buflen < buflen) {
+			void *nbuf = realloc(ctx->io_buf, buflen);
+			if (nbuf == NULL) {
+				logerr("%s: realloc", __func__);
+				return ifo;
+			}
+			ctx->io_buf = nbuf;
+			ctx->io_buflen = buflen;
 		}
-		/* Our embedded config is NULL terminated */
+		buflen = strlcpy(ctx->io_buf, dhcpcd_embedded_conf,
+		    ctx->io_buflen);
 #endif
-		bp = buf;
+		bp = ctx->io_buf;
 		while ((line = get_line(&bp, &buflen)) != NULL) {
 			option = strsep(&line, " \t");
 			if (line)
@@ -2817,24 +2818,20 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 	}
 
 	/* Parse our options file */
-	buflen = dhcp_readfile(ctx, ctx->cffile, buf, sizeof(buf));
-	if (buflen == -1) {
+	nread = dhcp_readfile(ctx, ctx->cffile, &ctx->io_buf, &ctx->io_buflen);
+	if (nread == -1) {
 		/* dhcpcd can continue without it, but no DNS options
 		 * would be requested ... */
 		logerr("%s: %s", __func__, ctx->cffile);
 		return ifo;
 	}
-	if (buf[buflen - 1] != '\0') {
-		if ((size_t)buflen < sizeof(buf) - 1)
-			buflen++;
-		buf[buflen - 1] = '\0';
-	}
+	buflen = (size_t)nread;
 	dhcp_filemtime(ctx, ctx->cffile, &ifo->mtime);
 
 	ldop = edop = NULL;
 	skip = have_profile = new_block = 0;
 	had_block = ifname == NULL ? 1 : 0;
-	bp = buf;
+	bp = ctx->io_buf;
 	while ((line = get_line(&bp, &buflen)) != NULL) {
 		option = strsep(&line, " \t");
 		if (line)

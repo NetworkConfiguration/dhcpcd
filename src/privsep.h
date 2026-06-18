@@ -91,19 +91,8 @@
 #define PS_SYSCTL_ODATA 0x0002
 
 /* Process commands */
-#define PS_START 0x4000
-#define PS_STOP	 0x8000
-
-#ifdef INET6
-#define PS_BUFLEN6 CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int))
-#else
-#define PS_BUFLEN6 0
-#endif
-
-/* Max INET message size + meta data for IPC */
-#define PS_BUFLEN                                                         \
-	((64 * 1024) + sizeof(struct ps_msghdr) + sizeof(struct msghdr) + \
-	    PS_BUFLEN6)
+#define PS_START     0x4000
+#define PS_STOP	     0x8000
 
 #define PSP_NAMESIZE 16 + INET_MAX_ADDRSTRLEN
 
@@ -169,11 +158,6 @@ struct ps_msghdr {
 	size_t ps_datalen;
 };
 
-struct ps_msg {
-	struct ps_msghdr psm_hdr;
-	uint8_t psm_data[PS_BUFLEN];
-};
-
 struct bpf;
 
 struct ps_process {
@@ -209,6 +193,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #include "privsep-bpf.h"
 #endif
 
+int ps_bufalloc(struct dhcpcd_ctx *, size_t);
 int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
@@ -231,9 +216,6 @@ ssize_t ps_sendcmdmsg(struct dhcpcd_ctx *, int fd, uint16_t cmd,
 ssize_t ps_recvmsg(int, unsigned short, uint16_t, int);
 ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
-
-/* Internal privsep functions. */
-int ps_setbuf_fdpair(int[]);
 
 #ifdef PRIVSEP_RIGHTS
 int ps_rights_limit_ioctl(int);

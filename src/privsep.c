@@ -186,48 +186,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
-static int
-ps_setbuf0(int fd, int ctl, int minlen)
-{
-	int len;
-	socklen_t slen;
-
-	slen = sizeof(len);
-	if (getsockopt(fd, SOL_SOCKET, ctl, &len, &slen) == -1)
-		return -1;
-
-#ifdef __linux__
-	len /= 2;
-#endif
-	if (len >= minlen)
-		return 0;
-
-	return setsockopt(fd, SOL_SOCKET, ctl, &minlen, sizeof(minlen));
-}
-
-static int
-ps_setbuf(int fd)
-{
-	/* Ensure we can receive a fully sized privsep message.
-	 * Double the send buffer. */
-	int minlen = (int)sizeof(struct ps_msg);
-
-	if (ps_setbuf0(fd, SO_RCVBUF, minlen) == -1 ||
-	    ps_setbuf0(fd, SO_SNDBUF, minlen * 2) == -1) {
-		logerr(__func__);
-		return -1;
-	}
-	return 0;
-}
-
-int
-ps_setbuf_fdpair(int fd[])
-{
-	if (ps_setbuf(fd[0]) == -1 || ps_setbuf(fd[1]) == -1)
-		return -1;
-	return 0;
-}
-
 #ifdef PRIVSEP_RIGHTS
 int
 ps_rights_limit_ioctl(int fd)
@@ -348,10 +306,7 @@ ps_startprocess(struct ps_process *psp,
 		logerr("%s: socketpair", __func__);
 		return -1;
 	}
-	if (ps_setbuf_fdpair(fd) == -1) {
-		logerr("%s: ps_setbuf_fdpair", __func__);
-		return -1;
-	}
+
 #ifdef PRIVSEP_RIGHTS
 	if (ps_rights_limit_fdpair(fd) == -1) {
 		logerr("%s: ps_rights_limit_fdpair", __func__);
@@ -523,12 +478,34 @@ ps_stopprocess(struct ps_process *psp)
 }
 
 int
+ps_bufalloc(struct dhcpcd_ctx *ctx, size_t len)
+{
+	void *nbuf;
+
+	if (ctx->ps_buflen >= len)
+		return 0;
+
+	nbuf = realloc(ctx->ps_buf, len);
+	if (nbuf == NULL)
+		return -1;
+
+	ctx->ps_buf = nbuf;
+	ctx->ps_buflen = len;
+	return 0;
+}
+
+int
 ps_start(struct dhcpcd_ctx *ctx)
 {
 	pid_t pid;
 	uint32_t rnd;
 
 	TAILQ_INIT(&ctx->ps_processes);
+	/* Alloc a reasonable buffer up front */
+	if (ps_bufalloc(ctx, BUFSIZ) == -1) {
+		logerr("%s: ps_bufalloc", __func__);
+		return -1;
+	}
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
@@ -1073,7 +1050,6 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
     void *cbctx)
 {
 	struct ps_msghdr psm;
-	uint8_t ps_data[PS_BUFLEN];
 	ssize_t len;
 	size_t dlen;
 	struct iovec iov[1];
@@ -1126,18 +1102,16 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen +
 	    psm.ps_datalen;
 	if (dlen != 0) {
-		if (dlen > sizeof(ps_data)) {
-			errno = EMSGSIZE;
+		if (ps_bufalloc(ctx, dlen) == -1)
 			goto stop;
-		}
-		len = recv(fd, ps_data, dlen, MSG_WAITALL);
+		len = recv(fd, ctx->ps_buf, dlen, MSG_WAITALL);
 		if ((size_t)len != dlen) {
 			errno = EINVAL;
 			goto stop;
 		}
 	}
 
-	if (ps_unrollmsg(&msg, &psm, ps_data, dlen) == -1)
+	if (ps_unrollmsg(&msg, &psm, ctx->ps_buf, dlen) == -1)
 		return -1;
 
 	if (callback == NULL)

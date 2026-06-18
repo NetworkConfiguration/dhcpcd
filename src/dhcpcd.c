@@ -2808,6 +2808,7 @@ exit1:
 #endif
 	free(ctx.script_buf);
 	free(ctx.script_env);
+	free(ctx.io_buf);
 	rt_dispose(&ctx);
 	free(ctx.duid);
 	if_closesockets(&ctx);

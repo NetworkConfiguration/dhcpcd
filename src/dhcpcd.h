@@ -170,6 +170,8 @@ struct dhcpcd_ctx {
 	size_t script_buflen;
 	char **script_env;
 	size_t script_envlen;
+	void *io_buf;
+	size_t io_buflen;
 
 	int control_fd;
 	int control_unpriv_fd;
@@ -202,6 +204,8 @@ struct dhcpcd_ctx {
 	int ps_log_root_fd;		   /* outside chroot log reader */
 	struct fd_list *ps_control;	   /* Queue for the above */
 	struct fd_list *ps_control_client; /* Queue for the above */
+	void *ps_buf;			   /* IPC buffer */
+	size_t ps_buflen;		   /* IPC buffer length */
 #endif
 
 #ifdef INET

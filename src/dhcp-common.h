@@ -132,7 +132,7 @@ void dhcp_envoption(struct dhcpcd_ctx *, FILE *, const char *, const char *,
     const uint8_t *od, size_t ol);
 void dhcp_zero_index(struct dhcp_opt *);
 
-ssize_t dhcp_readfile(struct dhcpcd_ctx *, const char *, void *, size_t);
+ssize_t dhcp_readfile(struct dhcpcd_ctx *, const char *, void **, size_t *);
 ssize_t dhcp_writefile(struct dhcpcd_ctx *, const char *, mode_t, const void *,
     size_t);
 int dhcp_filemtime(struct dhcpcd_ctx *, const char *, time_t *);

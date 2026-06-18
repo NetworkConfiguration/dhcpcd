@@ -2672,10 +2672,7 @@ dhcp6_validatelease(struct interface *ifp, struct dhcp6_message *m, size_t len,
 static ssize_t
 dhcp6_readlease(struct interface *ifp, int validate)
 {
-	union {
-		struct dhcp6_message dhcp6;
-		uint8_t buf[UDPLEN_MAX];
-	} buf;
+	struct dhcp6_message *dhcp6;
 	struct dhcp6_state *state;
 	ssize_t bytes;
 	int fd;
@@ -2686,14 +2683,12 @@ dhcp6_readlease(struct interface *ifp, int validate)
 #endif
 
 	state = D6_STATE(ifp);
-	if (state->leasefile[0] == '\0') {
+	if (state->leasefile[0] == '\0')
 		logdebugx("reading standard input");
-		bytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
-	} else {
+	else
 		logdebugx("%s: reading lease: %s", ifp->name, state->leasefile);
-		bytes = dhcp_readfile(ifp->ctx, state->leasefile, buf.buf,
-		    sizeof(buf.buf));
-	}
+	bytes = dhcp_readfile(ifp->ctx, state->leasefile, (void **)&dhcp6,
+	    NULL);
 	if (bytes == -1)
 		goto ex;
 
@@ -2716,7 +2711,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	state->acquired.tv_sec -= now - mtime;
 
 	/* Check to see if the lease is still valid */
-	fd = dhcp6_validatelease(ifp, &buf.dhcp6, (size_t)bytes, NULL,
+	fd = dhcp6_validatelease(ifp, dhcp6, (size_t)bytes, NULL,
 	    &state->acquired);
 	if (fd == -1) {
 		bytes = 0; /* We have already reported the error */
@@ -2733,11 +2728,10 @@ dhcp6_readlease(struct interface *ifp, int validate)
 auth:
 #ifdef AUTH
 	/* Authenticate the message */
-	o = dhcp6_findmoption(&buf.dhcp6, (size_t)bytes, D6_OPTION_AUTH, &ol);
+	o = dhcp6_findmoption(dhcp6, (size_t)bytes, D6_OPTION_AUTH, &ol);
 	if (o) {
-		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-			buf.buf, (size_t)bytes, 6, buf.dhcp6.type, o,
-			ol) == NULL) {
+		if (dhcp_auth_validate(&state->auth, &ifp->options->auth, dhcp6,
+			(size_t)bytes, 6, dhcp6->type, o, ol) == NULL) {
 			logerr("%s: authentication failed", ifp->name);
 			bytes = 0;
 			goto ex;
@@ -2756,13 +2750,7 @@ auth:
 
 out:
 	free(state->new);
-	state->new = malloc((size_t)bytes);
-	if (state->new == NULL) {
-		logerr(__func__);
-		goto ex;
-	}
-
-	memcpy(state->new, buf.buf, (size_t)bytes);
+	state->new = dhcp6;
 	state->new_len = (size_t)bytes;
 	return bytes;
 

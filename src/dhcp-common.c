@@ -1009,10 +1009,44 @@ dhcp_zero_index(struct dhcp_opt *opt)
 }
 
 ssize_t
-dhcp_readfile(struct dhcpcd_ctx *ctx, const char *file, void *data, size_t len)
+dhcp_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
+    size_t *len)
 {
+	size_t rlen = 0;
+
+	if (len == NULL)
+		len = &rlen;
+
+	if (file == NULL || *file == '\0') {
+		uint8_t *p = *data;
+		size_t needed = BUFSIZ, bytes = 0, left;
+		ssize_t nread;
+
+		for (;;) {
+			if (*len < needed) {
+				void *nbuf = realloc(*data, needed);
+				if (nbuf == NULL)
+					return -1;
+				p = *data = nbuf;
+				p += bytes;
+				*len = needed;
+			}
+
+			left = *len - bytes;
+			nread = read(fileno(stdin), p, left);
+			if (nread == -1)
+				return -1;
+			bytes += (size_t)nread;
+			if ((size_t)nread < left || nread == 0)
+				return (ssize_t)bytes;
+
+			/* We need a bigger buffer */
+			needed += BUFSIZ;
+		}
+	}
+
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP &&
+	if (file != NULL && ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
 		return ps_root_readfile(ctx, file, data, len);
 #else
@@ -1068,21 +1102,18 @@ dhcp_unlink(struct dhcpcd_ctx *ctx, const char *file)
 size_t
 dhcp_read_hwaddr_aton(struct dhcpcd_ctx *ctx, uint8_t **data, const char *file)
 {
-	char buf[BUFSIZ];
 	ssize_t bytes;
 	size_t len;
 
-	bytes = dhcp_readfile(ctx, file, buf, sizeof(buf));
-	if (bytes == -1 || bytes == sizeof(buf))
+	bytes = dhcp_readfile(ctx, file, &ctx->io_buf, &ctx->io_buflen);
+	if (bytes == -1)
 		return 0;
-
-	bytes[buf] = '\0';
-	len = hwaddr_aton(NULL, buf);
+	len = hwaddr_aton(NULL, ctx->io_buf);
 	if (len == 0)
 		return 0;
 	*data = malloc(len);
 	if (*data == NULL)
 		return 0;
-	hwaddr_aton(*data, buf);
+	hwaddr_aton(*data, ctx->io_buf);
 	return len;
 }

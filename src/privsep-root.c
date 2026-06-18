@@ -102,9 +102,14 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 		return len;
 
 	if (pc->psr_mallocdata) {
-		pc->psr_data = malloc(psr_error->psr_datalen);
-		if (pc->psr_data == NULL)
-			PSR_ERROR(errno);
+		if (psr_error->psr_datalen > pc->psr_datalen) {
+			void *nbuf = realloc(pc->psr_data,
+			    psr_error->psr_datalen);
+			if (nbuf == NULL)
+				PSR_ERROR(errno);
+			pc->psr_data = nbuf;
+			pc->psr_datalen = psr_error->psr_datalen;
+		}
 	} else if (psr_error->psr_datalen > pc->psr_datalen)
 		PSR_ERROR(EMSGSIZE);
 
@@ -122,10 +127,6 @@ ps_root_readerrorcb(struct psr_ctx *pc)
 
 error:
 	psr_error->psr_result = -1;
-	if (pc->psr_mallocdata && pc->psr_data != NULL) {
-		free(pc->psr_data);
-		pc->psr_data = NULL;
-	}
 	return -1;
 }
 
@@ -147,16 +148,18 @@ ssize_t
 ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 {
 	struct psr_ctx pc = { .psr_ctx = ctx,
-		.psr_data = NULL,
-		.psr_datalen = 0,
+		.psr_data = *data,
+		.psr_datalen = *len,
 		.psr_mallocdata = true };
 
 	ps_root_readerrorcb(&pc);
 
 	errno = pc.psr_error.psr_errno;
 	*data = pc.psr_data;
-	*len = pc.psr_error.psr_datalen;
-	return pc.psr_error.psr_result;
+	*len = pc.psr_datalen;
+	if (pc.psr_error.psr_result == -1)
+		return -1;
+	return (ssize_t)pc.psr_error.psr_datalen;
 }
 
 static ssize_t
@@ -438,7 +441,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base, *rdata = NULL;
 	size_t len = iov->iov_len, rlen = 0;
-	uint8_t buf[PS_BUFLEN];
 	time_t mtime;
 	ssize_t err;
 	bool free_rdata = false;
@@ -534,9 +536,9 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			err = -1;
 			break;
 		}
-		err = readfile(data, buf, sizeof(buf));
+		err = readfile(data, &ctx->ps_buf, &ctx->ps_buflen);
 		if (err != -1) {
-			rdata = buf;
+			rdata = ctx->ps_buf;
 			rlen = (size_t)err;
 		}
 		break;
@@ -565,10 +567,13 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 #ifdef PRIVSEP_GETHOSTNAME
 	case PS_GETHOSTNAME:
-		err = gethostname((char *)buf, sizeof(buf));
+		err = ps_bufalloc(ctx, _POSIX_HOST_NAME_MAX + 1);
+		if (err == -1)
+			break;
+		err = gethostname((char *)ctx->ps_buf, ctx->ps_buflen);
 		if (err != -1) {
-			rdata = buf;
-			rlen = strlen((char *)buf) + 1;
+			rdata = ctx->ps_buf;
+			rlen = strlen((char *)ctx->ps_buf) + 1;
 		}
 		break;
 #endif
@@ -858,8 +863,6 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, datafd) == -1)
 		return -1;
 
-	if (ps_setbuf_fdpair(datafd) == -1)
-		return -1;
 #ifdef PRIVSEP_RIGHTS
 	if (ps_rights_limit_fdpair(datafd) == -1)
 		return -1;
@@ -969,6 +972,8 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		ctx->ps_data_fd = -1;
 	}
 
+	free(ctx->ps_buf);
+
 	/* Only the manager process gets past this point. */
 	if (ctx->options & DHCPCD_FORKED) {
 		err = 0;
@@ -1042,33 +1047,38 @@ ps_root_unlink(struct dhcpcd_ctx *ctx, const char *file)
 }
 
 ssize_t
-ps_root_readfile(struct dhcpcd_ctx *ctx, const char *file, void *data,
-    size_t len)
+ps_root_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
+    size_t *len)
 {
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_READFILE, 0, file,
 		strlen(file) + 1) == -1)
 		return -1;
-	return ps_root_readerror(ctx, data, len);
+
+	return ps_root_mreaderror(ctx, data, len);
 }
 
 ssize_t
 ps_root_writefile(struct dhcpcd_ctx *ctx, const char *file, mode_t mode,
     const void *data, size_t len)
 {
-	char buf[PS_BUFLEN];
-	size_t flen;
+	struct iovec iov[] = {
+		{
+		    .iov_base = UNCONST(file),
+		    .iov_len = strlen(file) + 1,
+		},
+		{
+		    .iov_base = UNCONST(data),
+		    .iov_len = len,
+		},
+	};
+	struct msghdr msg = {
+		.msg_iov = iov,
+		.msg_iovlen = __arraycount(iov),
+	};
 
-	flen = strlcpy(buf, file, sizeof(buf));
-	flen += 1;
-	if (flen > sizeof(buf) || flen + len > sizeof(buf)) {
-		errno = ENOBUFS;
+	if (ps_sendcmdmsg(ctx, PS_ROOT_FD(ctx), PS_WRITEFILE, mode, &msg) == -1)
 		return -1;
-	}
-	memcpy(buf + flen, data, len);
 
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_WRITEFILE, mode, buf,
-		flen + len) == -1)
-		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
 
@@ -1107,7 +1117,7 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 	void *buf = NULL;
 	char *bp, *sap;
 	socklen_t salen;
-	size_t len;
+	size_t len = 0;
 	ssize_t err;
 
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_GETIFADDRS, 0, NULL, 0) == -1)
