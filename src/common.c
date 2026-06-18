@@ -114,7 +114,7 @@ ssize_t
 readfile(const char *file, void **data, size_t *len)
 {
 	int fd;
-	ssize_t bytes;
+	ssize_t bytes = -1;
 	struct stat st;
 	size_t nlen;
 	char *buf;
@@ -123,17 +123,20 @@ readfile(const char *file, void **data, size_t *len)
 	if (fd == -1)
 		return -1;
 	if (fstat(fd, &st) == -1)
-		return -1;
+		goto out;
 	nlen = (size_t)st.st_size + 1;
 	if (nlen > *len) {
 		void *ndata = realloc(*data, nlen);
 		if (ndata == NULL)
-			return -1;
+			goto out; 
 		*data = ndata;
 		*len = nlen;
 	}
 	bytes = read(fd, *data, *len);
+out:
 	close(fd);
+	if (bytes == -1)
+		return -1;
 	buf = *data;
 	buf[bytes] = '\0';
 	return bytes + 1;

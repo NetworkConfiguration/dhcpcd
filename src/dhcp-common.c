@@ -1019,7 +1019,7 @@ dhcp_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
 
 	if (file == NULL || *file == '\0') {
 		uint8_t *p = *data;
-		size_t needed = BUFSIZ, bytes = 0, blen = *len;
+		size_t needed = BUFSIZ, bytes = 0, left;
 		ssize_t nread;
 
 		for (;;) {
@@ -1032,16 +1032,16 @@ dhcp_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
 				*len = needed;
 			}
 
-			nread = read(fileno(stdin), p, blen);
+			left = *len - bytes;
+			nread = read(fileno(stdin), p, left);
 			if (nread == -1)
 				return -1;
 			bytes += (size_t)nread;
-			if ((size_t)nread < blen || nread == 0)
+			if ((size_t)nread < left || nread == 0)
 				return (ssize_t)bytes;
 
 			/* We need a bigger buffer */
-			blen = BUFSIZ;
-			needed += blen;
+			needed += BUFSIZ;
 		}
 	}
 

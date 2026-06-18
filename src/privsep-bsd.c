@@ -389,7 +389,7 @@ ssize_t
 ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
     void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
 {
-	char *p = ctx->ps_buf;
+	char *p;
 	unsigned long flags = 0;
 	size_t olen = (oldp && oldlenp) ? *oldlenp : 0, nolen;
 	size_t buflen = sizeof(namelen) + (sizeof(*name) * namelen) +
@@ -402,6 +402,7 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
 		flags |= PS_SYSCTL_OLEN;
 	if (oldp)
 		flags |= PS_SYSCTL_ODATA;
+	p = ctx->ps_buf;
 	memcpy(p, &namelen, sizeof(namelen));
 	p += sizeof(namelen);
 	memcpy(p, name, sizeof(*name) * namelen);
@@ -419,7 +420,7 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
 		(size_t)(p - (char *)ctx->ps_buf)) == -1)
 		return -1;
 
-	if (ps_root_readerror(ctx, buf, sizeof(buf)) == -1)
+	if (ps_root_readerror(ctx, ctx->ps_buf, ctx->ps_buflen) == -1)
 		return -1;
 
 	p = ctx->ps_buf;

@@ -145,7 +145,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
-	return 0;
 #ifdef __sun
 #warning not dropping any privileges on this platform .... eek!
 #else

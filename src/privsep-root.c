@@ -570,7 +570,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = gethostname((char *)ctx->ps_buf, ctx->ps_buflen);
 		if (err != -1) {
 			rdata = ctx->ps_buf;
-			rlen = strlen((char *)cts->ps_buf) + 1;
+			rlen = strlen((char *)ctx->ps_buf) + 1;
 		}
 		break;
 #endif
@@ -968,6 +968,8 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		close(ctx->ps_data_fd);
 		ctx->ps_data_fd = -1;
 	}
+
+	free(ctx->ps_buf);
 
 	/* Only the manager process gets past this point. */
 	if (ctx->options & DHCPCD_FORKED) {
