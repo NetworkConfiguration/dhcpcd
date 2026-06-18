@@ -66,100 +66,82 @@ struct psr_error {
 	size_t psr_datalen;
 };
 
-struct psr_ctx {
-	struct dhcpcd_ctx *psr_ctx;
-	struct psr_error psr_error;
-	size_t psr_datalen;
-	void *psr_data;
-	bool psr_mallocdata;
-};
-
 static ssize_t
-ps_root_readerrorcb(struct psr_ctx *pc)
+ps_root_doreaderror(struct dhcpcd_ctx *ctx, struct psr_error *pse, void **data,
+    size_t *datalen, bool mallocdata)
 {
-	struct dhcpcd_ctx *ctx = pc->psr_ctx;
 	int fd = PS_ROOT_FD(ctx);
-	struct psr_error *psr_error = &pc->psr_error;
 	ssize_t len;
 
-#define PSR_ERROR(e)                        \
-	do {                                \
-		psr_error->psr_errno = (e); \
-		goto error;                 \
+#define PSR_ERROR(e)                  \
+	do {                          \
+		pse->psr_errno = (e); \
+		goto error;           \
 	} while (0 /* CONSTCOND */)
 
 	if (eloop_waitfd(ctx->eloop, fd) == -1)
 		PSR_ERROR(errno);
 
-	len = recv(fd, psr_error, sizeof(*psr_error), MSG_WAITALL);
+	len = recv(fd, pse, sizeof(*pse), MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
 
-	if ((size_t)len < sizeof(*psr_error))
+	if ((size_t)len < sizeof(*pse))
 		PSR_ERROR(EINVAL);
 
-	if (psr_error->psr_datalen == 0)
+	if (pse->psr_datalen == 0)
 		return len;
 
-	if (pc->psr_mallocdata) {
-		if (psr_error->psr_datalen > pc->psr_datalen) {
-			void *nbuf = realloc(pc->psr_data,
-			    psr_error->psr_datalen);
+	if (mallocdata) {
+		if (pse->psr_datalen > *datalen) {
+			void *nbuf = realloc(*data, pse->psr_datalen);
 			if (nbuf == NULL)
 				PSR_ERROR(errno);
-			pc->psr_data = nbuf;
-			pc->psr_datalen = psr_error->psr_datalen;
+			*data = nbuf;
+			*datalen = pse->psr_datalen;
 		}
-	} else if (psr_error->psr_datalen > pc->psr_datalen)
+	} else if (pse->psr_datalen > *datalen)
 		PSR_ERROR(EMSGSIZE);
 
-	len = recv(fd, pc->psr_data, psr_error->psr_datalen, MSG_WAITALL);
+	len = recv(fd, *data, pse->psr_datalen, MSG_WAITALL);
 	if (len == -1)
 		PSR_ERROR(errno);
-	else if ((size_t)len != psr_error->psr_datalen) {
+	else if ((size_t)len != pse->psr_datalen) {
 #ifdef PRIVSEP_DEBUG
 		logerrx("%s: recvmsg returned %zd, expecting %zu", __func__,
-		    len, sizeof(*psr_error) + psr_error->psr_datalen);
+		    len, sizeof(*pse) + pse->psr_datalen);
 #endif
 		PSR_ERROR(EBADMSG);
 	}
 	return len;
 
 error:
-	psr_error->psr_result = -1;
+	pse->psr_result = -1;
 	return -1;
 }
 
 ssize_t
 ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-	struct psr_ctx pc = { .psr_ctx = ctx,
-		.psr_data = data,
-		.psr_datalen = len,
-		.psr_mallocdata = false };
+	struct psr_error pse = { .psr_result = -1 };
 
-	ps_root_readerrorcb(&pc);
+	ps_root_doreaderror(ctx, &pse, &data, &len, false);
 
-	errno = pc.psr_error.psr_errno;
-	return pc.psr_error.psr_result;
+	errno = pse.psr_errno;
+	return pse.psr_result;
 }
 
 ssize_t
 ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 {
-	struct psr_ctx pc = { .psr_ctx = ctx,
-		.psr_data = *data,
-		.psr_datalen = *len,
-		.psr_mallocdata = true };
+	struct psr_error pse = { .psr_result = -1 };
 
-	ps_root_readerrorcb(&pc);
+	ps_root_doreaderror(ctx, &pse, data, len, true);
 
-	errno = pc.psr_error.psr_errno;
-	*data = pc.psr_data;
-	*len = pc.psr_datalen;
-	if (pc.psr_error.psr_result == -1)
+	errno = pse.psr_errno;
+	if (pse.psr_result == -1)
 		return -1;
-	return (ssize_t)pc.psr_error.psr_datalen;
+	return (ssize_t)pse.psr_datalen;
 }
 
 static ssize_t
