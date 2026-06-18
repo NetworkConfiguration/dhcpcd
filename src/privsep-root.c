@@ -125,7 +125,11 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
 	struct psr_error pse = { .psr_result = -1 };
 
-	ps_root_doreaderror(ctx, &pse, &data, &len, false);
+	/* Any error on the stream socket means we need to exit. */
+	if (ps_root_doreaderror(ctx, &pse, &data, &len, false) == -1) {
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return -1;
+	}
 
 	errno = pse.psr_errno;
 	return pse.psr_result;
@@ -136,7 +140,11 @@ ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 {
 	struct psr_error pse = { .psr_result = -1 };
 
-	ps_root_doreaderror(ctx, &pse, data, len, true);
+	/* Any error on the stream socket means we need to exit. */
+	if (ps_root_doreaderror(ctx, &pse, data, len, true) == -1) {
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return -1;
+	}
 
 	errno = pse.psr_errno;
 	if (pse.psr_result == -1)
