@@ -2672,7 +2672,7 @@ dhcp6_validatelease(struct interface *ifp, struct dhcp6_message *m, size_t len,
 static ssize_t
 dhcp6_readlease(struct interface *ifp, int validate)
 {
-	struct dhcp6_message *dhcp6;
+	struct dhcp6_message *dhcp6 = NULL;
 	struct dhcp6_state *state;
 	ssize_t bytes;
 	int fd;
@@ -2761,6 +2761,7 @@ ex:
 	state->new = NULL;
 	state->new_len = 0;
 	dhcp6_addrequestedaddrs(ifp);
+	free(dhcp6);
 	return bytes == 0 ? 0 : -1;
 }
 
