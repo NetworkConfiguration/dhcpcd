@@ -875,7 +875,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		break;
 	case 'u':
-		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 1;
+		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 2;
 		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
 		    dl, arg);
 		if (s == -1) {
