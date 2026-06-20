@@ -875,13 +875,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		break;
 	case 'u':
-		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 2;
-		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
-		    dl, arg);
-		if (s == -1) {
+		if ((size_t)ifo->userclass[0] + 2 > sizeof(ifo->userclass)) {
+			errno = ENOBUFS;
 			logerr("userclass");
 			return -1;
 		}
+		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 2;
+		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
+		    dl, arg);
 		if (s != 0) {
 			ifo->userclass[ifo->userclass[0] + 1] = (uint8_t)s;
 			ifo->userclass[0] = (uint8_t)(ifo->userclass[0] + s +
