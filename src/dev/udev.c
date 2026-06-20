@@ -94,7 +94,8 @@ udev_handle_device(void *ctx)
 		logdebugx("%s: libudev: %s", ifname, action);
 		if (action == NULL || ifname == NULL)
 			;
-		else if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
+		else if (strcmp(action, "add") == 0 ||
+		    strcmp(action, "move") == 0)
 			dhcpcd.handle_interface(ctx, 1, ifname);
 		else if (strcmp(action, "remove") == 0)
 			dhcpcd.handle_interface(ctx, -1, ifname);
