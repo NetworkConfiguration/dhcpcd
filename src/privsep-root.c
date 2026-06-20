@@ -529,7 +529,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = readfile(data, &ctx->ps_buf, &ctx->ps_buflen);
 		if (err != -1) {
 			rdata = ctx->ps_buf;
-			rlen = (size_t)err;
+			/* We know the buffer is NUL terminated.
+			 * Send it over IPC to ensure the receiver has
+			 * enough space for it as well. */
+			rlen = (size_t)err + 1;
 		}
 		break;
 	case PS_WRITEFILE:
@@ -1040,11 +1043,18 @@ ssize_t
 ps_root_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
     size_t *len)
 {
+	ssize_t err;
+
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_READFILE, 0, file,
 		strlen(file) + 1) == -1)
 		return -1;
 
-	return ps_root_mreaderror(ctx, data, len);
+	err = ps_root_mreaderror(ctx, data, len);
+	if (err == -1)
+		return -1;
+
+	/* The returned length should not include the NUL terminator */
+	return err - 1;
 }
 
 ssize_t

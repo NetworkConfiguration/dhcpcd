@@ -124,6 +124,10 @@ readfile(const char *file, void **data, size_t *len)
 		return -1;
 	if (fstat(fd, &st) == -1)
 		goto out;
+
+	/* Ensure that what we read is NUL terminated
+	 * because it's mainly text files and this just
+	 * makes it easier. */
 	nlen = (size_t)st.st_size + 1;
 	if (nlen > *len) {
 		void *ndata = realloc(*data, nlen);
@@ -133,13 +137,14 @@ readfile(const char *file, void **data, size_t *len)
 		*len = nlen;
 	}
 	bytes = read(fd, *data, *len);
+
 out:
 	close(fd);
 	if (bytes == -1)
 		return -1;
 	buf = *data;
 	buf[bytes] = '\0';
-	return bytes + 1;
+	return bytes;
 }
 
 ssize_t
