@@ -37,7 +37,7 @@ jobs:
 
     steps:
     - name: Install libudev-dev
-      run: sudo apt install -y pkg-config libudev-dev
+      run: sudo apt install -y libudev-dev
 
     - uses: actions/checkout@v6
     
