@@ -35,6 +35,9 @@ jobs:
         os: [ ubuntu-latest, ubuntu-22.04 ]
     runs-on: ${{ matrix.os }}
 
+    - name: Install libudev-dev
+      run: sudo apt install -y pkg-config libudev-dev
+
     steps:
     - uses: actions/checkout@v6
     
