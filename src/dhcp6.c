@@ -2311,6 +2311,12 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid, uint8_t *d, size_t l,
 		memcpy(&pdp_plen, o, sizeof(pdp_plen));
 		o += sizeof(pdp_plen);
 
+		if (pdp_plen > 128) {
+			errno = EINVAL;
+			logerrx("%s: IA Prefix length %u invalid", ifp->name, pdp_plen);
+			continue;
+		}
+
 		pdp_pltime = ntohl(pdp_pltime);
 		pdp_vltime = ntohl(pdp_vltime);
 		/* RFC 3315 22.6 */
