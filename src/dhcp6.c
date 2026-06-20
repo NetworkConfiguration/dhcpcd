@@ -2313,7 +2313,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid, uint8_t *d, size_t l,
 
 		if (pdp_plen > 128) {
 			errno = EINVAL;
-			logerrx("%s: IA Prefix length %u invalid", ifp->name, pdp_plen);
+			logerrx("%s: IA Prefix length %u invalid", ifp->name,
+			    pdp_plen);
 			continue;
 		}
 
