@@ -136,7 +136,7 @@ readfile(const char *file, void **data, size_t *len)
 		*data = ndata;
 		*len = nlen;
 	}
-	bytes = read(fd, *data, *len);
+	bytes = read(fd, *data, *len - 1);
 
 out:
 	close(fd);
