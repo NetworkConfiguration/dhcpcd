@@ -963,7 +963,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	struct in6_addr pi_prefix;
 	struct ipv6_addr *ia;
 	struct dhcp_opt *dho;
-	bool new_rap, new_data, has_address;
+	bool new_rap, new_data, has_address, has_opt;
 	uint32_t old_lifetime;
 	int ifmtu;
 	int loglevel;
@@ -1043,28 +1043,30 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	nd_ra = (struct nd_router_advert *)icp;
 
 	/* Validate */
-	loglevel = rap == NULL || rap->willexpire || !rap->isreachable ? LOG_ERR :
-								     LOG_DEBUG;
+	loglevel = rap == NULL || rap->willexpire || !rap->isreachable ?
+	    LOG_ERR :
+	    LOG_DEBUG;
 	ifo = ifp->options;
 	rlen = len;
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	for (; len > 0; p += olen, len -= olen) {
 		if (len < sizeof(ndo)) {
-			logmessage(loglevel, "%s: short RA option from %s", ifp->name,
-			    sfrom);
+			logmessage(loglevel, "%s: short RA option from %s",
+			    ifp->name, sfrom);
 			break;
 		}
 		memcpy(&ndo, p, sizeof(ndo));
 		olen = (size_t)ndo.nd_opt_len * 8;
 		if (olen == 0) {
 			/* RFC4681 4.6 says we MUST discard this ND packet. */
-			logmessage(loglevel, "%s: zero length RA option %s", ifp->name,
-			    sfrom);
+			logmessage(loglevel, "%s: zero length RA option %s",
+			    ifp->name, sfrom);
 			return;
 		}
 		if (olen > len) {
-			logmessage(loglevel, "%s: RA option length exceeds message from %s",
+			logmessage(loglevel,
+			    "%s: RA option length exceeds message from %s",
 			    ifp->name, sfrom);
 			break;
 		}
@@ -1076,10 +1078,12 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 					break;
 			}
 			if (i == ctx->nd_opts_len)
-				logmessage(loglevel, "%s: reject RA (option %d) from %s",
+				logmessage(loglevel,
+				    "%s: reject RA (option %d) from %s",
 				    ifp->name, ndo.nd_opt_type, sfrom);
 			else
-				logmessage(loglevel, "%s: reject RA (option %s) from %s",
+				logmessage(loglevel,
+				    "%s: reject RA (option %s) from %s",
 				    ifp->name, dho->var, sfrom);
 			return;
 		}
@@ -1091,7 +1095,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 		len = rlen;
 		len -= sizeof(struct nd_router_advert);
 		p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
-		new_rap = false;
+		has_opt = false;
 		for (; len > 0; p += olen, len -= olen) {
 			if (len < sizeof(ndo))
 				break;
@@ -1100,14 +1104,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			if (olen > len)
 				break;
 			if (ndo.nd_opt_type == dho->option) {
-				new_rap = true;
+				has_opt = true;
 				break;
 			}
 		}
-		if (new_rap)
+		if (has_opt)
 			continue;
-		logmessage(loglevel, "%s: reject RA (missing %s) from %s", ifp->name,
-		    dho->var, sfrom);
+		logmessage(loglevel, "%s: reject RA (missing %s) from %s",
+		    ifp->name, dho->var, sfrom);
 		return;
 	}
 	len = rlen;
