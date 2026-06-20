@@ -949,7 +949,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
     const char *sfrom, struct interface *ifp, struct icmp6_hdr *icp, size_t len,
     int hoplimit)
 {
-	size_t i, olen;
+	size_t i, olen, rlen;
 	struct nd_router_advert *nd_ra;
 	struct nd_opt_hdr ndo;
 	struct nd_opt_prefix_info pi;
@@ -957,6 +957,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	struct nd_opt_rdnss rdnss;
 	struct nd_opt_ri ri;
 	struct routeinfo *rinfo;
+	struct if_options *ifo;
 	uint8_t *p;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
@@ -1040,6 +1041,76 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	}
 
 	nd_ra = (struct nd_router_advert *)icp;
+
+	/* Validate */
+	loglevel = rap == NULL || rap->willexpire || !rap->isreachable ? LOG_ERR :
+								     LOG_DEBUG;
+	ifo = ifp->options;
+	rlen = len;
+	len -= sizeof(struct nd_router_advert);
+	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
+	for (; len > 0; p += olen, len -= olen) {
+		if (len < sizeof(ndo)) {
+			logmessage(loglevel, "%s: short RA option from %s", ifp->name,
+			    sfrom);
+			break;
+		}
+		memcpy(&ndo, p, sizeof(ndo));
+		olen = (size_t)ndo.nd_opt_len * 8;
+		if (olen == 0) {
+			/* RFC4681 4.6 says we MUST discard this ND packet. */
+			logmessage(loglevel, "%s: zero length RA option %s", ifp->name,
+			    sfrom);
+			return;
+		}
+		if (olen > len) {
+			logmessage(loglevel, "%s: RA option length exceeds message from %s",
+			    ifp->name, sfrom);
+			break;
+		}
+
+		if (has_option_mask(ifo->rejectmasknd, ndo.nd_opt_type)) {
+			for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len;
+			    i++, dho++) {
+				if (dho->option == ndo.nd_opt_type)
+					break;
+			}
+			if (i == ctx->nd_opts_len)
+				logmessage(loglevel, "%s: reject RA (option %d) from %s",
+				    ifp->name, ndo.nd_opt_type, sfrom);
+			else
+				logmessage(loglevel, "%s: reject RA (option %s) from %s",
+				    ifp->name, dho->var, sfrom);
+			return;
+		}
+	}
+
+	for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len; i++, dho++) {
+		if (!has_option_mask(ifo->requiremasknd, dho->option))
+			continue;
+		len = rlen;
+		len -= sizeof(struct nd_router_advert);
+		p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
+		new_rap = false;
+		for (; len > 0; p += olen, len -= olen) {
+			if (len < sizeof(ndo))
+				break;
+			memcpy(&ndo, p, sizeof(ndo));
+			olen = (size_t)ndo.nd_opt_len * 8;
+			if (olen > len)
+				break;
+			if (ndo.nd_opt_type == dho->option) {
+				new_rap = true;
+				break;
+			}
+		}
+		if (new_rap)
+			continue;
+		logmessage(loglevel, "%s: reject RA (missing %s) from %s", ifp->name,
+		    dho->var, sfrom);
+		return;
+	}
+	len = rlen;
 
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
@@ -1125,39 +1196,12 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	for (; len > 0; p += olen, len -= olen) {
-		if (len < sizeof(ndo)) {
-			logerrx("%s: short option", ifp->name);
+		if (len < sizeof(ndo))
 			break;
-		}
 		memcpy(&ndo, p, sizeof(ndo));
 		olen = (size_t)ndo.nd_opt_len * 8;
-		if (olen == 0) {
-			/* RFC4681 4.6 says we MUST discard this ND packet. */
-			logerrx("%s: zero length option", ifp->name);
-			FREE_RAP(rap);
-			return;
-		}
-		if (olen > len) {
-			logerrx("%s: option length exceeds message", ifp->name);
+		if (olen > len)
 			break;
-		}
-
-		if (has_option_mask(ifp->options->rejectmasknd,
-			ndo.nd_opt_type)) {
-			for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len;
-			    i++, dho++) {
-				if (dho->option == ndo.nd_opt_type)
-					break;
-			}
-			if (i == ctx->nd_opts_len)
-				logwarnx("%s: reject RA (option %d) from %s",
-				    ifp->name, ndo.nd_opt_type, rap->sfrom);
-			else
-				logwarnx("%s: reject RA (option %s) from %s",
-				    ifp->name, dho->var, rap->sfrom);
-			FREE_RAP(rap);
-			return;
-		}
 
 		if (has_option_mask(ifp->options->nomasknd, ndo.nd_opt_type))
 			continue;
@@ -1403,15 +1447,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			break;
 		default:
 			continue;
-		}
-	}
-
-	for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len; i++, dho++) {
-		if (has_option_mask(ifp->options->requiremasknd, dho->option)) {
-			logwarnx("%s: reject RA (no option %s) from %s",
-			    ifp->name, dho->var, rap->sfrom);
-			FREE_RAP(rap);
-			return;
 		}
 	}
 
