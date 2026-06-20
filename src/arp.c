@@ -245,6 +245,8 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	/* Copy the frame header source and destination out */
 	memset(&arm, 0, sizeof(arm));
 	if (fl != 0) {
+		if (len < fl)
+			return;
 		hw_s = bpf_frame_header_src(ifp, data, &falen);
 		if (hw_s != NULL && falen <= sizeof(arm.fsha))
 			memcpy(arm.fsha, hw_s, falen);
