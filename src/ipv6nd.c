@@ -1149,12 +1149,12 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 				if (dho->option == ndo.nd_opt_type)
 					break;
 			}
-			if (dho != NULL)
-				logwarnx("%s: reject RA (option %s) from %s",
-				    ifp->name, dho->var, rap->sfrom);
-			else
+			if (i == ctx->nd_opts_len)
 				logwarnx("%s: reject RA (option %d) from %s",
 				    ifp->name, ndo.nd_opt_type, rap->sfrom);
+			else
+				logwarnx("%s: reject RA (option %s) from %s",
+				    ifp->name, dho->var, rap->sfrom);
 			FREE_RAP(rap);
 			return;
 		}
