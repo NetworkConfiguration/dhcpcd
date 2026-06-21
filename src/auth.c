@@ -75,7 +75,9 @@
 #endif
 #endif /* ntohll */
 
-#define HMAC_LENGTH 16
+#define MD5_DIGEST_LENGTH 16
+/* Maximum digest length we use - currently just MD5 */
+#define HMAC_DIGEST_LENGTH MD5_DIGEST_LENGTH
 
 static void
 free_token(struct token *t)
@@ -122,7 +124,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 	size_t realm_len;
 	const struct token *t;
 	time_t now;
-	uint8_t hmac_code[HMAC_LENGTH];
+	uint8_t hmac_code[HMAC_DIGEST_LENGTH];
 
 	if (dlen < 3 + sizeof(replay)) {
 		errno = EINVAL;
@@ -336,6 +338,19 @@ gottoken:
 		goto finish;
 	}
 
+	/* dlen should now match hash digest length */
+	switch (algorithm) {
+	case AUTH_ALG_HMAC_MD5:
+		if (dlen != MD5_DIGEST_LENGTH) {
+			errno = EINVAL;
+			return NULL;
+		}
+		break;
+	default:
+		errno = ENOSYS;
+		return NULL;
+	}
+
 	/* Make a duplicate of the message, but zero out the MAC part */
 	mm = malloc(mlen);
 	if (mm == NULL)
@@ -359,8 +374,8 @@ gottoken:
 		    sizeof(hmac_code));
 		break;
 	default:
-		errno = ENOSYS;
 		free(mm);
+		errno = ENOSYS;
 		return NULL;
 	}
 
@@ -522,7 +537,7 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
     size_t dlen)
 {
 	uint64_t rdm;
-	uint8_t hmac_code[HMAC_LENGTH];
+	uint8_t hmac_code[HMAC_DIGEST_LENGTH];
 	time_t now;
 	uint8_t hops, *p, *m, *data;
 	uint32_t giaddr, secretid;
