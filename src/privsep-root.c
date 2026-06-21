@@ -261,8 +261,14 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 }
 
 static bool
-ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path)
+ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
+    size_t len)
 {
+
+	/* path must be a valid string */
+	if (memchr(path, '\0', len) == NULL)
+		return false;
+
 	/* Avoid a previous directory attack to avoid /proc/../
 	 * dhcpcd should never use a path with double dots. */
 	if (strstr(path, "..") != NULL)
@@ -297,6 +303,7 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx, mode_t mode, void *data,
     size_t len)
 {
 	char *file = data, *nc;
+	size_t flen;
 
 	nc = memchr(file, '\0', len);
 	if (nc == NULL) {
@@ -304,10 +311,11 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx, mode_t mode, void *data,
 		return -1;
 	}
 
-	if (!ps_root_validpath(ctx, PS_WRITEFILE, file))
+	flen = (size_t)(nc - file) + 1;
+	if (!ps_root_validpath(ctx, PS_WRITEFILE, file, flen))
 		return -1;
 	nc++;
-	return writefile(file, mode, nc, len - (size_t)(nc - file));
+	return writefile(file, mode, nc, len - flen);
 }
 
 #ifdef AUTH
@@ -515,14 +523,14 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = ps_stopwait(ctx);
 		break;
 	case PS_UNLINK:
-		if (!ps_root_validpath(ctx, psm->ps_cmd, data)) {
+		if (!ps_root_validpath(ctx, psm->ps_cmd, data, len)) {
 			err = -1;
 			break;
 		}
 		err = unlink(data);
 		break;
 	case PS_READFILE:
-		if (!ps_root_validpath(ctx, psm->ps_cmd, data)) {
+		if (!ps_root_validpath(ctx, psm->ps_cmd, data, len)) {
 			err = -1;
 			break;
 		}
@@ -540,6 +548,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		    len);
 		break;
 	case PS_FILEMTIME:
+		if (!ps_root_validpath(ctx, psm->ps_cmd, data, len)) {
+			err = -1;
+			break;
+		}
 		err = filemtime(data, &mtime);
 		if (err != -1) {
 			rdata = &mtime;
@@ -578,6 +590,11 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 #ifdef PLUGIN_DEV
 	case PS_DEV_INITTED:
+		/* Check ifname is terminated */
+		if (memchr(data, '\0', len) == NULL) {
+			err = -1;
+			break;
+		}
 		err = dev_initialised(ctx, data);
 		break;
 	case PS_DEV_LISTENING:
