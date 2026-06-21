@@ -477,7 +477,7 @@ arp_announce(struct arp_state *astate)
 {
 	struct iarp_state *state;
 	struct interface *ifp;
-	struct arp_state *a2;
+	struct arp_state *a2, *an;
 	int r;
 
 	/* Cancel any other ARP announcements for this address. */
@@ -485,7 +485,7 @@ arp_announce(struct arp_state *astate)
 		state = ARP_STATE(ifp);
 		if (state == NULL)
 			continue;
-		TAILQ_FOREACH(a2, &state->arp_states, next) {
+		TAILQ_FOREACH_SAFE(a2, &state->arp_states, next, an) {
 			if (astate == a2 ||
 			    a2->addr.s_addr != astate->addr.s_addr)
 				continue;
