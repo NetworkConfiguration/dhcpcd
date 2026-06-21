@@ -75,7 +75,7 @@
 #endif
 #endif /* ntohll */
 
-#define MD5_DIGEST_LENGTH  16
+#define MD5_DIGEST_LENGTH 16
 /* Maximum digest length we use - currently just MD5 */
 #define HMAC_DIGEST_LENGTH MD5_DIGEST_LENGTH
 
