@@ -496,6 +496,7 @@ get_option_string(struct dhcpcd_ctx *ctx, const struct bootp *bootp,
     size_t bootp_len, uint8_t option)
 {
 	size_t len, sl;
+	ssize_t pl;
 	const uint8_t *p;
 	char *s;
 
@@ -503,10 +504,19 @@ get_option_string(struct dhcpcd_ctx *ctx, const struct bootp *bootp,
 	if (!p || len == 0 || *p == '\0')
 		return NULL;
 
-	sl = ((sizeof(char) * len) * 4) + 1;
+	pl = print_string(NULL, 0, OT_ESCSTRING, p, len);
+	if (pl == -1)
+		return NULL;
+
+	sl = (size_t)pl + 1;
 	s = malloc(sl);
-	if (s != NULL)
-		print_string(s, sl, OT_ESCSTRING, p, len);
+	if (s != NULL) {
+		pl = print_string(s, sl, OT_ESCSTRING, p, len);
+		if (pl == -1) {
+			free(s);
+			return NULL;
+		}
+	}
 	return s;
 }
 
