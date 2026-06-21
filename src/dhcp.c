@@ -3205,7 +3205,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 
 		/* We should restart on a NAK */
-		LOGDHCP(LOG_WARNING, "NAK:"); /* This also logs DHO_MESSAGE */
+		LOGDHCP(LOG_WARNING, "NAK:");	/* This also logs DHO_MESSAGE */
 		if (state->state == DHS_INFORM) /* INFORM should not be NAKed */
 			return;
 		if (!(ifp->ctx->options & DHCPCD_TEST)) {
