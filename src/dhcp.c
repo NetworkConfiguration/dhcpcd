@@ -495,7 +495,7 @@ static char *
 get_option_string(struct dhcpcd_ctx *ctx, const struct bootp *bootp,
     size_t bootp_len, uint8_t option)
 {
-	size_t len;
+	size_t len, sl;
 	const uint8_t *p;
 	char *s;
 
@@ -503,11 +503,10 @@ get_option_string(struct dhcpcd_ctx *ctx, const struct bootp *bootp,
 	if (!p || len == 0 || *p == '\0')
 		return NULL;
 
-	s = malloc(sizeof(char) * (len + 1));
-	if (s) {
-		memcpy(s, p, len);
-		s[len] = '\0';
-	}
+	sl = ((sizeof(char) * len) * 4) + 1;
+	s = malloc(sl);
+	if (s != NULL)
+		print_string(s, sl, OT_STRING, p, len);
 	return s;
 }
 
@@ -2949,25 +2948,9 @@ log_dhcp(int loglevel, const char *msg, const struct interface *ifp,
 	int r;
 	uint8_t overl;
 
-	if (strcmp(msg, "NAK:") == 0) {
+	if (strcmp(msg, "NAK:") == 0)
 		a = get_option_string(ifp->ctx, bootp, bootp_len, DHO_MESSAGE);
-		if (a) {
-			char *tmp;
-			size_t al, tmpl;
-
-			al = strlen(a);
-			tmpl = (al * 4) + 1;
-			tmp = malloc(tmpl);
-			if (tmp == NULL) {
-				logerr(__func__);
-				free(a);
-				return;
-			}
-			print_string(tmp, tmpl, OT_STRING, a, al);
-			free(a);
-			a = tmp;
-		}
-	} else if (ad && bootp->yiaddr != 0) {
+	else if (ad && bootp->yiaddr != 0) {
 		addr.s_addr = bootp->yiaddr;
 		a = strdup(inet_ntoa(addr));
 		if (a == NULL) {
@@ -3222,12 +3205,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 
 		/* We should restart on a NAK */
-		LOGDHCP(LOG_WARNING, "NAK:");
-		if ((msg = get_option_string(ifp->ctx, bootp, bootp_len,
-			 DHO_MESSAGE))) {
-			logwarnx("%s: message: %s", ifp->name, msg);
-			free(msg);
-		}
+		LOGDHCP(LOG_WARNING, "NAK:"); /* This also logs DHO_MESSAGE */
 		if (state->state == DHS_INFORM) /* INFORM should not be NAKed */
 			return;
 		if (!(ifp->ctx->options & DHCPCD_TEST)) {

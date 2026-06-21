@@ -2130,6 +2130,7 @@ dhcp6_checkstatusok(const struct interface *ifp, struct dhcp6_message *m,
 	mlen = opt_len - sizeof(code);
 	if (mlen == 0) {
 		sbuf = NULL;
+status_code:
 		if (code < sizeof(dhcp6_statuses) / sizeof(char *))
 			status = dhcp6_statuses[code];
 		else {
@@ -2137,12 +2138,12 @@ dhcp6_checkstatusok(const struct interface *ifp, struct dhcp6_message *m,
 			status = buf;
 		}
 	} else {
-		if ((sbuf = malloc(mlen + 1)) == NULL) {
-			logerr(__func__);
-			return -1;
-		}
-		memcpy(sbuf, opt, mlen);
-		sbuf[mlen] = '\0';
+		size_t slen = ((sizeof(char) * mlen) * 4) + 1;
+
+		sbuf = malloc(slen);
+		if (sbuf == NULL)
+			goto status_code; /* log something */
+		print_string(sbuf, slen, OT_STRING, opt, mlen);
 		status = sbuf;
 	}
 
