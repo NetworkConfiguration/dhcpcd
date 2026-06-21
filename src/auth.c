@@ -77,20 +77,28 @@
 
 #define HMAC_LENGTH 16
 
+static void
+free_token(struct token *t)
+{
+	if (t == NULL)
+		return;
+
+	(void)memset_explicit(t->key, 0, t->key_len);
+	free(t->key);
+	free(t->realm);
+	free(t);
+}
+
 void
 dhcp_auth_reset(struct authstate *state)
 {
 	state->replay = 0;
-	if (state->token) {
-		free(state->token->key);
-		free(state->token->realm);
-		free(state->token);
+	if (state->token != NULL) {
+		free_token(state->token);
 		state->token = NULL;
 	}
 	if (state->reconf) {
-		free(state->reconf->key);
-		free(state->reconf->realm);
-		free(state->reconf);
+		free_token(state->reconf);
 		state->reconf = NULL;
 	}
 }
