@@ -506,7 +506,7 @@ get_option_string(struct dhcpcd_ctx *ctx, const struct bootp *bootp,
 	sl = ((sizeof(char) * len) * 4) + 1;
 	s = malloc(sl);
 	if (s != NULL)
-		print_string(s, sl, OT_STRING, p, len);
+		print_string(s, sl, OT_ESCSTRING, p, len);
 	return s;
 }
 
