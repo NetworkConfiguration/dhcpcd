@@ -938,7 +938,6 @@ if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "#include			\"compat/arc4random_uniform.h\"" >>$CONFIG_H
 fi
 
-# Our arc4random compat needs memset_explicit, explicit_bzero or memset_s
 if [ -z "$MEMSET_EXPLICIT" ]; then
 	printf "Testing for memset_explicit ... "
 	cat <<EOF >_memset_explicit.c
@@ -957,11 +956,34 @@ EOF
 	echo "$MEMSET_EXPLICIT"
 	rm -rf _memset_explicit.* _memset_explicit
 fi
-if [ "$MEMSET_EXPLICIT" = yes ]; then
-	echo "#define	HAVE_MEMSET_EXPLICIT" >>$CONFIG_H
+if [ "$MEMSET_EXPLICIT" = no ]; then
+	echo "COMPAT_SRCS+=	compat/memset_explicit.c" >>$CONFIG_MK
+	echo "#include			\"compat/memset_explicit.h\"" >>$CONFIG_H
 fi
 
-if [ -z "$EXPLICIT_BZERO" ]; then
+if [ "$MEMSET_EXPLICIT" = no ] && [ -z "$EXPLICIT_MEMSET" ]; then
+	printf "Testing for explicit_memset ... "
+	cat <<EOF >_explicit_memset.c
+#include <string.h>
+int main(void) {
+	int a;
+	(void)explicit_memset(&a, 0, sizeof(a));
+	return 0;
+}
+EOF
+	if $XCC _explicit_memset.c -o _explicit_memset 2>&3; then
+		EXPLICIT_MEMSET=yes
+	else
+		EXPLICIT_MEMSET=no
+	fi
+	echo "$EXPLICIT_MEMSET"
+	rm -rf _explicit_memset.* _explicit_memset
+fi
+if [ "$EXPLICIT_MEMSET" = yes ]; then
+	echo "#define	HAVE_EXPLICIT_MEMSET" >>$CONFIG_H
+fi
+
+if [ "$MEMSET_EXPLICIT" = no ] && [ -z "$EXPLICIT_BZERO" ]; then
 	printf "Testing for explicit_bzero ... "
 	cat <<EOF >_explicit_bzero.c
 #define _BSD_SOURCE // musl, will be added for Linux in config.h
@@ -984,7 +1006,7 @@ if [ "$EXPLICIT_BZERO" = yes ]; then
 	echo "#define	HAVE_EXPLICIT_BZERO" >>$CONFIG_H
 fi
 
-if [ -z "$MEMSET_S" ]; then
+if [ "$MEMSET_EXPLICIT" = no ] && [ -z "$MEMSET_S" ]; then
 	printf "Testing for memset_s ... "
 	cat <<EOF >_memset_s.c
 #define	__STDC_WANT_LIB_EXT1__ 1
@@ -1004,7 +1026,6 @@ EOF
 	rm -rf _memset_s.* _memset_s
 fi
 if [ "$MEMSET_S" = yes ]; then
-	echo "#define	__STDC_WANT_LIB_EXT1__	1" >>$CONFIG_H
 	echo "#define	HAVE_MEMSET_S" >>$CONFIG_H
 fi
 
