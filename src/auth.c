@@ -83,7 +83,8 @@ free_token(struct token *t)
 	if (t == NULL)
 		return;
 
-	(void)memset_explicit(t->key, 0, t->key_len);
+	if (t->key != NULL)
+		(void)memset_explicit(t->key, 0, t->key_len);
 	free(t->key);
 	free(t->realm);
 	free(t);

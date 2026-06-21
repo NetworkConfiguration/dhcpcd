@@ -37,11 +37,11 @@ memset_explicit(void *b, int c, size_t len)
 {
 #if defined(HAVE_EXPLICIT_MEMSET)
 	return explicit_memset(b, c, len);
-#elif defined(HAVE_MEMSET_S)
-	(void)memset_s(b, len, c, len);
-	return b;
 #else
-#if defined(HAVE_EXPLICIT_BZERO)
+#if defined(HAVE_MEMSET_S)
+	if (memset_s(b, len, c, len) == 0)
+		return b;
+#elif defined(HAVE_EXPLICIT_BZERO)
 	if (c == 0) {
 		explicit_bzero(b, len);
 		return b;
