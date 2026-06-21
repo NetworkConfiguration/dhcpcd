@@ -264,15 +264,16 @@ static bool
 ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
     size_t len)
 {
-
 	/* path must be a valid string */
-	if (memchr(path, '\0', len) == NULL)
+	if (memchr(path, '\0', len) == NULL) {
+		errno = EINVAL;
 		return false;
+	}
 
 	/* Avoid a previous directory attack to avoid /proc/../
 	 * dhcpcd should never use a path with double dots. */
 	if (strstr(path, "..") != NULL)
-		return false;
+		goto noperm;
 
 	if (cmd == PS_READFILE) {
 #ifdef EMBEDDED_CONFIG
@@ -294,6 +295,7 @@ ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
 		return true;
 #endif
 
+noperm:
 	errno = EPERM;
 	return false;
 }
@@ -593,6 +595,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		/* Check ifname is terminated */
 		if (memchr(data, '\0', len) == NULL) {
 			err = -1;
+			errno = EINVAL;
 			break;
 		}
 		err = dev_initialised(ctx, data);
