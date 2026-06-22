@@ -825,7 +825,8 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 				goto err;
 			if (fprintf(fp, "%s", buf) == -1)
 				goto err;
-			if (data[0] == 0xfe && (data[1] & 0xc0) == 0x80) {
+			if (datalen >= 2 && data[0] == 0xfe &&
+			    (data[1] & 0xc0) == 0x80) {
 				if (fprintf(fp, "%%%s", ifname) == -1)
 					goto err;
 			}
