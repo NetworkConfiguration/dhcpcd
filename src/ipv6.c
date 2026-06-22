@@ -785,8 +785,9 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 
 #ifdef IPV6_MANAGETEMPADDR
 	/* RFC4941 Section 3.4 */
-	if (ia->flags & IPV6_AF_TEMPORARY && ia->prefix_pltime &&
-	    ia->prefix_vltime && ifp->options->options & DHCPCD_SLAACTEMP)
+	if (ia->flags & IPV6_AF_TEMPORARY &&
+	    ia->prefix_pltime > REGEN_ADVANCE && ia->prefix_vltime &&
+	    ifp->options->options & DHCPCD_SLAACTEMP)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ia->prefix_pltime - REGEN_ADVANCE, ipv6_regentempaddr, ia);
 #endif
