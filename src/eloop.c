@@ -434,9 +434,9 @@ eloop_timespec_diff(const struct timespec *tsp, const struct timespec *usp,
 	unsigned long long tsecs, usecs, secs;
 	long nsecs;
 
-	tsecs = (unsigned long long)tsp->tv_sec & UTIME_MAX;
-	usecs = (unsigned long long)usp->tv_sec & UTIME_MAX;
-	secs = (tsecs - usecs) & UTIME_MAX;
+	tsecs = (unsigned long long)tsp->tv_sec & (UTIME_MAX);
+	usecs = (unsigned long long)usp->tv_sec & (UTIME_MAX);
+	secs = (tsecs - usecs) & (UTIME_MAX);
 
 	if (secs > TIME_MAX) /* Monotonic clock went backward */
 		secs = 0;
