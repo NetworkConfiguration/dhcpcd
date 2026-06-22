@@ -434,19 +434,12 @@ eloop_timespec_diff(const struct timespec *tsp, const struct timespec *usp,
 	unsigned long long tsecs, usecs, secs;
 	long nsecs;
 
-	if (tsp->tv_sec < 0) /* time wrapped */
-		tsecs = UTIME_MAX - (unsigned long long)(-tsp->tv_sec);
-	else
-		tsecs = (unsigned long long)tsp->tv_sec;
-	if (usp->tv_sec < 0) /* time wrapped */
-		usecs = UTIME_MAX - (unsigned long long)(-usp->tv_sec);
-	else
-		usecs = (unsigned long long)usp->tv_sec;
+	tsecs = (unsigned long long)tsp->tv_sec & UTIME_MAX;
+	usecs = (unsigned long long)usp->tv_sec & UTIME_MAX;
+	secs = (tsecs - usecs) & UTIME_MAX;
 
-	if (usecs > tsecs) /* time wrapped */
-		secs = (UTIME_MAX - usecs) + tsecs;
-	else
-		secs = tsecs - usecs;
+	if (secs > TIME_MAX) /* Monotonic clock went backward */
+		secs = 0;
 
 	nsecs = tsp->tv_nsec - usp->tv_nsec;
 	if (nsecs < 0) {
@@ -457,6 +450,7 @@ eloop_timespec_diff(const struct timespec *tsp, const struct timespec *usp,
 			nsecs += NSEC_PER_SEC;
 		}
 	}
+
 	if (nsp != NULL)
 		*nsp = (unsigned int)nsecs;
 	return secs;
@@ -566,7 +560,7 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 	}
 
 	return eloop_q_timeout_add(eloop, queue, (unsigned int)when->tv_sec,
-	    (unsigned int)when->tv_sec, callback, arg);
+	    (unsigned int)when->tv_nsec, callback, arg);
 }
 
 int
