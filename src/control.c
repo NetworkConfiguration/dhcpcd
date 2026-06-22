@@ -247,7 +247,8 @@ control_recvdata(struct fd_list *fd, char *data, size_t len)
 				logerrx("%s: no terminator", __func__);
 				return -1;
 			}
-			if ((size_t)argc + 1 >= sizeof(argvp) / sizeof(argvp[0])) {
+			if ((size_t)argc + 1 >=
+			    sizeof(argvp) / sizeof(argvp[0])) {
 				errno = ENOBUFS;
 				logerrx("%s: no arg buffer", __func__);
 				return -1;
