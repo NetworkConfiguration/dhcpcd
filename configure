@@ -986,7 +986,6 @@ fi
 if [ "$MEMSET_EXPLICIT" = no ] && [ -z "$EXPLICIT_BZERO" ]; then
 	printf "Testing for explicit_bzero ... "
 	cat <<EOF >_explicit_bzero.c
-#define _BSD_SOURCE // musl, will be added for Linux in config.h
 #include <string.h>
 int main(void) {
 	int a;
