@@ -1814,6 +1814,7 @@ ipv6nd_expirera(void *arg)
 				logwarnx("%s: expired route %s",
 				    rap->iface->name, rinfo->sprefix);
 				TAILQ_REMOVE(&rap->rinfos, rinfo, next);
+				free(rinfo);
 			}
 		}
 
