@@ -1989,8 +1989,8 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			uint32_t limit, rmtime;
 
 			if (flags == 0) {
-				elapsed = eloop_timespec_diff(
-				    &ia->acquired, &ap->acquired, NULL);
+				elapsed = eloop_timespec_diff(&ia->acquired,
+				    &ap->acquired, NULL);
 				if (ap->prefix_pltime <= elapsed ||
 				    ap->prefix_pltime - elapsed < REGEN_ADVANCE)
 					continue;
