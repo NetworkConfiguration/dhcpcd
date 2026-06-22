@@ -590,7 +590,7 @@ ipv6_userprefix(const struct in6_addr *prefix, // prefix from router
 		if (prefix_len >= 64)
 			user_high = 0;
 		else
-			user_high = user_number >> (result_len - prefix_len);
+			user_high = user_number >> (result_len - 64);
 		user_low = user_number << (128 - result_len);
 	} else if (result_len == 64) {
 		user_high = user_number;
