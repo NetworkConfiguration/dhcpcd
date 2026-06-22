@@ -234,9 +234,13 @@ ps_root_dosysctl(unsigned long flags, void *data, size_t len, void **rdata,
 		errno = EINVAL;
 		return -1;
 	}
+	if (oldlen > SIZE_MAX - sizeof(oldlen)) {
+		errno = EINVAL;
+		return -1;
+	}
 	memcpy(&newlen, p, sizeof(newlen));
 	p += sizeof(newlen);
-	if (p + newlen > e) {
+	if (newlen > (size_t)(e - p)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -244,7 +248,10 @@ ps_root_dosysctl(unsigned long flags, void *data, size_t len, void **rdata,
 
 	if (flags & PS_SYSCTL_OLEN) {
 		*rlen = sizeof(oldlen) + oldlen;
-		*rdata = malloc(*rlen);
+		/* The sysctl call below might return less data
+		 * and thus we return data we might not want to
+		 * so ensure our block zeroed out. */
+		*rdata = calloc(1, *rlen);
 		if (*rdata == NULL)
 			return -1;
 		oldlenp = (size_t *)*rdata;
@@ -393,7 +400,7 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx, const int *name, unsigned int namelen,
 	unsigned long flags = 0;
 	size_t olen = (oldp && oldlenp) ? *oldlenp : 0, nolen;
 	size_t buflen = sizeof(namelen) + (sizeof(*name) * namelen) +
-	    sizeof(oldlenp) + sizeof(newlen) + newlen;
+	    sizeof(oldlenp) + sizeof(newlen) + MAX(newlen, olen);
 
 	if (ps_bufalloc(ctx, buflen) == -1)
 		return -1;
