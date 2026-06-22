@@ -1029,7 +1029,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    sl++, vsio_so++)
 			opt_max -= opt_header + vsio_so->len;
 		if (opt_header + dl > opt_max) {
-			logerrx("vsio is too big: %s", fp);
+			logerrx("vsio is too big: %s", arg);
 			free(np);
 			return -1;
 		}
