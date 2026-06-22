@@ -164,8 +164,11 @@ script_buftoenv(struct dhcpcd_ctx *ctx, char *buf, size_t len)
 	char **env, **envp, *bufp, *endp;
 	size_t nenv;
 
-	if (len == 0)
+	/* We should have something to process */
+	if (buf == NULL || len == 0) {
+		errno = EINVAL;
 		return NULL;
+	}
 
 	/* Ensure the buffer ends with NUL */
 	if (buf[len - 1] != '\0') {
