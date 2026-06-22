@@ -33,7 +33,6 @@
 #include <netinet/in.h>
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <pwd.h>
