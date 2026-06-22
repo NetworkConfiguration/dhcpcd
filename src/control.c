@@ -113,10 +113,8 @@ control_handle_read(struct fd_list *fd)
 	bytes = read(fd->fd, buffer, sizeof(buffer) - 1);
 	if (bytes == -1)
 		logerr(__func__);
-	if (bytes == -1 || bytes == 0) {
-		control_hangup(fd);
-		return -1;
-	}
+	if (bytes == -1 || bytes == 0)
+		return (int)bytes;
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
@@ -132,15 +130,13 @@ control_handle_read(struct fd_list *fd)
 		if (err == 1 &&
 		    ps_ctl_sendargs(fd, buffer, (size_t)bytes) == -1) {
 			logerr(__func__);
-			control_free(fd);
 			return -1;
 		}
-		return 0;
+		return 1;
 	}
 #endif
 
-	control_recvdata(fd, buffer, (size_t)bytes);
-	return 0;
+	return control_recvdata(fd, buffer, (size_t)bytes);
 }
 
 static int
@@ -209,17 +205,22 @@ control_handle_data(void *arg, unsigned short events)
 
 	if (events & ELE_WRITE && !(events & ELE_HANGUP)) {
 		if (control_handle_write(fd) == -1)
-			return;
+			goto hangup;
 	}
 	if (events & ELE_READ) {
 		if (control_handle_read(fd) == -1)
-			return;
+			goto hangup;
 	}
 	if (events & ELE_HANGUP)
-		control_hangup(fd);
+		goto hangup;
+
+	return;
+
+hangup:
+	control_hangup(fd);
 }
 
-void
+int
 control_recvdata(struct fd_list *fd, char *data, size_t len)
 {
 	char *p = data, *e;
@@ -241,12 +242,12 @@ control_recvdata(struct fd_list *fd, char *data, size_t len)
 			if (e == NULL) {
 				errno = EINVAL;
 				logerrx("%s: no terminator", __func__);
-				return;
+				return -1;
 			}
 			if ((size_t)argc >= sizeof(argvp) / sizeof(argvp[0])) {
 				errno = ENOBUFS;
 				logerrx("%s: no arg buffer", __func__);
-				return;
+				return -1;
 			}
 			*ap++ = p;
 			argc++;
@@ -266,12 +267,12 @@ control_recvdata(struct fd_list *fd, char *data, size_t len)
 		*ap = NULL;
 		if (dhcpcd_handleargs(fd->ctx, fd, argc, argvp) == -1) {
 			logerr(__func__);
-			if (errno != EINTR && errno != EAGAIN) {
-				control_free(fd);
-				return;
-			}
+			if (errno != EINTR && errno != EAGAIN)
+				return -1;
 		}
 	}
+
+	return 1;
 }
 
 struct fd_list *
