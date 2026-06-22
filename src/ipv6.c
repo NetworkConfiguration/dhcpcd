@@ -1985,13 +1985,13 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY && ap->prefix_pltime &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix)) {
-			unsigned int max, ext;
+			uint32_t elapsed, limit;
 
 			if (flags == 0) {
-				if (ap->prefix_pltime -
-					(uint32_t)(ia->acquired.tv_sec -
-					    ap->acquired.tv_sec) <
-				    REGEN_ADVANCE)
+				elapsed = (uint32_t)eloop_timespec_diff(
+				    &ia->acquired, &ap->acquired, NULL);
+				if (ap->prefix_pltime <= elapsed ||
+				    ap->prefix_pltime - elapsed < REGEN_ADVANCE)
 					continue;
 
 				return ap;
@@ -2000,6 +2000,9 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			if (!(ap->flags & IPV6_AF_ADDED))
 				ap->flags |= IPV6_AF_NEW | IPV6_AF_AUTOCONF;
 			ap->flags &= ~IPV6_AF_STALE;
+
+			elapsed = (uint32_t)eloop_timespec_diff(
+			    &ia->acquired, &ap->created, NULL);
 
 			/* RFC4941 Section 3.4
 			 * Deprecated prefix, deprecate the temporary address */
@@ -2014,26 +2017,22 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			/* RFC4941 Section 3.3.2
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
-			ext = (unsigned int)ia->acquired.tv_sec +
-			    ia->prefix_pltime;
-			max = (unsigned int)(ap->created.tv_sec +
-			    TEMP_PREFERRED_LIFETIME - state->desync_factor);
-			if (ext < max)
+			limit = TEMP_PREFERRED_LIFETIME - state->desync_factor;
+			if (elapsed >= limit)
+				ap->prefix_pltime = 0;
+			else if (ia->prefix_pltime < limit - elapsed)
 				ap->prefix_pltime = ia->prefix_pltime;
 			else
-				ap->prefix_pltime = (uint32_t)(max -
-				    ia->acquired.tv_sec);
+				ap->prefix_pltime = limit - elapsed;
 
 		valid:
-			ext = (unsigned int)ia->acquired.tv_sec +
-			    ia->prefix_vltime;
-			max = (unsigned int)(ap->created.tv_sec +
-			    TEMP_VALID_LIFETIME);
-			if (ext < max)
+			limit = TEMP_VALID_LIFETIME;
+			if (elapsed >= limit)
+				ap->prefix_vltime = 0;
+			else if (ia->prefix_vltime < limit - elapsed)
 				ap->prefix_vltime = ia->prefix_vltime;
 			else
-				ap->prefix_vltime = (uint32_t)(max -
-				    ia->acquired.tv_sec);
+				ap->prefix_vltime = limit - elapsed;
 
 			/* Just extend the latest matching prefix */
 			ap->acquired = ia->acquired;
