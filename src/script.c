@@ -165,20 +165,27 @@ script_buftoenv(struct dhcpcd_ctx *ctx, char *buf, size_t len)
 	char **env, **envp, *bufp, *endp;
 	size_t nenv;
 
-	/* Count the terminated env strings.
-	 * Assert that the terminations are correct. */
+	if (len == 0)
+		return NULL;
+
+	/* Ensure the buffer ends with NUL */
+	if (buf[len - 1] != '\0') {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	/* Count the NUL-terminated env strings */
 	nenv = 0;
 	endp = buf + len;
 	for (bufp = buf; bufp < endp; bufp++) {
 		if (*bufp == '\0') {
-#ifndef NDEBUG
-			if (bufp + 1 < endp)
-				assert(*(bufp + 1) != '\0');
-#endif
+			/* Skip consecutive NULs safely without crashing */
+			while (bufp + 1 < endp && *(bufp + 1) == '\0') {
+				bufp++;
+			}
 			nenv++;
 		}
 	}
-	assert(*(bufp - 1) == '\0');
 	if (nenv == 0)
 		return NULL;
 
@@ -192,11 +199,23 @@ script_buftoenv(struct dhcpcd_ctx *ctx, char *buf, size_t len)
 
 	bufp = buf;
 	envp = ctx->script_env;
-	*envp++ = bufp++;
-	endp--; /* Avoid setting the last \0 to an invalid pointer */
-	for (; bufp < endp; bufp++) {
-		if (*bufp == '\0')
-			*envp++ = bufp + 1;
+
+	/* If first char is NUL, skip leading empty strings if any,
+	 * or handle them gracefully */
+	while (bufp < endp && *bufp == '\0')
+		bufp++;
+	if (bufp < endp)
+		*envp++ = bufp;
+
+	/* Walk and capture pointers to each environment variable */
+	for (; bufp < endp - 1; bufp++) {
+		if (*bufp == '\0') {
+			/* Skip consecutive NULs */
+			while (bufp < endp - 1 && *(bufp + 1) == '\0')
+				bufp++;
+			if (bufp + 1 < endp)
+				*envp++ = bufp + 1;
+		}
 	}
 	*envp = NULL;
 
