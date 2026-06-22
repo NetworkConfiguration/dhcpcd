@@ -77,5 +77,5 @@ struct fd_list *control_new(struct dhcpcd_ctx *, int, unsigned int);
 void control_free(struct fd_list *);
 void control_delete(struct fd_list *);
 int control_queue(struct fd_list *, void *, size_t);
-void control_recvdata(struct fd_list *fd, char *, size_t);
+int control_recvdata(struct fd_list *fd, char *, size_t);
 #endif

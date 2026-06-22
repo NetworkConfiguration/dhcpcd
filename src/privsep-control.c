@@ -109,6 +109,7 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	struct iovec *iov = msg->msg_iov;
 	struct fd_list *fd;
 	unsigned int fd_flags = FD_SENDLEN;
+	int err;
 
 	switch (psm->ps_flags) {
 	case PS_CTL_PRIV:
@@ -132,7 +133,11 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		if (fd == NULL)
 			return -1;
 		ctx->ps_control_client = fd;
-		control_recvdata(fd, iov->iov_base, iov->iov_len);
+		err = control_recvdata(fd, iov->iov_base, iov->iov_len);
+		if (err == -1 || err == 0) {
+			control_free(fd);
+			ctx->ps_control_client = NULL;
+		}
 		break;
 	case PS_CTL_EOF:
 		ctx->ps_control_client = NULL;
