@@ -500,6 +500,7 @@ netbsd*)
 hurd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-hurd.c" >>$CONFIG_MK
+	echo "LDADD+=		-lpthread" >>$CONFIG_MK
 	BPF_OS="bpf-hurd.c"
 	# No INET6 support
 	INET6=no
