@@ -2019,23 +2019,27 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
 			limit = TEMP_PREFERRED_LIFETIME - state->desync_factor;
-			rmtime = (uint32_t)(limit - elapsed);
 			if (elapsed >= limit)
 				ap->prefix_pltime = 0;
-			else if (ia->prefix_pltime < rmtime)
-				ap->prefix_pltime = ia->prefix_pltime;
-			else
-				ap->prefix_pltime = rmtime;
+			else {
+				rmtime = (uint32_t)(limit - elapsed);
+				if (ia->prefix_pltime < rmtime)
+					ap->prefix_pltime = ia->prefix_pltime;
+				else
+					ap->prefix_pltime = rmtime;
+			}
 
 		valid:
 			limit = TEMP_VALID_LIFETIME;
-			rmtime = (uint32_t)(limit - elapsed);
 			if (elapsed >= limit)
 				ap->prefix_vltime = 0;
-			else if (ia->prefix_vltime < rmtime)
-				ap->prefix_vltime = ia->prefix_vltime;
-			else
-				ap->prefix_vltime = rmtime;
+			else {
+				rmtime = (uint32_t)(limit - elapsed);
+				if (ia->prefix_vltime < rmtime)
+					ap->prefix_vltime = ia->prefix_vltime;
+				else
+					ap->prefix_vltime = rmtime;
+			}
 
 			/* Just extend the latest matching prefix */
 			ap->acquired = ia->acquired;
