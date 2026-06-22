@@ -940,19 +940,18 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 		if (fp != NULL)
 			fp = strskipwhite(fp);
-		if (fp != NULL)
-			p = strchr(fp, ',');
-		else
-			p = NULL;
-		if (p == NULL || p[1] == '\0') {
+		if (fp == NULL) {
 			logerrx("invalid vendor format: %s", arg);
 			return -1;
 		}
 
 		/* Strip and preserve the comma */
-		*p = '\0';
+		p = strchr(fp, ',');
+		if (p != NULL)
+			*p = '\0';
 		i = (int)strtoi(fp, NULL, 0, 1, (intmax_t)opt_max, &e);
-		*p = ',';
+		if (p != NULL)
+			*p = ',';
 		if (e) {
 			logerrx("vendor option should be between"
 				" 1 and %zu inclusive",
@@ -960,9 +959,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 
-		fp = p + 1;
+		if (p != NULL)
+			fp = p + 1;
+		else
+			fp = NULL;
 
-		if (fp) {
+		if (fp != NULL && *fp != '\0') {
 			if (inet_pton(AF_INET, fp, &addr) == 1) {
 				s = sizeof(addr.s_addr);
 				dl = (size_t)s;
@@ -988,12 +990,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					return -1;
 				}
 				dl = (size_t)s;
-				np = malloc(dl);
-				if (np == NULL) {
-					logerr(__func__);
-					return -1;
+				if (dl == 0)
+					np = NULL;
+				else {
+					np = malloc(dl);
+					if (np == NULL) {
+						logerr(__func__);
+						return -1;
+					}
+					parse_string(np, dl, fp);
 				}
-				parse_string(np, dl, fp);
 			}
 		} else {
 			dl = 0;
@@ -1023,7 +1029,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    sl++, vsio_so++)
 			opt_max -= opt_header + vsio_so->len;
 		if (opt_header + dl > opt_max) {
-			logerrx("vsio is too big: %s", fp);
+			logerrx("vsio is too big: %s", arg);
 			free(np);
 			return -1;
 		}
