@@ -1985,10 +1985,11 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY && ap->prefix_pltime &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix)) {
-			uint32_t elapsed, limit;
+			unsigned long long elapsed;
+			uint32_t limit, rmtime;
 
 			if (flags == 0) {
-				elapsed = (uint32_t)eloop_timespec_diff(
+				elapsed = eloop_timespec_diff(
 				    &ia->acquired, &ap->acquired, NULL);
 				if (ap->prefix_pltime <= elapsed ||
 				    ap->prefix_pltime - elapsed < REGEN_ADVANCE)
@@ -2001,8 +2002,8 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 				ap->flags |= IPV6_AF_NEW | IPV6_AF_AUTOCONF;
 			ap->flags &= ~IPV6_AF_STALE;
 
-			elapsed = (uint32_t)eloop_timespec_diff(
-			    &ia->acquired, &ap->created, NULL);
+			elapsed = eloop_timespec_diff(&ia->acquired,
+			    &ap->created, NULL);
 
 			/* RFC4941 Section 3.4
 			 * Deprecated prefix, deprecate the temporary address */
@@ -2018,21 +2019,23 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
 			limit = TEMP_PREFERRED_LIFETIME - state->desync_factor;
+			rmtime = (uint32_t)(limit - elapsed);
 			if (elapsed >= limit)
 				ap->prefix_pltime = 0;
-			else if (ia->prefix_pltime < limit - elapsed)
+			else if (ia->prefix_pltime < rmtime)
 				ap->prefix_pltime = ia->prefix_pltime;
 			else
-				ap->prefix_pltime = limit - elapsed;
+				ap->prefix_pltime = rmtime;
 
 		valid:
 			limit = TEMP_VALID_LIFETIME;
+			rmtime = (uint32_t)(limit - elapsed);
 			if (elapsed >= limit)
 				ap->prefix_vltime = 0;
-			else if (ia->prefix_vltime < limit - elapsed)
+			else if (ia->prefix_vltime < rmtime)
 				ap->prefix_vltime = ia->prefix_vltime;
 			else
-				ap->prefix_vltime = limit - elapsed;
+				ap->prefix_vltime = rmtime;
 
 			/* Just extend the latest matching prefix */
 			ap->acquired = ia->acquired;
