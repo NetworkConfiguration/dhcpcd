@@ -199,16 +199,19 @@ static void
 control_handle_data(void *arg, unsigned short events)
 {
 	struct fd_list *fd = arg;
+	int err;
 
 	if (!(events & (ELE_READ | ELE_WRITE | ELE_HANGUP)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	if (events & ELE_WRITE && !(events & ELE_HANGUP)) {
-		if (control_handle_write(fd) == -1)
+		err = control_handle_write(fd);
+		if (err == -1)
 			goto hangup;
 	}
 	if (events & ELE_READ) {
-		if (control_handle_read(fd) == -1)
+		err = control_handle_read(fd);
+		if (err == -1 || err == 0)
 			goto hangup;
 	}
 	if (events & ELE_HANGUP)
@@ -244,7 +247,7 @@ control_recvdata(struct fd_list *fd, char *data, size_t len)
 				logerrx("%s: no terminator", __func__);
 				return -1;
 			}
-			if ((size_t)argc >= sizeof(argvp) / sizeof(argvp[0])) {
+			if ((size_t)argc + 1 >= sizeof(argvp) / sizeof(argvp[0])) {
 				errno = ENOBUFS;
 				logerrx("%s: no arg buffer", __func__);
 				return -1;
