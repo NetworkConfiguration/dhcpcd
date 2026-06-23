@@ -1821,15 +1821,23 @@ send_message(struct interface *ifp, uint8_t type, void (*callback)(void *))
 		    state->xid);
 		RT = 0; /* bogus gcc warning */
 	} else {
+		unsigned int jitter = ifo->backoff_jitter;
+
 		if (state->interval == 0)
-			state->interval = 4;
+			state->interval = ifo->initial_interval;
 		else {
+			unsigned int cutoff = ifo->backoff_cutoff;
+
 			state->interval *= 2;
-			if (state->interval > 64)
-				state->interval = 64;
+			if (state->interval > cutoff)
+				state->interval = cutoff;
 		}
-		RT = (state->interval * MSEC_PER_SEC) +
-		    (arc4random_uniform(MSEC_PER_SEC * 2) - MSEC_PER_SEC);
+
+		/* Jitter is bounded at config time to the smallest possible
+		 * interval, so the result can never underflow. */
+		RT = state->interval * MSEC_PER_SEC +
+		    arc4random_uniform(jitter * 2) - jitter;
+
 		/* No carrier? Don't bother sending the packet.
 		 * However, we do need to advance the timeout. */
 		if (!if_is_link_up(ifp))

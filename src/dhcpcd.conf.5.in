@@ -303,6 +303,52 @@ You can use this option to stop this from happening.
 .It Ic fallback Ar profile
 Fall back to using this profile if DHCP fails.
 This allows you to configure a static profile instead of using ZeroConf.
+.It Ic initial_interval Ar seconds
+Set the initial DHCPv4 retransmission interval to
+.Ar seconds .
+The minimum value is 1 and the maximum is 4.
+The default is 4 seconds as per RFC 2131.
+This option only affects DHCPv4;
+DHCPv6 retransmission is governed by RFC 8415.
+See also
+.Ic backoff_cutoff
+and
+.Ic backoff_jitter .
+.It Ic backoff_cutoff Ar seconds
+Cap the DHCPv4 exponential backoff interval at
+.Ar seconds .
+The minimum value is 1 and the maximum is 64.
+The default is 64 seconds as per RFC 2131.
+If
+.Ar seconds
+is less than
+.Ic initial_interval
+it will be raised to match it, since the cutoff is a cap on the
+exponential growth and must not shrink the initial interval.
+Setting both
+.Ic initial_interval
+and
+.Ic backoff_cutoff
+to 1 effectively disables exponential growth, so
+retransmissions use only the initial interval plus jitter.
+This option only affects DHCPv4;
+DHCPv6 retransmission is governed by RFC 8415.
+See also
+.Ic initial_interval
+and
+.Ic backoff_jitter .
+.It Ic backoff_jitter Ar milliseconds
+Set the random jitter applied to each DHCPv4 retransmission interval.
+The jitter is applied as \(+-
+.Ar milliseconds .
+The default is 1000 (\(+-1 second) as per RFC 2131, which is also the maximum.
+A value of 0 disables jitter, producing deterministic retransmission timing.
+This option only affects DHCPv4;
+DHCPv6 retransmission is governed by RFC 8415.
+See also
+.Ic backoff_cutoff
+and
+.Ic initial_interval .
 .It Ic fallback_time Ar seconds
 Start fallback after
 .Ar seconds .

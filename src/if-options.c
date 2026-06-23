@@ -175,6 +175,9 @@ const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "fallback_time", required_argument, NULL, O_FALLBACK_TIME },
 	{ "ipv4ll_time", required_argument, NULL, O_IPV4LL_TIME },
 	{ "nosyslog", no_argument, NULL, O_NOSYSLOG },
+	{ "initial_interval", required_argument, NULL, O_INITIAL_INTERVAL },
+	{ "backoff_cutoff", required_argument, NULL, O_BACKOFF_CUTOFF },
+	{ "backoff_jitter", required_argument, NULL, O_BACKOFF_JITTER },
 	{ NULL, 0, NULL, '\0' } };
 
 static char *
@@ -2563,6 +2566,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		logopts &= ~LOGERR_LOG;
 		logsetopts(logopts);
 	} break;
+	case O_INITIAL_INTERVAL:
+		ARG_REQUIRED;
+		ifo->initial_interval = (uint32_t)strtou(arg, NULL, 0, 1,
+		    MAX_INITIAL_INTERVAL, &e);
+		if (e) {
+			logerrx("invalid initial interval: %s", arg);
+			return -1;
+		}
+		break;
+	case O_BACKOFF_CUTOFF:
+		ARG_REQUIRED;
+		ifo->backoff_cutoff = (uint32_t)strtou(arg, NULL, 0, 1,
+		    MAX_BACKOFF_CUTOFF, &e);
+		if (e) {
+			logerrx("invalid backoff cutoff: %s", arg);
+			return -1;
+		}
+		break;
+	case O_BACKOFF_JITTER:
+		ARG_REQUIRED;
+		ifo->backoff_jitter = (uint32_t)strtou(arg, NULL, 0, 0,
+		    MAX_BACKOFF_JITTER, &e);
+		if (e) {
+			logerrx("invalid backoff jitter: %s", arg);
+			return -1;
+		}
+		break;
 	default:
 		return 0;
 	}
@@ -2629,6 +2659,19 @@ finish_config(struct if_options *ifo)
 	if (!(ifo->options & DHCPCD_IPV6RS))
 		ifo->options &= ~(
 		    DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
+
+#ifdef INET
+	/* The exponential backoff cutoff must not be lower than the initial
+	 * interval, otherwise the retransmission sequence would shrink rather
+	 * than grow up to the cap. Clamp the cutoff up to the initial
+	 * interval to preserve the documented "cap" semantics. */
+	if (ifo->backoff_cutoff < ifo->initial_interval) {
+		logwarnx("backoff_cutoff (%u) is less than initial_interval "
+			 "(%u); raising backoff_cutoff to match",
+		    ifo->backoff_cutoff, ifo->initial_interval);
+		ifo->backoff_cutoff = ifo->initial_interval;
+	}
+#endif
 }
 
 static struct if_options *
@@ -2648,6 +2691,9 @@ default_config(struct dhcpcd_ctx *ctx)
 #ifdef INET
 	ifo->fallback_time = DEFAULT_FALLBACK;
 	ifo->ipv4ll_time = DEFAULT_IPV4LL;
+	ifo->initial_interval = DEFAULT_INITIAL_INTERVAL;
+	ifo->backoff_cutoff = DEFAULT_BACKOFF_CUTOFF;
+	ifo->backoff_jitter = DEFAULT_BACKOFF_JITTER;
 #endif
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
