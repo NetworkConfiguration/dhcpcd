@@ -766,7 +766,7 @@ ipv4_applyaddr(void *arg)
 	}
 
 	/* ipv4_dadaddr() will overwrite this, we need it to purge later */
-	old_ia = state->addr;
+	old_ia = ifp->options->options & DHCPCD_NOALIAS ? NULL : state->addr;
 
 	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	/* If the netmask or broadcast is different, re-add the addresss.
@@ -784,8 +784,11 @@ ipv4_applyaddr(void *arg)
 		/* Linux does not change netmask/broadcast address
 		 * for re-added addresses, so we need to delete the old one
 		 * first. */
-		if (ia != NULL)
+		if (ia != NULL) {
 			ipv4_deladdr(ia, 0);
+			if (ia == old_ia)
+				old_ia = NULL;
+		}
 #endif
 #ifndef IP_LIFETIME
 		if (ipv4_daddaddr(ifp, lease) == -1 && errno != EEXIST)
