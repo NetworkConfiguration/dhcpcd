@@ -1060,7 +1060,7 @@ dhcp6_makemessage(struct interface *ifp)
 
 				/* RFC6603 Section 4.2 */
 				if (ap->prefix_exclude_len) {
-					uint8_t exb[16], *ep, u8;
+					uint8_t exb[17], *ep, u8;
 					const uint8_t *pp;
 
 					n = (size_t)((ap->prefix_exclude_len -
