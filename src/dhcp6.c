@@ -2638,6 +2638,8 @@ again:
 		 * the delegations. */
 		if (ia->flags & IPV6_AF_PFXDELEGATION)
 			again = dhcp6_deprecatedele(ia);
+		else
+			again = false;
 #endif
 
 		if (ia->flags & IPV6_AF_REQUEST) {
