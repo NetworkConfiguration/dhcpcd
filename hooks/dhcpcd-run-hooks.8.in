@@ -194,6 +194,13 @@ if dhcpcd has configured the
 .Ev interface
 otherwise
 .Dv false .
+.It Ev $if_persistent
+.Dv true
+if the
+.Ev interface
+is configured to be persistent when dhcpcd exits,
+otherwise
+.Dv false .
 .It Ev $if_up
 .Dv true
 if the
