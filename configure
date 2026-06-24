@@ -9,6 +9,8 @@ exec 3>config.log
 
 # Ensure that we do not inherit these from env
 HOOKSET=false
+EGHOOKSET=false
+EGHOOKSCRIPTS=
 INET=
 ARP=
 ARPING=
@@ -99,7 +101,7 @@ for x do
 	PKG_CONFIG) PKG_CONFIG=$var;;
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
-	--with-eghook) EGHOOKSCRIPTS="$EGHOOKSCRIPTS${EGHOOKSCRIPTS+ }$var";;
+	--with-eghook) EGHOOKSCRIPTS="$EGHOOKSCRIPTS${EGHOOKSCRIPTS+ }$var"; EGHOOKSET=true;;
 	--with-eghooks|EGHOOKSCRIPTS) EGHOOKSCRIPTS=$var; EGHOOKSET=true;;
 	--with-default-hostname) _DEFAULT_HOSTNAME=$var;;
 	--build) BUILD=$var;;
@@ -1907,7 +1909,9 @@ if ! $HOOKSET; then
 			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
 		fi
 		echo "$YPBIND ($YPHOOK${YPOS:+ }$YPOS)"
-		EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
+		if $EGHOOKSET; then
+			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
+		fi
 	else
 		echo "not found"
 		YPHOOK="50-ypbind"
@@ -1937,7 +1941,9 @@ if ! $HOOKSET; then
 		esac
 		if [ -n "$YPHOOK" ]; then
 			echo "Assuming ypbind is $YPOS"
-			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
+			if $EGHOOKSET; then
+				EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
+			fi
 		fi
 	fi
 fi
@@ -1993,6 +1999,9 @@ if cd hooks; then
 fi
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 echo "EGHOOKSCRIPTS=	$EGHOOKS" >>$CONFIG_MK
+if $EGHOOKSET && [ -n "$EGHOOKS" ]; then
+	echo "INSTALL_DATADIR_HOOKS=	yes" >>$CONFIG_MK
+fi
 
 echo
 echo "   SYSCONFDIR =		$SYSCONFDIR"
@@ -2005,6 +2014,11 @@ echo "   MANDIR =		$MANDIR"
 echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo "   EGHOOKSCRIPTS =	$EGHOOKS"
+if $EGHOOKSET && [ -n "$EGHOOKS" ]; then
+	echo "   INSTALL_DATADIR_HOOKS =	yes"
+else
+	echo "   INSTALL_DATADIR_HOOKS =	no"
+fi
 echo "   STATUSARG =		$STATUSARG"
 if [ "$PRIVSEP" = yes ]; then
 	echo "   PRIVSEPUSER =	$PRIVSEP_USER"
