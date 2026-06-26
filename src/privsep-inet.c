@@ -506,10 +506,12 @@ ps_inet_recvmsgpspcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 
 	switch (psm->ps_cmd) {
+#ifdef INET6
 	case PS_ND:
 		if (!ps_inet_validnd(msg))
 			return -1;
 		break;
+#endif
 	default:
 		errno = EINVAL;
 		return -1;
