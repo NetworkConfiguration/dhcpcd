@@ -358,6 +358,9 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 	if (efprintf(fp, "if_configured=%s",
 		ifo->options & DHCPCD_CONFIGURE ? "true" : "false") == -1)
 		goto eexit;
+	if (efprintf(fp, "if_persistent=%s",
+		ifo->options & DHCPCD_PERSISTENT ? "true" : "false") == -1)
+		goto eexit;
 	if (efprintf(fp, "ifcarrier=%s",
 		ifp->carrier == LINK_UNKNOWN ? "unknown" :
 		    ifp->carrier == LINK_UP  ? "up" :
