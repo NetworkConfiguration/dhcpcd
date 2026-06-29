@@ -247,23 +247,24 @@ struct vsio {
 };
 #endif
 
+#define OPTION_POLICY_MAX 5
+struct dho_policy {
+	uint32_t *dhop_policy;
+	size_t dhop_policy_len;
+};
+
+struct dho_policy_group {
+	struct dho_policy dhop_request;
+	struct dho_policy dhop_require;
+	struct dho_policy dhop_allow;
+	struct dho_policy dhop_remove;
+	struct dho_policy dhop_reject;
+};
+
 struct if_options {
 	time_t mtime;
 	uint8_t iaid[4];
 	int metric;
-	uint8_t requestmask[256 / NBBY];
-	uint8_t requiremask[256 / NBBY];
-	uint8_t nomask[256 / NBBY];
-	uint8_t rejectmask[256 / NBBY];
-	uint8_t dstmask[256 / NBBY];
-	uint8_t requestmasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t requiremasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t nomasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t rejectmasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t requestmask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t requiremask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t rejectmask6[(UINT16_MAX + 1) / NBBY];
 	uint32_t leasetime;
 	uint32_t timeout;
 	uint32_t reboot;
@@ -275,6 +276,12 @@ struct if_options {
 	uint32_t backoff_jitter;
 	unsigned long long options;
 	bool randomise_hwaddr;
+
+	struct dho_policy_group dhopg_dhcp;
+	struct dho_policy dhop_destination;
+
+	struct dho_policy_group dhopg_nd;
+	struct dho_policy_group dhopg_dhcp6;
 
 	struct in_addr req_addr;
 	struct in_addr req_mask;

@@ -338,7 +338,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	/* If configured, install a gateway to the desintion
 	 * for P2P interfaces. */
 	if (ifp->flags & IFF_POINTOPOINT &&
-	    has_option_mask(ifp->options->dstmask, DHO_ROUTER)) {
+	    dho_policy_has(&ifp->options->dhop_destination, DHO_ROUTER)) {
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
 		in.s_addr = INADDR_ANY;

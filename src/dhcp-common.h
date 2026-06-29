@@ -45,45 +45,37 @@
 #define NS_MAXLABEL  MAXLABEL
 #endif
 
-#define OT_REQUEST   (1 << 0)
-#define OT_UINT8     (1 << 1)
-#define OT_INT8	     (1 << 2)
-#define OT_UINT16    (1 << 3)
-#define OT_INT16     (1 << 4)
-#define OT_UINT32    (1 << 5)
-#define OT_INT32     (1 << 6)
-#define OT_ADDRIPV4  (1 << 7)
-#define OT_STRING    (1 << 8)
-#define OT_ARRAY     (1 << 9)
-#define OT_RFC3361   (1 << 10)
-#define OT_RFC1035   (1 << 11)
-#define OT_RFC3442   (1 << 12)
-#define OT_OPTIONAL  (1 << 13)
-#define OT_ADDRIPV6  (1 << 14)
-#define OT_BINHEX    (1 << 15)
-#define OT_FLAG	     (1 << 16)
-#define OT_NOREQ     (1 << 17)
-#define OT_EMBED     (1 << 18)
-#define OT_ENCAP     (1 << 19)
-#define OT_INDEX     (1 << 20)
-#define OT_OPTION    (1 << 21)
-#define OT_DOMAIN    (1 << 22)
-#define OT_ASCII     (1 << 23)
-#define OT_RAW	     (1 << 24)
-#define OT_ESCSTRING (1 << 25)
-#define OT_ESCFILE   (1 << 26)
-#define OT_BITFLAG   (1 << 27)
-#define OT_RESERVED  (1 << 28)
-#define OT_URI	     (1 << 29)
-#define OT_TRUNCATED (1 << 30)
-
-#define DHC_REQ(r, n, o) \
-	(has_option_mask((r), (o)) && !has_option_mask((n), (o)))
-
-#define DHC_REQOPT(o, r, n)                                                  \
-	(!((o)->type & OT_NOREQ) &&                                          \
-	    ((o)->type & OT_REQUEST || has_option_mask((r), (o)->option)) && \
-	    !has_option_mask((n), (o)->option))
+#define OT_REQUEST	 (1 << 0)
+#define OT_UINT8	 (1 << 1)
+#define OT_INT8		 (1 << 2)
+#define OT_UINT16	 (1 << 3)
+#define OT_INT16	 (1 << 4)
+#define OT_UINT32	 (1 << 5)
+#define OT_INT32	 (1 << 6)
+#define OT_ADDRIPV4	 (1 << 7)
+#define OT_STRING	 (1 << 8)
+#define OT_ARRAY	 (1 << 9)
+#define OT_RFC3361	 (1 << 10)
+#define OT_RFC1035	 (1 << 11)
+#define OT_RFC3442	 (1 << 12)
+#define OT_OPTIONAL	 (1 << 13)
+#define OT_ADDRIPV6	 (1 << 14)
+#define OT_BINHEX	 (1 << 15)
+#define OT_FLAG		 (1 << 16)
+#define OT_NOREQ	 (1 << 17)
+#define OT_EMBED	 (1 << 18)
+#define OT_ENCAP	 (1 << 19)
+#define OT_INDEX	 (1 << 20)
+#define OT_OPTION	 (1 << 21)
+#define OT_DOMAIN	 (1 << 22)
+#define OT_ASCII	 (1 << 23)
+#define OT_RAW		 (1 << 24)
+#define OT_ESCSTRING	 (1 << 25)
+#define OT_ESCFILE	 (1 << 26)
+#define OT_BITFLAG	 (1 << 27)
+#define OT_RESERVED	 (1 << 28)
+#define OT_URI		 (1 << 29)
+#define OT_TRUNCATED	 (1 << 30)
 
 struct dhcp_opt {
 	uint32_t option; /* Also used for IANA Enterpise Number */
@@ -104,6 +96,13 @@ struct dhcp_opt {
 	size_t encopts_len;
 };
 
+struct dho_policy_ctx {
+	const struct dhcp_opt *dopts;
+	size_t dopts_len;
+    	const struct dhcp_opt *odopts;
+	size_t odopts_len;
+};
+
 const char *dhcp_get_hostname(struct dhcpcd_ctx *, char *, size_t,
     const struct if_options *);
 struct dhcp_opt *vivso_find(uint32_t, const void *);
@@ -111,14 +110,21 @@ struct dhcp_opt *vivso_find(uint32_t, const void *);
 ssize_t dhcp_vendor(char *, size_t);
 
 void dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols);
-#define add_option_mask(var, val) \
-	((var)[(val) >> 3] = (uint8_t)((var)[(val) >> 3] | 1 << ((val) & 7)))
-#define del_option_mask(var, val) \
-	((var)[(val) >> 3] = (uint8_t)((var)[(val) >> 3] & ~(1 << ((val) & 7))))
-#define has_option_mask(var, val) \
-	((var)[(val) >> 3] & (uint8_t)(1 << ((val) & 7)))
-int make_option_mask(const struct dhcp_opt *, size_t, const struct dhcp_opt *,
-    size_t, uint8_t *, const char *, int);
+const char *dhcp_option_string(const struct dhcp_opt *, size_t, uint32_t);
+
+int dho_policy_has(const struct dho_policy *policy, uint32_t option);
+int dho_policy_add(struct dho_policy *policy, uint32_t option);
+int dho_policy_del(struct dho_policy *policy, uint32_t option);
+int dho_policy_set(const struct dho_policy_ctx *, struct dho_policy *policy,
+    const char *opts, int add);
+void dho_policy_free(struct dho_policy);
+void dho_policy_group_free(struct dho_policy_group);
+int dho_policy_check(const struct dho_policy *, int (*)(uint32_t, void *),
+    void *);
+
+int dho_policy_requested(const struct dho_policy_group *, const struct dhcp_opt *);
+int dho_policy_removed(const struct dho_policy_group *, uint32_t);
+int dho_policy_allowed(const struct dho_policy_group *, uint32_t);
 
 size_t encode_rfc1035(const char *src, uint8_t *dst);
 ssize_t decode_rfc1035(char *, size_t, const uint8_t *, size_t);
