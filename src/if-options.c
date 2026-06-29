@@ -1514,7 +1514,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
 		set_option_space(ctx, ifo, arg, &pctx, &pg);
-		set_default_allow(ifo, pg);
+		if (set_default_allow(ifo, pg)) {
+			logerr("%s: set_default_allow", __func__);
+			return -1;
+		}
 		if (dho_policy_set(&pctx, &pg->dhop_allow, arg, 1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_reject, arg, -1) != 0) {
@@ -1529,11 +1532,17 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 		/* Allow the bare minimum through */
 #ifdef INET
-		set_default_allow(ifo, &ifo->dhopg_dhcp);
+		if (set_default_allow(ifo, &ifo->dhopg_dhcp) == -1) {
+			logerr("%s: set_defaut_allow DHCP", __func__);
+			return -1;
+		}
 #endif
 
 #ifdef DHCP6
-		set_default_allow(ifo, &ifo->dhopg_dhcp6);
+		if (set_default_allow(ifo, &ifo->dhopg_dhcp6) == -1) {
+			logerr("%s: set_default_allow DHCPv6", __func__);
+			return -1;
+		}
 #endif
 
 		break;

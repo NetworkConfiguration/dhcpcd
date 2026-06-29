@@ -4053,14 +4053,25 @@ dhcp6_start1(void *arg)
 	   match configured DHCPv4 options to DHCPv6 equivalents. */
 	if (pg->dhop_request.dhop_policy_len == 0) {
 		const struct dho_policy_group *dpg = &ifo->dhopg_dhcp;
+		int err;
 
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
-			if (dho_policy_allowed(dpg, dhc->dhcp_opt))
-				dho_policy_add(&pg->dhop_request,
-				    dhc->dhcp6_opt);
+			if (!dho_policy_allowed(dpg, dhc->dhcp_opt))
+				continue;
+			err = dho_policy_add(&pg->dhop_request, dhc->dhcp6_opt);
+			if (err == -1) {
+				logerr(__func__);
+				return;
+			}
 		}
-		if (ifo->fqdn != FQDN_DISABLE || ifo->options & DHCPCD_HOSTNAME)
-			dho_policy_add(&pg->dhop_request, D6_OPTION_FQDN);
+		if (ifo->fqdn != FQDN_DISABLE ||
+		    ifo->options & DHCPCD_HOSTNAME) {
+			err = dho_policy_add(&pg->dhop_request, D6_OPTION_FQDN);
+			if (err == -1) {
+				logerr(__func__);
+				return;
+			}
+		}
 	}
 
 #ifndef SMALL
