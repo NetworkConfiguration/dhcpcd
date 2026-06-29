@@ -4056,7 +4056,7 @@ dhcp6_start1(void *arg)
 		int err;
 
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
-			if (!dho_policy_allowed(dpg, dhc->dhcp_opt))
+			if (!dho_policy_has(&dpg->dhop_request, dhc->dhcp_opt))
 				continue;
 			err = dho_policy_add(&pg->dhop_request, dhc->dhcp6_opt);
 			if (err == -1) {

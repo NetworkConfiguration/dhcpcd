@@ -640,7 +640,7 @@ set_default_allow(struct if_options *ifo, struct dho_policy_group *pg)
 		if (dho_policy_add(p, D6_OPTION_DNS_SERVERS) == -1 ||
 		    dho_policy_add(p, D6_OPTION_DOMAIN_LIST) == -1 ||
 		    dho_policy_add(p, D6_OPTION_SOL_MAX_RT) == -1 ||
-		    dho_policy_add(p, D6_OPTION_INF_MAX_RT))
+		    dho_policy_add(p, D6_OPTION_INF_MAX_RT) == -1)
 			return -1;
 	}
 #endif
