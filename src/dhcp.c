@@ -557,6 +557,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
     const struct bootp *bootp, size_t bootp_len)
 {
 	struct if_options *ifo = ifp->options;
+	struct dho_policy_group *pg = &ifo->dhopg_dhcp;
 	const uint8_t *p;
 	const uint8_t *e;
 	struct rt *rt = NULL;
@@ -566,12 +567,12 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 	int n;
 
 	/* If we have CSR's then we MUST use these only */
-	if (!has_option_mask(ifo->nomask, DHO_CSR))
+	if (dho_policy_allowed(pg, DHO_CSR))
 		p = get_option(ifp->ctx, bootp, bootp_len, DHO_CSR, &len);
 	else
 		p = NULL;
 	/* Check for crappy MS option */
-	if (!p && !has_option_mask(ifo->nomask, DHO_MSCSR)) {
+	if (!p && dho_policy_allowed(pg, DHO_MSCSR)) {
 		p = get_option(ifp->ctx, bootp, bootp_len, DHO_MSCSR, &len);
 		if (p)
 			csr = "MS ";
@@ -591,7 +592,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 
 	n = 0;
 	/* OK, get our static routes first. */
-	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
+	if (dho_policy_allowed(pg, DHO_STATICROUTE))
 		p = get_option(ifp->ctx, bootp, bootp_len, DHO_STATICROUTE,
 		    &len);
 	else
@@ -632,7 +633,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 	}
 
 	/* Now grab our routers */
-	if (!has_option_mask(ifo->nomask, DHO_ROUTER))
+	if (dho_policy_allowed(pg, DHO_ROUTER))
 		p = get_option(ifp->ctx, bootp, bootp_len, DHO_ROUTER, &len);
 	else
 		p = NULL;
@@ -660,13 +661,15 @@ uint16_t
 dhcp_get_mtu(const struct interface *ifp)
 {
 	const struct dhcp_state *state;
+	const struct if_options *ifo = ifp->options;
+	const struct dho_policy_group *pg = &ifo->dhopg_dhcp;
 	uint16_t mtu;
 
-	if (ifp->options->mtu)
-		return (uint16_t)ifp->options->mtu;
+	if (ifo->mtu)
+		return (uint16_t)ifo->mtu;
 	mtu = 0; /* bogus gcc warning */
 	if ((state = D_CSTATE(ifp)) == NULL ||
-	    has_option_mask(ifp->options->nomask, DHO_MTU) ||
+	    !dho_policy_allowed(pg, DHO_MTU) ||
 	    get_option_uint16(ifp->ctx, &mtu, state->new, state->new_len,
 		DHO_MTU) == -1)
 		return 0;
@@ -797,6 +800,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	size_t len, i;
 	const struct dhcp_opt *opt;
 	struct if_options *ifo = ifp->options;
+	const struct dho_policy_group *pg = &ifo->dhopg_dhcp;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 	const struct dhcp_lease *lease = &state->lease;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
@@ -967,11 +971,11 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		*p++ = 0;
 		for (i = 0, opt = ctx->dhcp_opts; i < ctx->dhcp_opts_len;
 		    i++, opt++) {
-			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
-				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
 				opt->option == DHO_REBINDTIME))
+				continue;
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			AREA_FIT(1);
 			*p++ = (uint8_t)opt->option;
@@ -984,19 +988,18 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 					break;
 			if (lp < p)
 				continue;
-			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
-				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
 				opt->option == DHO_REBINDTIME))
+				continue;
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			AREA_FIT(1);
 			*p++ = (uint8_t)opt->option;
 		}
 		*n_params = (uint8_t)(p - n_params - 1);
 
-		if (mtu != -1 &&
-		    !(has_option_mask(ifo->nomask, DHO_MAXMESSAGESIZE))) {
+		if (mtu != -1 && (dho_policy_allowed(pg, DHO_MAXMESSAGESIZE))) {
 			AREA_CHECK(2);
 			*p++ = DHO_MAXMESSAGESIZE;
 			*p++ = 2;
@@ -1006,7 +1009,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 
 		if (ifo->userclass[0] &&
-		    !has_option_mask(ifo->nomask, DHO_USERCLASS)) {
+		    dho_policy_allowed(pg, DHO_USERCLASS)) {
 			AREA_CHECK(ifo->userclass[0]);
 			*p++ = DHO_USERCLASS;
 			memcpy(p, ifo->userclass,
@@ -1022,8 +1025,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		p += state->clientid[0] + 1;
 	}
 
-	if (DHCP_DIR(type) &&
-	    !has_option_mask(ifo->nomask, DHO_VENDORCLASSID) &&
+	if (DHCP_DIR(type) && dho_policy_allowed(pg, DHO_VENDORCLASSID) &&
 	    ifo->vendorclassid[0]) {
 		AREA_CHECK(ifo->vendorclassid[0]);
 		*p++ = DHO_VENDORCLASSID;
@@ -1033,7 +1035,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (type == DHCP_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    DHC_REQ(ifo->requestmask, ifo->nomask, DHO_RAPIDCOMMIT)) {
+	    dho_policy_allowed(pg, DHO_RAPIDCOMMIT)) {
 		/* RFC 4039 Section 3 */
 		AREA_CHECK(0);
 		*p++ = DHO_RAPIDCOMMIT;
@@ -1114,7 +1116,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 	/* RFC 2563 Auto Configure */
 	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_IPV4LL &&
-	    !(has_option_mask(ifo->nomask, DHO_AUTOCONFIGURE))) {
+	    dho_policy_allowed(pg, DHO_AUTOCONFIGURE)) {
 		AREA_CHECK(1);
 		*p++ = DHO_AUTOCONFIGURE;
 		*p++ = 1;
@@ -1130,8 +1132,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 
 #ifndef SMALL
-		if (ifo->vivco_len &&
-		    !has_option_mask(ifo->nomask, DHO_VIVCO)) {
+		if (ifo->vivco_len && dho_policy_allowed(pg, DHO_VIVCO)) {
 			struct vivco *vivco = ifo->vivco;
 			size_t vlen = ifo->vivco_len;
 			struct rfc3396_ctx rctx = {
@@ -1157,7 +1158,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			}
 		}
 
-		if (ifo->vsio_len && !has_option_mask(ifo->nomask, DHO_VIVSO)) {
+		if (ifo->vsio_len && dho_policy_allowed(pg, DHO_VIVSO)) {
 			struct vsio *vso = ifo->vsio;
 			size_t vlen = ifo->vsio_len;
 			struct vsio_so *so;
@@ -1201,7 +1202,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 			DHCPCD_AUTH_SENDREQUIRE &&
-		    !has_option_mask(ifo->nomask, DHO_FORCERENEW_NONCE)) {
+		    dho_policy_allowed(pg, DHO_FORCERENEW_NONCE)) {
 			/* We support HMAC-MD5 */
 			AREA_CHECK(1);
 			*p++ = DHO_FORCERENEW_NONCE;
@@ -1362,6 +1363,7 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
     const struct bootp *bootp, size_t bootp_len)
 {
 	const struct if_options *ifo;
+	const struct dho_policy_group *pg;
 	const uint8_t *p;
 	struct in_addr addr;
 	struct in_addr net;
@@ -1373,6 +1375,8 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
 	uint32_t en;
 
 	ifo = ifp->options;
+	pg = &ifo->dhopg_dhcp;
+
 	if (get_option_uint8(ifp->ctx, &overl, bootp, bootp_len,
 		DHO_OPTSOVERLOADED) == -1)
 		overl = 0;
@@ -1432,7 +1436,7 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
 
 	for (i = 0, opt = ifp->ctx->dhcp_opts; i < ifp->ctx->dhcp_opts_len;
 	    i++, opt++) {
-		if (has_option_mask(ifo->nomask, opt->option))
+		if (dho_policy_has(&pg->dhop_remove, opt->option))
 			continue;
 		if (dhcp_getoverride(ifo, opt->option))
 			continue;
@@ -1458,7 +1462,7 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
 
 	for (i = 0, opt = ifo->dhcp_override; i < ifo->dhcp_override_len;
 	    i++, opt++) {
-		if (has_option_mask(ifo->nomask, opt->option))
+		if (dho_policy_has(&pg->dhop_remove, opt->option))
 			continue;
 		p = get_option(ifp->ctx, bootp, bootp_len, opt->option, &pl);
 		if (p == NULL)
@@ -3036,12 +3040,52 @@ dhcp_redirect_dhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 }
 
+struct dhcp_policy {
+	struct dhcpcd_ctx *ctx;
+	struct bootp *bootp;
+	size_t bootp_len;
+	uint8_t type;
+};
+
+static int
+dhcp_policy_reject(uint32_t option, void *arg)
+{
+	struct dhcp_policy *dp = arg;
+
+	if (get_option(dp->ctx, dp->bootp, dp->bootp_len, (uint8_t)option,
+		NULL))
+		return 1;
+
+	return 0;
+}
+
+static int
+dhcp_policy_require(uint32_t option, void *arg)
+{
+	struct dhcp_policy *dp = arg;
+
+	if (get_option(dp->ctx, dp->bootp, dp->bootp_len, (uint8_t)option,
+		NULL))
+		return 0;
+
+	/* If we are BOOTP, then ignore the need for serverid.
+	 * To ignore BOOTP, require dhcp_message_type.
+	 * However, nothing really stops BOOTP from providing
+	 * DHCP style options as well so the above isn't
+	 * always true. */
+	if (dp->type == 0 && option == DHO_SERVERID)
+		return 0;
+
+	return -1;
+}
+
 static void
 dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
     const struct in_addr *from)
 {
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
+	struct dho_policy_group *pg = &ifo->dhopg_dhcp;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type;
 	struct in_addr addr;
@@ -3050,6 +3094,12 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	bool bootp_copied;
 	uint32_t v6only_time = 0;
 	bool use_v6only = false, has_auto_conf = false;
+	struct dhcp_policy dp = {
+		.ctx = ifp->ctx,
+		.bootp = bootp,
+		.bootp_len = bootp_len,
+	};
+
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
@@ -3205,17 +3255,14 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	state->interval = 0;
 
 	/* Ensure that no reject options are present */
-	for (i = 1; i < 255; i++) {
-		if (has_option_mask(ifo->rejectmask, i) &&
-		    get_option(ifp->ctx, bootp, bootp_len, (uint8_t)i, NULL)) {
-			LOGDHCP(LOG_WARNING, "reject DHCP");
-			return;
-		}
+	if (dho_policy_check(&pg->dhop_reject, dhcp_policy_reject, &dp) == 1) {
+		LOGDHCP(LOG_WARNING, "reject DHCP");
+		return;
 	}
 
 	if (type == DHCP_NAK) {
 		/* For NAK, only check if we require the ServerID */
-		if (has_option_mask(ifo->requiremask, DHO_SERVERID) &&
+		if (dho_policy_has(&pg->dhop_require, DHO_SERVERID) &&
 		    get_option_addr(ifp->ctx, &addr, bootp, bootp_len,
 			DHO_SERVERID) == -1) {
 			LOGDHCP(LOG_WARNING, "reject NAK");
@@ -3245,22 +3292,14 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 
 	/* Ensure that all required options are present */
-	for (i = 1; i < 255; i++) {
-		if (has_option_mask(ifo->requiremask, i) &&
-		    !get_option(ifp->ctx, bootp, bootp_len, (uint8_t)i, NULL)) {
-			/* If we are BOOTP, then ignore the need for serverid.
-			 * To ignore BOOTP, require dhcp_message_type.
-			 * However, nothing really stops BOOTP from providing
-			 * DHCP style options as well so the above isn't
-			 * always true. */
-			if (type == 0 && i == DHO_SERVERID)
-				continue;
-			LOGDHCP(LOG_WARNING, "reject DHCP");
-			return;
-		}
+	dp.type = type;
+	if (dho_policy_check(&pg->dhop_require, dhcp_policy_require, &dp) ==
+	    -1) {
+		LOGDHCP(LOG_WARNING, "reject DHCP");
+		return;
 	}
 
-	if (has_option_mask(ifo->requestmask, DHO_IPV6_PREFERRED_ONLY)) {
+	if (dho_policy_allowed(pg, DHO_IPV6_PREFERRED_ONLY)) {
 		if (get_option_uint32(ifp->ctx, &v6only_time, bootp, bootp_len,
 			DHO_IPV6_PREFERRED_ONLY) == 0 &&
 		    (state->state == DHS_DISCOVER ||
@@ -3366,7 +3405,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 		/* Test for rapid commit in the OFFER */
 		if (!(ifp->ctx->options & DHCPCD_TEST) &&
-		    has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT) &&
+		    dho_policy_allowed(pg, DHO_RAPIDCOMMIT) &&
 		    get_option(ifp->ctx, bootp, bootp_len, DHO_RAPIDCOMMIT,
 			NULL)) {
 			state->state = DHS_REQUEST;
@@ -3428,7 +3467,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 		if (state->state == DHS_DISCOVER) {
 			/* We only allow ACK of rapid commit DISCOVER. */
-			if (has_option_mask(ifo->requestmask,
+			if (dho_policy_has(&pg->dhop_request,
 				DHO_RAPIDCOMMIT) &&
 			    get_option(ifp->ctx, bootp, bootp_len,
 				DHO_RAPIDCOMMIT, NULL))
@@ -4344,7 +4383,8 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 	if (ifp->flags & IFF_POINTOPOINT) {
 		for (i = 1; i < 255; i++)
-			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask, i))
+			if (i != DHO_ROUTER &&
+			    dho_policy_has(&ifo->dhop_destination, i))
 				dhcp_message_add_addr(state->new, i, ia->brd);
 	}
 

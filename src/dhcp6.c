@@ -703,6 +703,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint16_t si_len, uni_len, n_options;
 	uint8_t *o_lenp;
 	struct if_options *ifo = ifp->options;
+	const struct dho_policy_group *pg = &ifo->dhopg_dhcp6;
 	const struct dhcp_opt *opt, *opt2;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
@@ -794,7 +795,7 @@ dhcp6_makemessage(struct interface *ifp)
 			}
 			if (n < ifo->dhcp6_override_len)
 				continue;
-			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -802,7 +803,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -820,15 +821,13 @@ dhcp6_makemessage(struct interface *ifp)
 			len += sizeof(o) + 1 + hl;
 		}
 
-		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL) &&
-		    ifo->mudurl[0])
+		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) && ifo->mudurl[0])
 			len += sizeof(o) + ifo->mudurl[0];
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 			DHCPCD_AUTH_SENDREQUIRE &&
-		    DHC_REQ(ifo->requestmask6, ifo->nomask6,
-			D6_OPTION_RECONF_ACCEPT))
+		    dho_policy_allowed(pg, D6_OPTION_RECONF_ACCEPT))
 			len += sizeof(o); /* Reconfigure Accept */
 #endif
 	}
@@ -843,13 +842,13 @@ dhcp6_makemessage(struct interface *ifp)
 		len += sizeof(o) + ctx->duid_len;
 	}
 
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
+	if (dho_policy_allowed(pg, D6_OPTION_USER_CLASS))
 		len += dhcp6_makeuser(NULL, ifp);
 
 #ifndef SMALL
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+	if (dho_policy_allowed(pg, D6_OPTION_VENDOR_CLASS))
 		len += dhcp6_makevendor(NULL, ifp);
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
+	if (dho_policy_allowed(pg, D6_OPTION_VENDOR_OPTS))
 		len += dhcp6_makevendoropts(NULL, ifp);
 #endif
 
@@ -921,7 +920,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
+	    dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
 	if (m == NULL) {
@@ -933,7 +932,7 @@ dhcp6_makemessage(struct interface *ifp)
 	case DH6S_REQUEST: /* FALLTHROUGH */
 	case DH6S_RENEW:   /* FALLTHROUGH */
 	case DH6S_RELEASE:
-		if (has_option_mask(ifo->nomask6, D6_OPTION_UNICAST)) {
+		if (!dho_policy_allowed(pg, D6_OPTION_UNICAST)) {
 			unicast = NULL;
 			break;
 		}
@@ -1127,7 +1126,7 @@ dhcp6_makemessage(struct interface *ifp)
 			if (n < ifo->dhcp6_override_len)
 				continue;
 #endif
-			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));
@@ -1137,7 +1136,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+			if (!dho_policy_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));
@@ -1159,16 +1158,16 @@ dhcp6_makemessage(struct interface *ifp)
 	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
 
 	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
+	    dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
 		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
+	if (dho_policy_allowed(pg, D6_OPTION_USER_CLASS))
 		p += dhcp6_makeuser(p, ifp);
 
 #ifndef SMALL
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+	if (dho_policy_allowed(pg, D6_OPTION_VENDOR_CLASS))
 		p += dhcp6_makevendor(p, ifp);
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_OPTS))
+	if (dho_policy_allowed(pg, D6_OPTION_VENDOR_OPTS))
 		p += dhcp6_makevendoropts(p, ifp);
 #endif
 
@@ -1199,16 +1198,14 @@ dhcp6_makemessage(struct interface *ifp)
 			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 
-		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL) &&
-		    ifo->mudurl[0])
+		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) && ifo->mudurl[0])
 			COPYIN(D6_OPTION_MUDURL, ifo->mudurl + 1,
 			    ifo->mudurl[0]);
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 			DHCPCD_AUTH_SENDREQUIRE &&
-		    DHC_REQ(ifo->requestmask6, ifo->nomask6,
-			D6_OPTION_RECONF_ACCEPT))
+		    dho_policy_allowed(pg, D6_OPTION_RECONF_ACCEPT))
 			COPYIN1(D6_OPTION_RECONF_ACCEPT, 0);
 #endif
 	}
@@ -1695,6 +1692,7 @@ dhcp6_startdiscover(void *arg)
 {
 	struct interface *ifp;
 	struct if_options *ifo;
+	struct dho_policy_group *pg;
 	struct dhcp6_state *state;
 	int llevel;
 	struct ipv6_addr *ia;
@@ -1702,13 +1700,14 @@ dhcp6_startdiscover(void *arg)
 	ifp = arg;
 	state = D6_STATE(ifp);
 	ifo = ifp->options;
+	pg = &ifo->dhopg_dhcp6;
 #ifndef SMALL
 	if (state->reason == NULL || strcmp(state->reason, "TIMEOUT6") != 0)
 		dhcp6_delete_delegates(ifp);
 #endif
 	/* Ensure we never request INFO_REFRESH_TIME,
 	 * this only belongs in Information-Request messages */
-	del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+	dho_policy_del(&pg->dhop_request, D6_OPTION_INFO_REFRESH_TIME);
 
 	if (state->new == NULL && !state->failed)
 		llevel = LOG_INFO;
@@ -1743,6 +1742,7 @@ dhcp6_startinform(void *arg)
 	struct dhcp6_state *state;
 	int llevel;
 	struct if_options *ifo;
+	struct dho_policy_group *pg;
 
 	ifp = arg;
 	state = D6_STATE(ifp);
@@ -1757,7 +1757,8 @@ dhcp6_startinform(void *arg)
 	state->MRC = 0;
 
 	/* Ensure we always request INFO_REFRESH_TIME as per rfc8415 */
-	add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
+	pg = &ifo->dhopg_dhcp6;
+	dho_policy_add(&pg->dhop_request, D6_OPTION_INFO_REFRESH_TIME);
 
 	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
@@ -3405,25 +3406,62 @@ dhcp6_adjust_max_rt(struct interface *ifp, struct dhcp6_message *r, size_t len)
 	}
 }
 
+struct dhcp6_policy {
+	const struct dhcpcd_ctx *ctx;
+	const char *ifname;
+	const char *sfrom;
+	struct dhcp6_message *msg;
+	size_t len;
+};
+
+static int
+dhcp6_require(uint32_t option, void *arg)
+{
+	struct dhcp6_policy *ctx = arg;
+	void *o;
+
+	o = dhcp6_findmoption(ctx->msg, ctx->len, (uint16_t)option, NULL);
+	if (o != NULL)
+		return 0;
+
+	logwarnx("%s: reject DHCPv6 (missing option %u) from %s", ctx->ifname,
+	    option, ctx->sfrom);
+	return -1;
+}
+
+static int
+dhcp6_reject(uint32_t option, void *arg)
+{
+	struct dhcp6_policy *ctx = arg;
+	void *o;
+
+	o = dhcp6_findmoption(ctx->msg, ctx->len, (uint16_t)option, NULL);
+	if (o == NULL)
+		return 0;
+
+	logwarnx("%s: reject DHCPv6 (option %u) from %s", ctx->ifname, option,
+	    ctx->sfrom);
+	return -1;
+}
+
 static void
 dhcp6_recvif(struct interface *ifp, const char *sfrom, struct dhcp6_message *r,
     size_t len)
 {
-	struct dhcpcd_ctx *ctx;
-	size_t i;
 	const char *op;
 	struct dhcp6_state *state;
+	struct dhcp6_policy policy = { .sfrom = sfrom, .msg = r, .len = len };
+	int err;
 	uint8_t *o, preference = 0;
 	uint16_t ol;
-	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
+	const struct dho_policy_group *pg;
 	bool valid_op;
 #ifdef AUTH
 	uint8_t *auth;
 	uint16_t auth_len;
 #endif
 
-	ctx = ifp->ctx;
 	state = D6_STATE(ifp);
 	if (state == NULL || state->send == NULL) {
 		logdebugx("%s: DHCPv6 reply received but not running",
@@ -3446,21 +3484,16 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom, struct dhcp6_message *r,
 	}
 
 	ifo = ifp->options;
-	for (i = 0, opt = ctx->dhcp6_opts; i < ctx->dhcp6_opts_len;
-	    i++, opt++) {
-		if (has_option_mask(ifo->requiremask6, opt->option) &&
-		    !dhcp6_findmoption(r, len, (uint16_t)opt->option, NULL)) {
-			logwarnx("%s: reject DHCPv6 (no option %s) from %s",
-			    ifp->name, opt->var, sfrom);
-			return;
-		}
-		if (has_option_mask(ifo->rejectmask6, opt->option) &&
-		    dhcp6_findmoption(r, len, (uint16_t)opt->option, NULL)) {
-			logwarnx("%s: reject DHCPv6 (option %s) from %s",
-			    ifp->name, opt->var, sfrom);
-			return;
-		}
-	}
+	pg = &ifo->dhopg_dhcp6;
+	policy.ifname = ifp->name;
+
+	err = dho_policy_check(&pg->dhop_require, dhcp6_require, &policy);
+	if (err == -1)
+		return;
+
+	err = dho_policy_check(&pg->dhop_reject, dhcp6_reject, &policy);
+	if (err == -1)
+		return;
 
 #ifdef AUTH
 	/* Authenticate the message */
@@ -3506,8 +3539,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom, struct dhcp6_message *r,
 		case DH6S_DISCOVER:
 			/* Only accept REPLY in DISCOVER for RAPID_COMMIT.
 			 * Normally we get an ADVERTISE for a DISCOVER. */
-			if (!has_option_mask(ifo->requestmask6,
-				D6_OPTION_RAPID_COMMIT) ||
+			if (!dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT) ||
 			    !dhcp6_findmoption(r, len, D6_OPTION_RAPID_COMMIT,
 				NULL)) {
 				valid_op = false;
@@ -3991,8 +4023,8 @@ dhcp6_start1(void *arg)
 	struct interface *ifp = arg;
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct if_options *ifo = ifp->options;
+	struct dho_policy_group *pg = &ifo->dhopg_dhcp6;
 	struct dhcp6_state *state;
-	size_t i;
 	const struct dhcp_compat *dhc;
 
 	if ((ctx->options & (DHCPCD_MANAGER | DHCPCD_PRIVSEP)) ==
@@ -4019,25 +4051,33 @@ dhcp6_start1(void *arg)
 	state = D6_STATE(ifp);
 	/* If no DHCPv6 options are configured,
 	   match configured DHCPv4 options to DHCPv6 equivalents. */
-	for (i = 0; i < sizeof(ifo->requestmask6); i++) {
-		if (ifo->requestmask6[i] != '\0')
-			break;
-	}
-	if (i == sizeof(ifo->requestmask6)) {
+	if (pg->dhop_request.dhop_policy_len == 0) {
+		const struct dho_policy_group *dpg = &ifo->dhopg_dhcp;
+		int err;
+
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
-			if (DHC_REQ(ifo->requestmask, ifo->nomask,
-				dhc->dhcp_opt))
-				add_option_mask(ifo->requestmask6,
-				    dhc->dhcp6_opt);
+			if (!dho_policy_has(&dpg->dhop_request, dhc->dhcp_opt))
+				continue;
+			err = dho_policy_add(&pg->dhop_request, dhc->dhcp6_opt);
+			if (err == -1) {
+				logerr(__func__);
+				return;
+			}
 		}
-		if (ifo->fqdn != FQDN_DISABLE || ifo->options & DHCPCD_HOSTNAME)
-			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
+		if (ifo->fqdn != FQDN_DISABLE ||
+		    ifo->options & DHCPCD_HOSTNAME) {
+			err = dho_policy_add(&pg->dhop_request, D6_OPTION_FQDN);
+			if (err == -1) {
+				logerr(__func__);
+				return;
+			}
+		}
 	}
 
 #ifndef SMALL
 	/* Rapid commit won't work with Prefix Delegation Exclusion */
 	if (dhcp6_findselfsla(ifp))
-		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
+		dho_policy_del(&pg->dhop_request, D6_OPTION_RAPID_COMMIT);
 #endif
 
 	if (state->state == DH6S_INFORM)
@@ -4332,6 +4372,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
     const struct dhcp6_message *m, size_t len)
 {
 	const struct if_options *ifo;
+	const struct dho_policy_group *pg;
 	struct dhcp_opt *opt, *vo;
 	const uint8_t *p;
 	struct dhcp6_option o;
@@ -4356,6 +4397,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 	}
 
 	ifo = ifp->options;
+	pg = &ifo->dhopg_dhcp6;
 	ctx = ifp->ctx;
 
 	/* Zero our indexes */
@@ -4387,7 +4429,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 			break;
 		}
 		o.code = ntohs(o.code);
-		if (has_option_mask(ifo->nomask6, o.code))
+		if (!dho_policy_allowed(pg, o.code))
 			continue;
 		for (i = 0, opt = ifo->dhcp6_override;
 		    i < ifo->dhcp6_override_len; i++, opt++)
