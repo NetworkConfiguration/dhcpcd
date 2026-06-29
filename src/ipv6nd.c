@@ -1688,8 +1688,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 				errno = EINVAL;
 				break;
 			}
-			if (!dho_policy_allowed(pg,
-				ndo.nd_opt_type))
+			if (!dho_policy_allowed(pg, ndo.nd_opt_type))
 				continue;
 			for (j = 0, opt = rap->iface->options->nd_override;
 			    j < rap->iface->options->nd_override_len;
@@ -1855,8 +1854,7 @@ ipv6nd_expirera(void *arg)
 				break;
 			}
 
-			if (dho_policy_allowed(pg,
-				ndo.nd_opt_type))
+			if (!dho_policy_allowed(pg, ndo.nd_opt_type))
 				continue;
 
 			switch (ndo.nd_opt_type) {

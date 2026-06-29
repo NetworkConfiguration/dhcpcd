@@ -669,7 +669,7 @@ dhcp_get_mtu(const struct interface *ifp)
 		return (uint16_t)ifo->mtu;
 	mtu = 0; /* bogus gcc warning */
 	if ((state = D_CSTATE(ifp)) == NULL ||
-	    dho_policy_allowed(pg, DHO_MTU) ||
+	    !dho_policy_allowed(pg, DHO_MTU) ||
 	    get_option_uint16(ifp->ctx, &mtu, state->new, state->new_len,
 		DHO_MTU) == -1)
 		return 0;
@@ -999,8 +999,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 		*n_params = (uint8_t)(p - n_params - 1);
 
-		if (mtu != -1 &&
-		    (dho_policy_allowed(pg, DHO_MAXMESSAGESIZE))) {
+		if (mtu != -1 && (dho_policy_allowed(pg, DHO_MAXMESSAGESIZE))) {
 			AREA_CHECK(2);
 			*p++ = DHO_MAXMESSAGESIZE;
 			*p++ = 2;
@@ -1026,8 +1025,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		p += state->clientid[0] + 1;
 	}
 
-	if (DHCP_DIR(type) &&
-	    dho_policy_allowed(pg, DHO_VENDORCLASSID) &&
+	if (DHCP_DIR(type) && dho_policy_allowed(pg, DHO_VENDORCLASSID) &&
 	    ifo->vendorclassid[0]) {
 		AREA_CHECK(ifo->vendorclassid[0]);
 		*p++ = DHO_VENDORCLASSID;
@@ -1134,8 +1132,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 
 #ifndef SMALL
-		if (ifo->vivco_len &&
-		    dho_policy_allowed(pg, DHO_VIVCO)) {
+		if (ifo->vivco_len && dho_policy_allowed(pg, DHO_VIVCO)) {
 			struct vivco *vivco = ifo->vivco;
 			size_t vlen = ifo->vivco_len;
 			struct rfc3396_ctx rctx = {
@@ -1161,8 +1158,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			}
 		}
 
-		if (ifo->vsio_len &&
-		    dho_policy_allowed(pg, DHO_VIVSO)) {
+		if (ifo->vsio_len && dho_policy_allowed(pg, DHO_VIVSO)) {
 			struct vsio *vso = ifo->vsio;
 			size_t vlen = ifo->vsio_len;
 			struct vsio_so *so;

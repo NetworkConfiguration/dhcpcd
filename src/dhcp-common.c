@@ -232,16 +232,17 @@ dho_policy_allowed(const struct dho_policy_group *pg, uint32_t option)
 	if (dho_policy_has(&pg->dhop_allow, option) ||
 	    dho_policy_has(&pg->dhop_request, option))
 		return 1;
-	return 1;
+	return 0;
 }
 
 int
-dho_policy_requested(const struct dho_policy_group *pg, const struct dhcp_opt *dho)
+dho_policy_requested(const struct dho_policy_group *pg,
+    const struct dhcp_opt *dho)
 {
-
 	if (dho->type & OT_NOREQ)
 		return 0;
-	if (!(dho->type & OT_REQUEST) && !dho_policy_has(&pg->dhop_request, dho->option))
+	if (!(dho->type & OT_REQUEST) &&
+	    !dho_policy_has(&pg->dhop_request, dho->option))
 		return 0;
 	if (dho_policy_has(&pg->dhop_allow, dho->option))
 		return 1;
@@ -259,7 +260,8 @@ dho_policy_find(struct dho_policy *policy, uint32_t option,
 	for (i = 0; i < policy->dhop_policy_len; i++) {
 		if (policy->dhop_policy[i] == option)
 			return &policy->dhop_policy[i];
-		if (policy->dhop_policy[i] == 0 && *free_option == NULL)
+		if (policy->dhop_policy[i] == 0 && free_option != NULL &&
+		    *free_option == NULL)
 			*free_option = &policy->dhop_policy[i];
 	}
 
@@ -310,7 +312,7 @@ dho_policy_set(const struct dho_policy_ctx *pctx, struct dho_policy *policy,
 	char *token, *o, *p;
 	const struct dhcp_opt *opt;
 	int match, e, err = -1;
-	unsigned int n;
+	unsigned int n, max = UINT16_MAX;
 	size_t i;
 
 	if (opts == NULL)
@@ -321,11 +323,14 @@ dho_policy_set(const struct dho_policy_ctx *pctx, struct dho_policy *policy,
 			continue;
 		if (strncmp(token, "dhcp6_", 6) == 0)
 			token += 6;
-		if (strncmp(token, "nd_", 3) == 0)
+		else if (strncmp(token, "nd_", 3) == 0)
 			token += 3;
-		n = (unsigned int)strtou(token, NULL, 0, 0, UINT_MAX, &e);
+		else
+			max = UINT8_MAX;
+		n = (unsigned int)strtou(token, NULL, 0, 1, max, &e);
 		match = 0;
-		for (i = 0, opt = pctx->odopts; i < pctx->odopts_len; i++, opt++) {
+		for (i = 0, opt = pctx->odopts; i < pctx->odopts_len;
+		    i++, opt++) {
 			if (opt->var == NULL || opt->option == 0)
 				continue; /* buggy dhcpcd-definitions.conf */
 			if (strcmp(opt->var, token) == 0)
@@ -336,7 +341,8 @@ dho_policy_set(const struct dho_policy_ctx *pctx, struct dho_policy *policy,
 				break;
 		}
 		if (match == 0) {
-			for (i = 0, opt = pctx->dopts; i < pctx->dopts_len; i++, opt++) {
+			for (i = 0, opt = pctx->dopts; i < pctx->dopts_len;
+			    i++, opt++) {
 				if (strcmp(opt->var, token) == 0)
 					match = 1;
 				else if (e == 0 && opt->option == n)
@@ -345,18 +351,20 @@ dho_policy_set(const struct dho_policy_ctx *pctx, struct dho_policy *policy,
 					break;
 			}
 		}
-		if (!match || !opt->option) {
+		if ((!match || !opt->option) && e != 0) {
 			errno = ENOENT;
 			goto out;
 		}
-		if (add == 2 && !(opt->type & OT_ADDRIPV4)) {
+		if (match && add == 2 && !(opt->type & OT_ADDRIPV4)) {
 			errno = EINVAL;
 			goto out;
 		}
+		if (match)
+			n = opt->option;
 		if (add == 1 || add == 2)
-			dho_policy_add(policy, opt->option);
+			dho_policy_add(policy, n);
 		else
-			dho_policy_del(policy, opt->option);
+			dho_policy_del(policy, n);
 	}
 
 	err = 0;

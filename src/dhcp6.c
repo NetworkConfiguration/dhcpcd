@@ -821,14 +821,13 @@ dhcp6_makemessage(struct interface *ifp)
 			len += sizeof(o) + 1 + hl;
 		}
 
-		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) &&
-		    ifo->mudurl[0])
+		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) && ifo->mudurl[0])
 			len += sizeof(o) + ifo->mudurl[0];
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 			DHCPCD_AUTH_SENDREQUIRE &&
-			dho_policy_allowed(pg, D6_OPTION_RECONF_ACCEPT))
+		    dho_policy_allowed(pg, D6_OPTION_RECONF_ACCEPT))
 			len += sizeof(o); /* Reconfigure Accept */
 #endif
 	}
@@ -921,7 +920,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-		dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
+	    dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
 	if (m == NULL) {
@@ -1199,8 +1198,7 @@ dhcp6_makemessage(struct interface *ifp)
 			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 
-		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) &&
-		    ifo->mudurl[0])
+		if (dho_policy_allowed(pg, D6_OPTION_MUDURL) && ifo->mudurl[0])
 			COPYIN(D6_OPTION_MUDURL, ifo->mudurl + 1,
 			    ifo->mudurl[0]);
 
@@ -4057,8 +4055,7 @@ dhcp6_start1(void *arg)
 		const struct dho_policy_group *dpg = &ifo->dhopg_dhcp;
 
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
-			if (dho_policy_allowed(dpg, dhc->dhcp_opt) &&
-			    dho_policy_has(&pg->dhop_request, dhc->dhcp_opt))
+			if (dho_policy_allowed(dpg, dhc->dhcp_opt))
 				dho_policy_add(&pg->dhop_request,
 				    dhc->dhcp6_opt);
 		}
