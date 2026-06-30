@@ -19,6 +19,7 @@ jobs:
         os: [ macos-26 ]
         args:
           -
+          - --sanitize
           - --disable-ipv4
           - --disable-arp
           - --disable-ipv4ll
@@ -31,9 +32,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-
-    - name: Configure
-      run: ./configure --sanitize
 
     - name: Build
       run: make
