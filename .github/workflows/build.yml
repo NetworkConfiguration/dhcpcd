@@ -18,7 +18,6 @@ jobs:
       matrix:
         os: [ macos-26 ]
         args:
-          -
           - --sanitize
           - --disable-ipv4
           - --disable-arp
@@ -32,6 +31,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+
+    - name: Configure
+      run: CPPFLAGS="${{ matrix.cppflags }}" ./configure ${{ matrix.args }}
 
     - name: Build
       run: make
