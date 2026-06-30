@@ -154,6 +154,7 @@ struct dhcp_compat {
  * But we can support both as the hook scripts will uniqify the
  * results if the server returns both options.
  */
+#ifdef INET
 static const struct dhcp_compat dhcp_compats[] = { { DHO_DNSSERVER,
 						       D6_OPTION_DNS_SERVERS },
 	{ DHO_HOSTNAME, D6_OPTION_FQDN }, { DHO_DNSDOMAIN, D6_OPTION_FQDN },
@@ -164,6 +165,7 @@ static const struct dhcp_compat dhcp_compats[] = { { DHO_DNSSERVER,
 	{ DHO_FQDN, D6_OPTION_FQDN }, { DHO_VIVCO, D6_OPTION_VENDOR_CLASS },
 	{ DHO_VIVSO, D6_OPTION_VENDOR_OPTS },
 	{ DHO_DNSSEARCH, D6_OPTION_DOMAIN_LIST }, { 0, 0 } };
+#endif
 
 static const char *const dhcp6_statuses[] = { "Success", "Unspecified Failure",
 	"No Addresses Available", "No Binding", "Not On Link", "Use Multicast",
@@ -4025,7 +4027,6 @@ dhcp6_start1(void *arg)
 	struct if_options *ifo = ifp->options;
 	struct dho_policy_group *pg = &ifo->dhopg_dhcp6;
 	struct dhcp6_state *state;
-	const struct dhcp_compat *dhc;
 
 	if ((ctx->options & (DHCPCD_MANAGER | DHCPCD_PRIVSEP)) ==
 		DHCPCD_MANAGER &&
@@ -4052,9 +4053,13 @@ dhcp6_start1(void *arg)
 	/* If no DHCPv6 options are configured,
 	   match configured DHCPv4 options to DHCPv6 equivalents. */
 	if (pg->dhop_request.dhop_policy_len == 0) {
+#ifdef INET
+		const struct dhcp_compat *dhc;
 		const struct dho_policy_group *dpg = &ifo->dhopg_dhcp;
+#endif
 		int err;
 
+#ifdef INET
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
 			if (!dho_policy_has(&dpg->dhop_request, dhc->dhcp_opt))
 				continue;
@@ -4064,6 +4069,18 @@ dhcp6_start1(void *arg)
 				return;
 			}
 		}
+#else
+		err = dho_policy_add(&pg->dhop_request, D6_OPTION_DNS_SERVERS);
+		if (err == -1) {
+			logerr(__func__);
+			return;
+		}
+		err = dho_policy_add(&pg->dhop_request, D6_OPTION_DOMAIN_LIST);
+		if (err == -1) {
+			logerr(__func__);
+			return;
+		}
+#endif
 		if (ifo->fqdn != FQDN_DISABLE ||
 		    ifo->options & DHCPCD_HOSTNAME) {
 			err = dho_policy_add(&pg->dhop_request, D6_OPTION_FQDN);

@@ -278,11 +278,17 @@ struct if_options {
 	unsigned long long options;
 	bool randomise_hwaddr;
 
+#ifdef INET
 	struct dho_policy_group dhopg_dhcp;
 	struct dho_policy dhop_destination;
+#endif
 
+#ifdef INET6
 	struct dho_policy_group dhopg_nd;
+#endif
+#ifdef DHCP6
 	struct dho_policy_group dhopg_dhcp6;
+#endif
 
 	struct in_addr req_addr;
 	struct in_addr req_mask;

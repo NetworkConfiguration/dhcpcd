@@ -17,13 +17,23 @@ jobs:
     strategy:
       matrix:
         os: [ macos-26 ]
+        args:
+          - --sanitize
+          - --disable-ipv4
+          - --disable-arp
+          - --disable-ipv4ll
+          - --disable-ipv6
+          - --disable-dhcp6
+        cppflags:
+          -
+          - -DSMALL
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v6
 
     - name: Configure
-      run: ./configure --sanitize
+      run: CPPFLAGS="${{ matrix.cppflags }}" ./configure ${{ matrix.args }}
 
     - name: Build
       run: make

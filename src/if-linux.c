@@ -170,7 +170,9 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 #endif
 
+#ifdef INET
 static int if_addressexists(struct interface *, struct in_addr *);
+#endif
 
 #define PROC_PROMOTE "/proc/sys/net/ipv4/conf/%s/promote_secondaries"
 #define SYS_BRIDGE   "/sys/class/net/%s/bridge/bridge_id"
