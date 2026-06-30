@@ -17,6 +17,16 @@ jobs:
     strategy:
       matrix:
         os: [ macos-26 ]
+        args:
+          -
+          - --disable-ipv4
+          - --disable-arp
+          - --disable-ipv4ll
+          - --disable-ipv6
+          - --disable-dhcp6
+        cppflags:
+          -
+          - -DSMALL
     runs-on: ${{ matrix.os }}
 
     steps:
