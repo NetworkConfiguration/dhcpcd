@@ -507,33 +507,49 @@ parse_addr(__unused struct in_addr *addr, __unused struct in_addr *net,
 }
 #endif
 
-static void
+static int
 set_option_space(struct dhcpcd_ctx *ctx, struct if_options *ifo,
     const char *arg, struct dho_policy_ctx *pctx, struct dho_policy_group **pg)
 {
 	if (strncmp(arg, "nd_", strlen("nd_")) == 0) {
+#ifdef INET6
 		pctx->dopts = ctx->nd_opts;
 		pctx->dopts_len = ctx->nd_opts_len;
 		pctx->odopts = ifo->nd_override;
 		pctx->odopts_len = ifo->nd_override_len;
 		*pg = &ifo->dhopg_nd;
-		return;
+		return 0;
+#else
+		errno = EPFNOSUPPORT;
+		return -1;
+#endif
 	}
 
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
+#ifdef DHCP6
 		pctx->dopts = ctx->dhcp6_opts;
 		pctx->dopts_len = ctx->dhcp6_opts_len;
 		pctx->odopts = ifo->dhcp6_override;
 		pctx->odopts_len = ifo->dhcp6_override_len;
 		*pg = &ifo->dhopg_dhcp6;
-		return;
+		return 0;
+#else
+		errno = EPFNOSUPPORT;
+		return -1;
+#endif
 	}
 
+#ifdef INET
 	pctx->dopts = ctx->dhcp_opts;
 	pctx->dopts_len = ctx->dhcp_opts_len;
 	pctx->odopts = ifo->dhcp_override;
 	pctx->odopts_len = ifo->dhcp_override_len;
 	*pg = &ifo->dhopg_dhcp;
+	return 0;
+#else
+	errno = EPFNOSUPPORT;
+	return -1;
+#endif
 }
 
 void
@@ -824,7 +840,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (dho_policy_set(&pctx, &pg->dhop_request, arg, 1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_reject, arg, -1) != 0) {
@@ -836,7 +853,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (dho_policy_set(&pctx, &pg->dhop_reject, arg, 1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_request, arg, -1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_require, arg, -1) != 0) {
@@ -1268,7 +1286,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (dho_policy_set(&pctx, &pg->dhop_request, arg, -1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_require, arg, -1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_remove, arg, 1) != 0) {
@@ -1280,7 +1299,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (dho_policy_set(&pctx, &pg->dhop_require, arg, 1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_request, arg, 1) != 0 ||
 		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
@@ -1513,7 +1533,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (set_default_allow(ifo, pg)) {
 			logerr("%s: set_default_allow", __func__);
 			return -1;
@@ -1572,7 +1593,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, ifo, arg, &pctx, &pg);
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
 		if (dho_policy_set(&pctx, &ifo->dhop_destination, arg, 2) !=
 		    0) {
 			if (errno == EINVAL)
@@ -3109,11 +3131,17 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 		free(ifo->config);
 	}
 
+#ifdef INET
 	dho_policy_group_free(ifo->dhopg_dhcp);
 	dho_policy_free(ifo->dhop_destination);
+#endif
 
+#ifdef INET6
 	dho_policy_group_free(ifo->dhopg_nd);
+#endif
+#ifdef DHCP6
 	dho_policy_group_free(ifo->dhopg_dhcp6);
+#endif
 
 #ifdef RT_FREE_ROUTE_TABLE
 	/* Stupidly, we don't know the interface when creating the
