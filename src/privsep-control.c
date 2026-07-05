@@ -37,6 +37,9 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#define PS_CTL_FD(ctx)	  (ctx)->ps_ctl->psp_fd
+#define PS_CTL_FLAGS_PRIV ~(~0UL >> 1)
+
 /* We expect to have open 2 privsep STREAM, 2 STREAM and 2 file STREAM fds */
 
 static int
@@ -93,12 +96,6 @@ ps_ctl_handleargs(struct fd_list *fd, char *data, size_t len)
 		fd->flags |= FD_LISTEN;
 		return 0;
 	}
-
-	if (fd->ctx->ps_control_client != NULL &&
-	    fd->ctx->ps_control_client != fd) {
-		logerrx("%s: cannot handle another client", __func__);
-		return 0;
-	}
 	return 1;
 }
 
@@ -106,41 +103,24 @@ static ssize_t
 ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	struct iovec *iov = msg->msg_iov;
 	struct fd_list *fd;
 	unsigned int fd_flags = FD_SENDLEN;
 	int err;
 
-	switch (psm->ps_flags) {
-	case PS_CTL_PRIV:
-		break;
-	case PS_CTL_UNPRIV:
-		fd_flags |= FD_UNPRIV;
-		break;
-	}
-
 	switch (psm->ps_cmd) {
+	case PS_CTL_PRIV:
+		fd_flags |= FD_PRIV; /* FALLTHROUGH */
 	case PS_CTL:
 		if (msg->msg_iovlen != 1) {
 			errno = EINVAL;
 			return -1;
 		}
-		if (ctx->ps_control_client != NULL) {
-			logerrx("%s: cannot handle another client", __func__);
-			return 0;
-		}
 		fd = control_new(ctx, ctx->ps_ctl->psp_work_fd, fd_flags);
 		if (fd == NULL)
 			return -1;
-		ctx->ps_control_client = fd;
-		err = control_recvdata(fd, iov->iov_base, iov->iov_len);
-		if (err == -1 || err == 0) {
+		err = control_recvmsg(fd, msg, psm->ps_datalen);
+		if (err == -1 || err == 0)
 			control_free(fd);
-			ctx->ps_control_client = NULL;
-		}
-		break;
-	case PS_CTL_EOF:
-		ctx->ps_control_client = NULL;
 		break;
 	default:
 		errno = ENOTSUP;
@@ -162,29 +142,34 @@ ps_ctl_dodispatch(void *arg, unsigned short events)
 static void
 ps_ctl_recv(void *arg, unsigned short events)
 {
-	struct dhcpcd_ctx *ctx = arg;
 	char buf[BUFSIZ];
+	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
+	struct fd_list *fd;
 
-	if (!(events & (ELE_READ | ELE_HANGUP)))
+	if (events & ELE_HANGUP) {
+	hangup:
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+		return;
+	}
+
+	if (!(events & ELE_READ)) {
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
+		return;
+	}
 
-	if (events & ELE_READ) {
-		len = read(ctx->ps_ctl->psp_work_fd, buf, sizeof(buf));
-		if (len == -1)
-			logerr("%s: read", __func__);
-		else if (len == 0)
-			// FIXME: Why does this happen?
-			;
-		else if (ctx->ps_control_client == NULL)
-			logerrx("%s: clientfd #%d disconnected (len=%zd)",
-			    __func__, ctx->ps_ctl->psp_work_fd, len);
-		else {
-			errno = 0;
-			if (control_queue(ctx->ps_control_client, buf,
-				(size_t)len) == -1)
-				logerr("%s: control_queue", __func__);
-		}
+	len = read(ctx->ps_ctl->psp_work_fd, buf, sizeof(buf));
+	if (len == -1) {
+		logerr("%s: read", __func__);
+		return;
+	} else if (len == 0)
+		goto hangup;
+
+	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
+		if (fd->flags & FD_LISTEN)
+			continue;
+		if (control_queue(fd, buf, (size_t)len) == -1)
+			logerr("%s: control_queue", __func__);
 	}
 }
 
@@ -196,6 +181,12 @@ ps_ctl_listen(void *arg, unsigned short events)
 	ssize_t len;
 	struct fd_list *fd;
 
+	if (events & ELE_HANGUP) {
+	hangup:
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+		return;
+	}
+
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
@@ -205,10 +196,12 @@ ps_ctl_listen(void *arg, unsigned short events)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
+	if (len == 0)
+		goto hangup;
 
 	/* Send to our listeners */
 	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
-		if (!(fd->flags & FD_LISTEN))
+		if (fd == ctx->ps_control || !(fd->flags & FD_LISTEN))
 			continue;
 		if (control_queue(fd, buf, (size_t)len) == -1)
 			logerr("%s: control_queue", __func__);
@@ -263,7 +256,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 		ctx) == -1)
 		return -1;
 
-	ctx->ps_control = control_new(ctx, listen_fd[1], 0);
+	ctx->ps_control = control_new(ctx, listen_fd[1], FD_LISTEN);
 	if (ctx->ps_control == NULL)
 		return -1;
 	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd, ELE_READ,
@@ -281,21 +274,11 @@ ps_ctl_stop(struct dhcpcd_ctx *ctx)
 }
 
 ssize_t
-ps_ctl_sendargs(struct fd_list *fd, void *data, size_t len)
+ps_ctl_sendmsg(struct fd_list *fd, const struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = fd->ctx;
+	uint16_t cmd = fd->flags & FD_PRIV ? PS_CTL_PRIV : PS_CTL;
+	unsigned long flags = (unsigned long)fd->fd;
 
-	if (ctx->ps_control_client != NULL && ctx->ps_control_client != fd)
-		logerrx("%s: cannot deal with another client", __func__);
-	ctx->ps_control_client = fd;
-	return ps_sendcmd(ctx, ctx->ps_ctl->psp_fd, PS_CTL,
-	    fd->flags & FD_UNPRIV ? PS_CTL_UNPRIV : PS_CTL_PRIV, data, len);
-}
-
-ssize_t
-ps_ctl_sendeof(struct fd_list *fd)
-{
-	struct dhcpcd_ctx *ctx = fd->ctx;
-
-	return ps_sendcmd(ctx, ctx->ps_ctl->psp_fd, PS_CTL_EOF, 0, NULL, 0);
+	return ps_sendmsg(ctx, PS_CTL_FD(ctx), cmd, flags, msg);
 }

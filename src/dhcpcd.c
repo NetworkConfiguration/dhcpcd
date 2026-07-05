@@ -1704,7 +1704,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 	}
 
 	/* Only privileged users can control dhcpcd via the socket. */
-	if (fd->flags & FD_UNPRIV) {
+	if (!(fd->flags & FD_PRIV)) {
 		errno = EPERM;
 		return -1;
 	}
@@ -2078,7 +2078,7 @@ main(int argc, char **argv, char **envp)
 	ifo = NULL;
 	ctx.cffile = CONFIG;
 	ctx.script = UNCONST(dhcpcd_default_script);
-	ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
+	ctx.control_fd = ctx.link_fd = -1;
 	ctx.pf_inet_fd = -1;
 #ifdef PF_LINK
 	ctx.pf_link_fd = -1;
@@ -2421,20 +2421,12 @@ main(int argc, char **argv, char **envp)
 	if (!(ctx.options & DHCPCD_TEST)) {
 		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
 		if (!(ctx.options & DHCPCD_MANAGER))
-			ctx.control_fd = control_open(argv[optind], family,
-			    ctx.options & DHCPCD_DUMPLEASE);
+			ctx.control_fd = control_open(argv[optind], family);
 		if (!(ctx.options & DHCPCD_MANAGER) && ctx.control_fd == -1)
-			ctx.control_fd = control_open(argv[optind], AF_UNSPEC,
-			    ctx.options & DHCPCD_DUMPLEASE);
+			ctx.control_fd = control_open(argv[optind], AF_UNSPEC);
 		if (ctx.control_fd == -1)
-			ctx.control_fd = control_open(NULL, AF_UNSPEC,
-			    ctx.options & DHCPCD_DUMPLEASE);
+			ctx.control_fd = control_open(NULL, AF_UNSPEC);
 		if (ctx.control_fd != -1) {
-#ifdef PRIVSEP
-			if (IN_PRIVSEP(&ctx) &&
-			    ps_managersandbox(&ctx, NULL) == -1)
-				goto exit_failure;
-#endif
 			if (!(ctx.options & DHCPCD_DUMPLEASE))
 				loginfox("sending commands to dhcpcd process");
 			len = control_send(&ctx, argc, argv);
@@ -2580,6 +2572,8 @@ main(int argc, char **argv, char **envp)
 	logdebugx("spawned manager process on PID %d", (int)getpid());
 
 start_manager:
+
+	logdebugx("spawned manager process on PID %d", (int)getpid());
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, (int)pid);

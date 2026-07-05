@@ -174,10 +174,8 @@ struct dhcpcd_ctx {
 	size_t io_buflen;
 
 	int control_fd;
-	int control_unpriv_fd;
 	struct fd_list_head control_fds;
 	char control_sock[sizeof(CONTROLSOCKET) + IF_NAMESIZE];
-	char control_sock_unpriv[sizeof(CONTROLSOCKET) + IF_NAMESIZE + 7];
 	gid_t control_group;
 
 	/* DHCP Enterprise options, RFC3925 */
@@ -199,13 +197,12 @@ struct dhcpcd_ctx {
 	struct ps_process *ps_root;
 	struct ps_process *ps_inet;
 	struct ps_process *ps_ctl;
-	int ps_data_fd;			   /* data returned from processes */
-	int ps_log_fd;			   /* chroot logging */
-	int ps_log_root_fd;		   /* outside chroot log reader */
-	struct fd_list *ps_control;	   /* Queue for the above */
-	struct fd_list *ps_control_client; /* Queue for the above */
-	void *ps_buf;			   /* IPC buffer */
-	size_t ps_buflen;		   /* IPC buffer length */
+	int ps_data_fd;		    /* data returned from processes */
+	int ps_log_fd;		    /* chroot logging */
+	int ps_log_root_fd;	    /* outside chroot log reader */
+	struct fd_list *ps_control; /* Queue for the above */
+	void *ps_buf;		    /* IPC buffer */
+	size_t ps_buflen;	    /* IPC buffer length */
 #endif
 
 #ifdef INET

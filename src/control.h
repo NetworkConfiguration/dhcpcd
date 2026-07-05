@@ -66,16 +66,18 @@ struct fd_list {
 TAILQ_HEAD(fd_list_head, fd_list);
 
 #define FD_LISTEN  0x01U
-#define FD_UNPRIV  0x02U
+#define FD_PRIV	   0x02U
 #define FD_SENDLEN 0x04U
 
 int control_start(struct dhcpcd_ctx *, const char *, sa_family_t);
 int control_stop(struct dhcpcd_ctx *);
-int control_open(const char *, sa_family_t, bool);
+int control_open(const char *, sa_family_t);
 ssize_t control_send(struct dhcpcd_ctx *, int, char *const *);
+struct fd_list *control_find(struct dhcpcd_ctx *, int);
 struct fd_list *control_new(struct dhcpcd_ctx *, int, unsigned int);
 void control_free(struct fd_list *);
 void control_delete(struct fd_list *);
 int control_queue(struct fd_list *, void *, size_t);
-int control_recvdata(struct fd_list *fd, char *, size_t);
+int control_recvmsg(struct fd_list *, struct msghdr *, size_t);
+int control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid);
 #endif

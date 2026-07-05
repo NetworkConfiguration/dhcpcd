@@ -358,11 +358,13 @@ ps_startprocess(struct ps_process *psp,
 
 	/* Close things we no longer need */
 	pidfile_unlock();
-	eloop_closefdwaiter(ctx->eloop);
+	if (ctx->ps_ctl != psp)
+		eloop_closefdwaiter(ctx->eloop);
 
 	/* Close more if we are not root */
 	if (ctx->ps_root != psp) {
-		ps_root_close(ctx);
+		if (ctx->ps_ctl != psp)
+			ps_root_close(ctx);
 #ifdef PLUGIN_DEV
 		dev_stop(ctx);
 #endif
@@ -391,7 +393,6 @@ ps_startprocess(struct ps_process *psp,
 
 	if (ctx->ps_root != psp) {
 		ctx->options &= ~DHCPCD_PRIVSEPROOT;
-		ctx->ps_root = NULL;
 		if (ctx->ps_log_root_fd != -1) {
 			/* Already removed from eloop thanks to above clear. */
 			close(ctx->ps_log_root_fd);
@@ -1184,6 +1185,9 @@ ps_freeprocesses(struct dhcpcd_ctx *ctx, struct ps_process *notthis)
 
 	TAILQ_FOREACH_SAFE(psp, &ctx->ps_processes, next, psn) {
 		if (psp == notthis)
+			continue;
+		/* control needs root access to work out user group */
+		if (ctx->ps_ctl == notthis && psp == ctx->ps_root)
 			continue;
 		ps_freeprocess(psp);
 	}
