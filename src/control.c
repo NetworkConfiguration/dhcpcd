@@ -33,6 +33,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,10 @@
 #define SUN_LEN(su) \
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
+
+#define SUN_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+
+#define LISTEN_BACKLOG 5
 
 static void control_handle_data(void *, unsigned short);
 
@@ -93,6 +98,22 @@ control_hangup(struct fd_list *fd)
 {
 	control_free(fd);
 }
+
+#ifdef SO_PEERCRED
+static int
+getpeereid(int fd, uid_t *uid, gid_t *gid)
+{
+	struct ucred creds;
+	socklen_t creds_len = sizeof(creds);
+
+	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &creds_len) == -1)
+		return -1;
+
+	*uid = creds.uid;
+	*gid = creds.gid;
+	return 0;
+}
+#endif
 
 static int
 control_handle_read(struct fd_list *fd)
@@ -431,8 +452,6 @@ make_sock(struct sockaddr_un *sa, const char *ifname, sa_family_t family)
 	return fd;
 }
 
-#define SOCK_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
-
 static int
 control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
@@ -447,10 +466,8 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 	len = (socklen_t)SUN_LEN(&sa);
 	unlink(sa.sun_path);
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
-	    chmod(sa.sun_path, 0666) == -1 ||
-	    (ctx->control_group &&
-		chown(sa.sun_path, geteuid(), ctx->control_group) == -1) ||
-	    listen(fd, sizeof(ctx->control_fds)) == -1)
+	    chmod(sa.sun_path, SUN_MODE) == -1 ||
+	    listen(fd, LISTEN_BACKLOG) == -1)
 		goto err;
 
 #ifdef PRIVSEP_RIGHTS
@@ -647,7 +664,7 @@ control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
 
 	pw = getpwuid(uid);
 	if (pw == NULL)
-		return -1;
+		return 0; /* unknown user is not privileged */
 
 	groups = reallocarray(groups, (size_t)ngroups, sizeof(*groups));
 	if (groups == NULL)

@@ -38,7 +38,6 @@
 #include "privsep.h"
 
 #define PS_CTL_FD(ctx)	  (ctx)->ps_ctl->psp_fd
-#define PS_CTL_FLAGS_PRIV ~(~0UL >> 1)
 
 /* We expect to have open 2 privsep STREAM, 2 STREAM and 2 file STREAM fds */
 

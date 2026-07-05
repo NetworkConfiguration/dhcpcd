@@ -325,7 +325,7 @@ ps_root_douser_ispriv(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
 	uid_t uid;
 	gid_t gid;
-	uint8_t *p = data;
+	uint8_t *p;
 
 	if (len != sizeof(uid) + sizeof(gid)) {
 		errno = EINVAL;
