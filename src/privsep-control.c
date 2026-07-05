@@ -37,7 +37,7 @@
 #include "logerr.h"
 #include "privsep.h"
 
-#define PS_CTL_FD(ctx)	  (ctx)->ps_ctl->psp_fd
+#define PS_CTL_FD(ctx) (ctx)->ps_ctl->psp_fd
 
 /* We expect to have open 2 privsep STREAM, 2 STREAM and 2 file STREAM fds */
 

@@ -41,6 +41,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#if defined(__sun)
+#include <ucred.h>
+#endif
+
 #include "common.h"
 #include "config.h"
 #include "control.h"
@@ -55,7 +59,7 @@
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
-#define SUN_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
 #define LISTEN_BACKLOG 5
 
@@ -111,6 +115,20 @@ getpeereid(int fd, uid_t *uid, gid_t *gid)
 
 	*uid = creds.uid;
 	*gid = creds.gid;
+	return 0;
+}
+#elif defined(__sun)
+static int
+getpeereid(int fd, uid_t *uid, gid_t *gid)
+{
+	ucred_t *ucred = NULL;
+
+	if (getpeerucred(fd, &ucred) == -1)
+		return -1;
+
+	*uid = ucred_geteuid(ucred);
+	*gid_t gid = ucred_getegid(ucred);
+	ucred_free(ucred);
 	return 0;
 }
 #endif
