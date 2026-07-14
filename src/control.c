@@ -127,7 +127,7 @@ getpeereid(int fd, uid_t *uid, gid_t *gid)
 		return -1;
 
 	*uid = ucred_geteuid(ucred);
-	*gid_t gid = ucred_getegid(ucred);
+	*gid = ucred_getegid(ucred);
 	ucred_free(ucred);
 	return 0;
 }
