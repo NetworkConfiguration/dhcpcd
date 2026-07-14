@@ -196,11 +196,13 @@ ps_ctl_listen(void *arg, unsigned short events)
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
 	size_t msglen;
-	struct iovec iov[] = {
-		{ .iov_base = &msglen, .iov_len = sizeof(msglen), }
-	};
+	struct iovec iov[] = { {
+	    .iov_base = &msglen,
+	    .iov_len = sizeof(msglen),
+	} };
 	struct msghdr msg = {
-		.msg_iov = iov, .msg_iovlen = __arraycount(iov),
+		.msg_iov = iov,
+		.msg_iovlen = __arraycount(iov),
 	};
 	int fd;
 	struct fd_list *fdl;
