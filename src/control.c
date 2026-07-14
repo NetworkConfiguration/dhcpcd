@@ -133,7 +133,7 @@ getpeereid(int fd, uid_t *uid, gid_t *gid)
 }
 #endif
 
-static int
+static ssize_t
 control_handle_read(struct fd_list *fd)
 {
 	uid_t uid;
@@ -153,7 +153,7 @@ control_handle_read(struct fd_list *fd)
 	if (bytes == -1)
 		logerr(__func__);
 	if (bytes == -1 || bytes == 0)
-		return (int)bytes;
+		return bytes;
 
 	if (getpeereid(fd->fd, &uid, &gid) == -1) {
 		logerr("%s: getpeereid", __func__);
@@ -177,12 +177,14 @@ control_handle_read(struct fd_list *fd)
 		fd->flags |= FD_SENDLEN;
 		perr = ps_ctl_handleargs(fd, buf, (size_t)bytes);
 		fd->flags &= ~FD_SENDLEN;
+		if (!(fd->flags & FD_LISTEN))
+			fd->flags |= FD_COMMAND;
 		if (perr == -1) {
 			logerr(__func__);
 			return 0;
 		}
 		iov[0].iov_len = (size_t)bytes;
-		if (perr == 1 && ps_ctl_sendmsg(fd, &msg) == -1) {
+		if (perr == 0 && ps_ctl_sendmsg(fd, &msg) == -1) {
 			logerr(__func__);
 			return -1;
 		}
@@ -202,28 +204,30 @@ control_handle_read(struct fd_list *fd)
 	return control_recvmsg(fd, &msg, (size_t)bytes);
 }
 
-static int
+static ssize_t
 control_handle_write(struct fd_list *fd)
 {
 	struct iovec iov[2];
-	int iov_len;
+	struct msghdr msg = { .msg_iov = iov };
 	struct fd_data *data;
+	ssize_t len;
 
 	data = TAILQ_FIRST(&fd->queue);
 
 	if (data->data_flags & FD_SENDLEN) {
 		iov[0].iov_base = &data->data_len;
-		iov[0].iov_len = sizeof(size_t);
+		iov[0].iov_len = sizeof(data->data_len);
 		iov[1].iov_base = data->data;
 		iov[1].iov_len = data->data_len;
-		iov_len = 2;
+		msg.msg_iovlen = 2;
 	} else {
 		iov[0].iov_base = data->data;
 		iov[0].iov_len = data->data_len;
-		iov_len = 1;
+		msg.msg_iovlen = 1;
 	}
 
-	if (writev(fd->fd, iov, iov_len) == -1) {
+	len = sendmsg(fd->fd, &msg, 0);
+	if (len == -1) {
 		if (errno != EPIPE && errno != ENOTCONN) {
 			// We don't get ELE_HANGUP for some reason
 			logerr("%s: write", __func__);
@@ -242,20 +246,23 @@ control_handle_write(struct fd_list *fd)
 #endif
 
 	if (TAILQ_FIRST(&fd->queue) != NULL)
-		return 0;
+		return len;
 
 	/* Done sending data, stop watching write to fd */
 	if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
 		control_handle_data, fd) == -1)
 		logerr("%s: eloop_event_add", __func__);
-	return 0;
+	return len;
 }
 
 static void
 control_handle_data(void *arg, unsigned short events)
 {
 	struct fd_list *fd = arg;
-	int err;
+	ssize_t err;
+
+	if (events & ELE_HANGUP)
+		goto hangup;
 
 	if (!(events & (ELE_READ | ELE_WRITE | ELE_HANGUP)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
@@ -270,8 +277,6 @@ control_handle_data(void *arg, unsigned short events)
 		if ((err == -1 && errno != EPERM) || err == 0)
 			goto hangup;
 	}
-	if (events & ELE_HANGUP)
-		goto hangup;
 
 	return;
 
@@ -339,6 +344,8 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 			if (errno != EINTR && errno != EAGAIN && errno != EPERM)
 				return -1;
 		}
+		if (!(fd->flags & FD_LISTEN))
+			fd->flags |= FD_COMMAND;
 	}
 
 	return 1;
@@ -412,7 +419,6 @@ control_handle1(struct dhcpcd_ctx *ctx, int lfd, unsigned int fd_flags,
 	else
 #endif
 		fd_flags |= FD_SENDLEN;
-
 	l = control_new(ctx, fd, fd_flags);
 	if (l == NULL)
 		goto error;
@@ -618,7 +624,7 @@ control_send(struct dhcpcd_ctx *ctx, int argc, char *const *argv)
 }
 
 int
-control_queue(struct fd_list *fd, void *data, size_t data_len)
+control_queue(struct fd_list *fd, const void *data, size_t data_len)
 {
 	struct fd_data *d;
 	unsigned short events;

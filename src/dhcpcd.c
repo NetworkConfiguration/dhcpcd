@@ -1587,24 +1587,6 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 	size_t len, l, nifaces;
 	char *tmp, *p;
 
-	/* Special commands for our control socket
-	 * as the other end should be blocking until it gets the
-	 * expected reply we should be safely able just to change the
-	 * write callback on the fd */
-	/* Make any change here in privsep-control.c as well. */
-	if (strcmp(*argv, "--version") == 0) {
-		return control_queue(fd, UNCONST(VERSION), strlen(VERSION) + 1);
-	} else if (strcmp(*argv, "--getconfigfile") == 0) {
-		return control_queue(fd, UNCONST(fd->ctx->cffile),
-		    strlen(fd->ctx->cffile) + 1);
-	} else if (strcmp(*argv, "--getinterfaces") == 0) {
-		oifind = argc = 0;
-		goto dumplease;
-	} else if (strcmp(*argv, "--listen") == 0) {
-		fd->flags |= FD_LISTEN;
-		return 0;
-	}
-
 	/* Log the command */
 	len = 1;
 	for (opt = 0; opt < argc; opt++)
@@ -1623,6 +1605,27 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 	*--p = '\0';
 	loginfox("control command: %s", tmp);
 	free(tmp);
+
+	/* Special commands for our control socket
+	 * as the other end should be blocking until it gets the
+	 * expected reply we should be safely able just to change the
+	 * write callback on the fd */
+	/* Make any change here in privsep-control.c as well. */
+	if (strcmp(*argv, "--version") == 0) {
+		return control_queue(fd, VERSION, strlen(VERSION) + 1);
+	} else if (strcmp(*argv, "--getconfigfile") == 0) {
+		return control_queue(fd, fd->ctx->cffile,
+		    strlen(fd->ctx->cffile) + 1);
+	} else if (strcmp(*argv, "--getinterfaces") == 0) {
+		oifind = argc = 0;
+		goto dumplease;
+	} else if (strcmp(*argv, "--isprivileged") == 0) {
+		const char *ret = fd->flags & FD_PRIV ? "true" : "false";
+		return control_queue(fd, ret, strlen(ret) + 1);
+	} else if (strcmp(*argv, "--listen") == 0) {
+		fd->flags |= FD_LISTEN;
+		return 0;
+	}
 
 	optind = 0;
 	oi = 0;
@@ -1682,8 +1685,10 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 				nifaces += (size_t)opt;
 			}
 		}
-		if (write(fd->fd, &nifaces, sizeof(nifaces)) != sizeof(nifaces))
+		fd->flags &= ~FD_SENDLEN;
+		if (control_queue(fd, &nifaces, sizeof(nifaces)) == -1)
 			goto dumperr;
+		fd->flags |= FD_SENDLEN;
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (!ifp->active)
 				continue;

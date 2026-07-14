@@ -83,19 +83,26 @@ ps_ctl_recvmsg(void *arg, unsigned short events)
 ssize_t
 ps_ctl_handleargs(struct fd_list *fd, char *data, size_t len)
 {
+	int err;
+
 	/* Make any change here in dhcpcd.c as well. */
 	if (strncmp(data, "--version", MIN(strlen("--version"), len)) == 0) {
-		return control_queue(fd, UNCONST(VERSION), strlen(VERSION) + 1);
+		err = control_queue(fd, UNCONST(VERSION), strlen(VERSION) + 1);
+		return err == -1 ? -1 : 1;
 	} else if (strncmp(data, "--getconfigfile",
 		       MIN(strlen("--getconfigfile"), len)) == 0) {
-		return control_queue(fd, UNCONST(fd->ctx->cffile),
+		err = control_queue(fd, UNCONST(fd->ctx->cffile),
 		    strlen(fd->ctx->cffile) + 1);
+		return err == -1 ? -1 : 1;
+	} else if (strcmp(data, "--isprivileged") == 0) {
+		const char *ret = fd->flags & FD_PRIV ? "true" : "false";
+		return control_queue(fd, ret, strlen(ret) + 1);
 	} else if (strncmp(data, "--listen", MIN(strlen("--listen"), len)) ==
 	    0) {
 		fd->flags |= FD_LISTEN;
-		return 0;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 static ssize_t
@@ -141,44 +148,19 @@ ps_ctl_dodispatch(void *arg, unsigned short events)
 static void
 ps_ctl_recv(void *arg, unsigned short events)
 {
-	char buf[BUFSIZ];
-	struct dhcpcd_ctx *ctx = arg;
-	ssize_t len;
-	struct fd_list *fd;
-
-	if (events & ELE_HANGUP) {
-	hangup:
-		eloop_exit(ctx->eloop, EXIT_SUCCESS);
-		return;
-	}
-
-	if (!(events & ELE_READ)) {
-		logerrx("%s: unexpected event 0x%04x", __func__, events);
-		return;
-	}
-
-	len = read(ctx->ps_ctl->psp_work_fd, buf, sizeof(buf));
-	if (len == -1) {
-		logerr("%s: read", __func__);
-		return;
-	} else if (len == 0)
-		goto hangup;
-
-	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
-		if (fd->flags & FD_LISTEN)
-			continue;
-		if (control_queue(fd, buf, (size_t)len) == -1)
-			logerr("%s: control_queue", __func__);
-	}
-}
-
-static void
-ps_ctl_listen(void *arg, unsigned short events)
-{
 	struct dhcpcd_ctx *ctx = arg;
 	char buf[BUFSIZ];
-	ssize_t len;
-	struct fd_list *fd;
+	struct iovec iov[] = { {
+	    .iov_base = buf,
+	    .iov_len = sizeof(buf),
+	} };
+	struct msghdr msg = {
+		.msg_iov = iov,
+		.msg_iovlen = __arraycount(iov),
+	};
+	ssize_t msglen;
+	int fd;
+	struct fd_list *fdl;
 
 	if (events & ELE_HANGUP) {
 	hangup:
@@ -189,22 +171,76 @@ ps_ctl_listen(void *arg, unsigned short events)
 	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	len = read(ctx->ps_control->fd, buf, sizeof(buf));
-	if (len == -1) {
+	fd = ctx->ps_ctl->psp_work_fd;
+	msglen = recvmsg(fd, &msg, 0);
+	if (msglen == 0)
+		goto hangup;
+	if (msglen == -1) {
 		logerr("%s: read", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
-		return;
 	}
-	if (len == 0)
-		goto hangup;
 
-	/* Send to our listeners */
-	TAILQ_FOREACH(fd, &ctx->control_fds, next) {
-		if (fd == ctx->ps_control || !(fd->flags & FD_LISTEN))
+	/* Send to our command controls */
+	TAILQ_FOREACH(fdl, &ctx->control_fds, next) {
+		if (!(fdl->flags & FD_COMMAND))
 			continue;
-		if (control_queue(fd, buf, (size_t)len) == -1)
+		if (control_queue(fdl, buf, (size_t)msglen) == -1)
 			logerr("%s: control_queue", __func__);
 	}
+}
+
+static void
+ps_ctl_listen(void *arg, unsigned short events)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	ssize_t len;
+	size_t msglen;
+	int fd;
+	struct fd_list *fdl;
+
+	if (events & ELE_HANGUP) {
+	hangup:
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+		return;
+	}
+
+	if (!(events & ELE_READ))
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
+	fd = ctx->ps_control->fd;
+	len = read(fd, &msglen, sizeof(msglen));
+	if (len == 0)
+		goto hangup;
+	if (len != sizeof(msglen)) {
+		logerr("%s: read len", __func__);
+		goto err;
+	}
+
+	if (ps_bufalloc(ctx, msglen) == -1) {
+		logerr("%s: realloc", __func__);
+		goto err;
+	}
+
+	len = read(fd, ctx->ps_buf, msglen);
+	if (len == 0)
+		goto hangup;
+	if ((size_t)len != msglen) {
+		logerr("%s: read", __func__);
+		goto err;
+	}
+
+	/* Send to our listeners */
+	TAILQ_FOREACH(fdl, &ctx->control_fds, next) {
+		if (!(fdl->flags & FD_LISTEN))
+			continue;
+		if (control_queue(fdl, ctx->ps_buf, msglen) == -1)
+			logerr("%s: control_queue", __func__);
+	}
+
+	return;
+
+err:
+	eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
 
 pid_t
@@ -220,8 +256,10 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 
 	if_closesockets(ctx);
 
-	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, work_fd) == -1 ||
-	    xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, listen_fd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, work_fd) ==
+		-1 ||
+	    xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, listen_fd) ==
+		-1)
 		return -1;
 #ifdef PRIVSEP_RIGHTS
 	if (ps_rights_limit_fdpair(work_fd) == -1 ||
@@ -255,7 +293,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 		ctx) == -1)
 		return -1;
 
-	ctx->ps_control = control_new(ctx, listen_fd[1], FD_LISTEN);
+	ctx->ps_control = control_new(ctx, listen_fd[1], 0);
 	if (ctx->ps_control == NULL)
 		return -1;
 	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd, ELE_READ,
