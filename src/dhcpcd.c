@@ -1587,25 +1587,6 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 	size_t len, l, nifaces;
 	char *tmp, *p;
 
-	/* Log the command */
-	len = 1;
-	for (opt = 0; opt < argc; opt++)
-		len += strlen(argv[opt]) + 1;
-	tmp = malloc(len);
-	if (tmp == NULL)
-		return -1;
-	p = tmp;
-	for (opt = 0; opt < argc; opt++) {
-		l = strlen(argv[opt]);
-		strlcpy(p, argv[opt], len);
-		len -= l + 1;
-		p += l;
-		*p++ = ' ';
-	}
-	*--p = '\0';
-	loginfox("control command: %s", tmp);
-	free(tmp);
-
 	/* Special commands for our control socket
 	 * as the other end should be blocking until it gets the
 	 * expected reply we should be safely able just to change the
@@ -1626,6 +1607,25 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 		fd->flags |= FD_LISTEN;
 		return 0;
 	}
+
+	/* Log the command */
+	len = 1;
+	for (opt = 0; opt < argc; opt++)
+		len += strlen(argv[opt]) + 1;
+	tmp = malloc(len);
+	if (tmp == NULL)
+		return -1;
+	p = tmp;
+	for (opt = 0; opt < argc; opt++) {
+		l = strlen(argv[opt]);
+		strlcpy(p, argv[opt], len);
+		len -= l + 1;
+		p += l;
+		*p++ = ' ';
+	}
+	*--p = '\0';
+	loginfox("control command: %s", tmp);
+	free(tmp);
 
 	optind = 0;
 	oi = 0;

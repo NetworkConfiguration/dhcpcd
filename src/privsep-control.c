@@ -177,7 +177,7 @@ ps_ctl_recv(void *arg, unsigned short events)
 	if (msglen == 0)
 		goto hangup;
 	if (msglen == -1) {
-		logerr("%s: read", __func__);
+		logerr("%s: recvmsg", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 	}
 
@@ -196,6 +196,12 @@ ps_ctl_listen(void *arg, unsigned short events)
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
 	size_t msglen;
+	struct iovec iov[] = {
+		{ .iov_base = &msglen, .iov_len = sizeof(msglen), }
+	};
+	struct msghdr msg = {
+		.msg_iov = iov, .msg_iovlen = __arraycount(iov),
+	};
 	int fd;
 	struct fd_list *fdl;
 
@@ -209,11 +215,11 @@ ps_ctl_listen(void *arg, unsigned short events)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	fd = ctx->ps_control->fd;
-	len = read(fd, &msglen, sizeof(msglen));
+	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == 0)
 		goto hangup;
 	if (len != sizeof(msglen)) {
-		logerr("%s: read len", __func__);
+		logerr("%s: recvmsg len %zd", __func__, len);
 		goto err;
 	}
 
@@ -222,11 +228,13 @@ ps_ctl_listen(void *arg, unsigned short events)
 		goto err;
 	}
 
-	len = read(fd, ctx->ps_buf, msglen);
+	iov->iov_base = ctx->ps_buf;
+	iov->iov_len = msglen;
+	len = recvmsg(fd, &msg, MSG_WAITALL);
 	if (len == 0)
 		goto hangup;
 	if ((size_t)len != msglen) {
-		logerr("%s: read", __func__);
+		logerr("%s: recvmsg", __func__);
 		goto err;
 	}
 
