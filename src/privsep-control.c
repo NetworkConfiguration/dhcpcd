@@ -94,7 +94,8 @@ ps_ctl_handleargs(struct fd_list *fd, char *data, size_t len)
 		err = control_queue(fd, UNCONST(fd->ctx->cffile),
 		    strlen(fd->ctx->cffile) + 1);
 		return err == -1 ? -1 : 1;
-	} else if (strcmp(data, "--isprivileged") == 0) {
+	} else if (strncmp(data, "--isprivileged",
+		       MIN(strlen("--isprivileged"), len)) == 0) {
 		const char *ret = fd->flags & FD_PRIV ? "true" : "false";
 		return control_queue(fd, ret, strlen(ret) + 1);
 	} else if (strncmp(data, "--listen", MIN(strlen("--listen"), len)) ==
