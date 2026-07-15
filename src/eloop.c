@@ -236,7 +236,6 @@ eloop_event_count(const struct eloop *eloop)
 static int
 eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 {
-	unsigned int cmd = nsignals == 0 ? EV_DELETE : EV_ADD;
 	struct kevent *ke, *kep;
 	size_t i;
 	int err;
@@ -253,8 +252,8 @@ eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 		return -1;
 
 	for (i = 0; i < nsignals; i++)
-		EV_SET(kep++, (uintptr_t)signals[i], EVFILT_SIGNAL, cmd, 0, 0,
-		    NULL);
+		EV_SET(kep++, (uintptr_t)signals[i], EVFILT_SIGNAL,
+		    nsignals == 0 ? EV_DELETE : EV_ADD, 0, 0, NULL);
 
 	err = kevent(eloop->fd, ke, (KEVENT_N)nsignals, NULL, 0, NULL);
 	free(ke);
