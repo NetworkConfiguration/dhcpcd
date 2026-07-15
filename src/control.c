@@ -41,10 +41,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#if defined(__sun)
-#include <ucred.h>
-#endif
-
 #include "common.h"
 #include "config.h"
 #include "control.h"
@@ -102,36 +98,6 @@ control_hangup(struct fd_list *fd)
 {
 	control_free(fd);
 }
-
-#ifdef SO_PEERCRED
-static int
-getpeereid(int fd, uid_t *uid, gid_t *gid)
-{
-	struct ucred creds;
-	socklen_t creds_len = sizeof(creds);
-
-	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &creds_len) == -1)
-		return -1;
-
-	*uid = creds.uid;
-	*gid = creds.gid;
-	return 0;
-}
-#elif defined(__sun)
-static int
-getpeereid(int fd, uid_t *uid, gid_t *gid)
-{
-	ucred_t *ucred = NULL;
-
-	if (getpeerucred(fd, &ucred) == -1)
-		return -1;
-
-	*uid = ucred_geteuid(ucred);
-	*gid = ucred_getegid(ucred);
-	ucred_free(ucred);
-	return 0;
-}
-#endif
 
 static ssize_t
 control_handle_read(struct fd_list *fd)
