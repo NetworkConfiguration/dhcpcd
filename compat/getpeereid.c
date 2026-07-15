@@ -37,11 +37,7 @@ int
 getpeereid(int fd, uid_t *uid, gid_t *gid)
 {
 #if defined(SO_PEERCRED)
-#if defined(__OpenBSD__)
-	struct sockpeercred creds;
-#else
 	struct ucred creds;
-#endif
 	socklen_t creds_len = sizeof(creds);
 
 	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &creds_len) == -1)
