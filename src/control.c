@@ -648,7 +648,14 @@ control_queue(struct fd_list *fd, const void *data, size_t data_len)
 int
 control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
 {
+#ifdef __APPLE__
+	/* why is getgrouplist API is different ..... */
+	int *groups = NULL, *gp;
+#define GID (int)
+#else
 	gid_t *groups = NULL, *gp;
+#define GID
+#endif
 	struct passwd *pw;
 	int ngroups = 10, err = -1;
 
@@ -660,17 +667,17 @@ control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
 	if (groups == NULL)
 		return -1;
 
-	if (getgrouplist(pw->pw_name, gid, groups, &ngroups) == -1) {
+	if (getgrouplist(pw->pw_name, GID gid, groups, &ngroups) == -1) {
 		gp = reallocarray(groups, (size_t)ngroups, sizeof(*groups));
 		if (gp == NULL)
 			goto out;
 		groups = gp;
-		if (getgrouplist(pw->pw_name, gid, groups, &ngroups) == -1)
+		if (getgrouplist(pw->pw_name, GID gid, groups, &ngroups) == -1)
 			goto out;
 	}
 
 	for (gp = groups; ngroups != 0; ngroups--, gp++) {
-		if (*gp == ctx->control_group) {
+		if (*gp == GID ctx->control_group) {
 			err = 1;
 			goto out;
 		}
