@@ -128,29 +128,29 @@ control_handle_read(struct fd_list *fd)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
-		ssize_t perr;
-
-		perr = ps_root_user_ispriv(fd->ctx, uid, gid);
-		if (perr == -1) {
+		err = ps_root_user_ispriv(fd->ctx, uid, gid);
+		if (err == -1) {
 			logerr(__func__);
 			return -1;
 		}
-		if (perr == 0)
+		if (err == 0)
 			fd->flags &= ~FD_PRIV;
 		else
 			fd->flags |= FD_PRIV;
 
 		fd->flags |= FD_SENDLEN;
-		perr = ps_ctl_handleargs(fd, buf, (size_t)bytes);
+		err = ps_ctl_handleargs(fd, buf, (size_t)bytes);
 		fd->flags &= ~FD_SENDLEN;
 		if (!(fd->flags & FD_LISTEN))
 			fd->flags |= FD_COMMAND;
-		if (perr == -1) {
+		if (err == -1) {
 			logerr(__func__);
 			return 0;
 		}
 		iov[0].iov_len = (size_t)bytes;
-		if (perr == 0 && ps_ctl_sendmsg(fd, &msg) == -1) {
+		/* If ps_ctl_handleargs returns 0 that means it didn't
+		 * do anything with the command, so pass it to the manager. */
+		if (err == 0 && ps_ctl_sendmsg(fd, &msg) == -1) {
 			logerr(__func__);
 			return -1;
 		}
@@ -589,7 +589,7 @@ control_send(struct dhcpcd_ctx *ctx, int argc, char *const *argv)
 	return write(ctx->control_fd, buffer, len);
 }
 
-int
+ssize_t
 control_queue(struct fd_list *fd, const void *data, size_t data_len)
 {
 	struct fd_data *d;
@@ -641,8 +641,10 @@ control_queue(struct fd_list *fd, const void *data, size_t data_len)
 	events = ELE_WRITE;
 	if (fd->flags & FD_LISTEN)
 		events |= ELE_READ;
-	return eloop_event_add(fd->ctx->eloop, fd->fd, events,
-	    control_handle_data, fd);
+	if (eloop_event_add(fd->ctx->eloop, fd->fd, events,
+	    control_handle_data, fd) == -1)
+		return -1;
+	return (ssize_t)d->data_len;
 }
 
 int

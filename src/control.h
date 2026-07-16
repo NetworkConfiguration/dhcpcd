@@ -78,7 +78,7 @@ struct fd_list *control_find(struct dhcpcd_ctx *, int);
 struct fd_list *control_new(struct dhcpcd_ctx *, int, unsigned int);
 void control_free(struct fd_list *);
 void control_delete(struct fd_list *);
-int control_queue(struct fd_list *, const void *, size_t);
+ssize_t control_queue(struct fd_list *, const void *, size_t);
 int control_recvmsg(struct fd_list *, struct msghdr *, size_t);
 int control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid);
 #endif

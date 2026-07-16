@@ -83,17 +83,13 @@ ps_ctl_recvmsg(void *arg, unsigned short events)
 ssize_t
 ps_ctl_handleargs(struct fd_list *fd, char *data, size_t len)
 {
-	int err;
-
 	/* Make any change here in dhcpcd.c as well. */
 	if (strncmp(data, "--version", MIN(strlen("--version"), len)) == 0) {
-		err = control_queue(fd, UNCONST(VERSION), strlen(VERSION) + 1);
-		return err == -1 ? -1 : 1;
+		return control_queue(fd, VERSION, strlen(VERSION) + 1);
 	} else if (strncmp(data, "--getconfigfile",
 		       MIN(strlen("--getconfigfile"), len)) == 0) {
-		err = control_queue(fd, UNCONST(fd->ctx->cffile),
+		return control_queue(fd, fd->ctx->cffile,
 		    strlen(fd->ctx->cffile) + 1);
-		return err == -1 ? -1 : 1;
 	} else if (strncmp(data, "--isprivileged",
 		       MIN(strlen("--isprivileged"), len)) == 0) {
 		const char *ret = fd->flags & FD_PRIV ? "true" : "false";
