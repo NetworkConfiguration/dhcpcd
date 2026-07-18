@@ -247,7 +247,6 @@ dho_policy_requested(const struct dho_policy_group *pg, uint32_t option)
 	return 1;
 }
 
-
 int
 dho_policy_opt_requested(const struct dho_policy_group *pg,
     const struct dhcp_opt *dho)
