@@ -50,6 +50,7 @@ struct fd_data {
 	size_t data_size;
 	size_t data_len;
 	unsigned int data_flags;
+#define FD_DATA_SENDLEN 0x01
 };
 TAILQ_HEAD(fd_data_head, fd_data);
 
@@ -65,10 +66,10 @@ struct fd_list {
 };
 TAILQ_HEAD(fd_list_head, fd_list);
 
+#define FD_READ	   0x02U
+#define FD_CONTROL 0x08U
+#define FD_COMMAND 0x04U
 #define FD_LISTEN  0x01U
-#define FD_COMMAND 0x02U
-#define FD_PRIV	   0x04U
-#define FD_SENDLEN 0x08U
 
 int control_start(struct dhcpcd_ctx *, const char *, sa_family_t);
 int control_stop(struct dhcpcd_ctx *);
@@ -78,7 +79,9 @@ struct fd_list *control_find(struct dhcpcd_ctx *, int);
 struct fd_list *control_new(struct dhcpcd_ctx *, int, unsigned int);
 void control_free(struct fd_list *);
 void control_delete(struct fd_list *);
+ssize_t control_queuef(struct fd_list *, const void *, size_t, unsigned int);
 ssize_t control_queue(struct fd_list *, const void *, size_t);
 int control_recvmsg(struct fd_list *, struct msghdr *, size_t);
-int control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid);
+int control_user_ingroup(uid_t, gid_t, gid_t);
+ssize_t control_handle_listen(struct fd_list *);
 #endif

@@ -81,7 +81,7 @@ ps_ctl_recvmsg(void *arg, unsigned short events)
 }
 
 ssize_t
-ps_ctl_handleargs(struct fd_list *fd, char *data, __unused size_t len)
+ps_ctl_handleargs(struct fd_list *fd, const char *data, __unused size_t len)
 {
 	/* Make any change here in dhcpcd.c as well.
 	 * --version is NOT terminated with \n. */
@@ -91,12 +91,12 @@ ps_ctl_handleargs(struct fd_list *fd, char *data, __unused size_t len)
 		return control_queue(fd, fd->ctx->cffile,
 		    strlen(fd->ctx->cffile) + 1);
 	} else if (strcmp(data, "--isprivileged\n") == 0) {
-		const char *ret = fd->flags & FD_PRIV ? "true" : "false";
+		const char *ret = fd->flags & FD_CONTROL ? "true" : "false";
 		return control_queue(fd, ret, strlen(ret) + 1);
-	} else if (strcmp(data, "--listen\n") == 0) {
-		fd->flags |= FD_LISTEN;
-		return 1;
-	}
+	} else if (strcmp(data, "--listen\n") == 0)
+		return control_handle_listen(fd);
+
+	fd->flags |= FD_COMMAND;
 	return 0;
 }
 
@@ -105,12 +105,14 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	struct fd_list *fd;
-	unsigned int fd_flags = FD_SENDLEN;
+	unsigned int fd_flags = 0;
 	int err;
 
 	switch (psm->ps_cmd) {
-	case PS_CTL_PRIV:
-		fd_flags |= FD_PRIV; /* FALLTHROUGH */
+	case PS_CTL_CONTROL:
+		fd_flags |= FD_CONTROL; /* FALLTHROUGH */
+	case PS_CTL_READ:
+		fd_flags |= FD_READ; /* FALLTHROUGH */
 	case PS_CTL:
 		if (msg->msg_iovlen != 1) {
 			errno = EINVAL;
@@ -179,7 +181,7 @@ ps_ctl_recv(void *arg, unsigned short events)
 	TAILQ_FOREACH(fdl, &ctx->control_fds, next) {
 		if (!(fdl->flags & FD_COMMAND))
 			continue;
-		if (control_queue(fdl, buf, (size_t)msglen) == -1)
+		if (control_queuef(fdl, buf, (size_t)msglen, 0) == -1)
 			logerr("%s: control_queue", __func__);
 	}
 }
@@ -283,8 +285,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 		psp->psp_work_fd = work_fd[0];
 		close(work_fd[1]);
 		close(listen_fd[1]);
-		ctx->ps_control = control_new(ctx, listen_fd[0],
-		    FD_SENDLEN | FD_LISTEN);
+		ctx->ps_control = control_new(ctx, listen_fd[0], FD_LISTEN);
 		if (ctx->ps_control == NULL)
 			return -1;
 		return pid;
@@ -319,8 +320,14 @@ ssize_t
 ps_ctl_sendmsg(struct fd_list *fd, const struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = fd->ctx;
-	uint16_t cmd = fd->flags & FD_PRIV ? PS_CTL_PRIV : PS_CTL;
+	uint16_t cmd;
 	unsigned long flags = (unsigned long)fd->fd;
 
+	if (fd->flags & FD_CONTROL)
+		cmd = PS_CTL_CONTROL;
+	else if (fd->flags & FD_READ)
+		cmd = PS_CTL_READ;
+	else
+		cmd = PS_CTL;
 	return ps_sendmsg(ctx, PS_CTL_FD(ctx), cmd, flags, msg);
 }

@@ -321,13 +321,13 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx, mode_t mode, void *data,
 }
 
 static ssize_t
-ps_root_douser_ispriv(struct dhcpcd_ctx *ctx, void *data, size_t len)
+ps_root_douser_ingroup(void *data, size_t len)
 {
 	uid_t uid;
-	gid_t gid;
+	gid_t gid, grpid;
 	uint8_t *p;
 
-	if (len != sizeof(uid) + sizeof(gid)) {
+	if (len != sizeof(uid) + sizeof(gid) + sizeof(grpid)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -336,8 +336,10 @@ ps_root_douser_ispriv(struct dhcpcd_ctx *ctx, void *data, size_t len)
 	memcpy(&uid, p, sizeof(uid));
 	p += sizeof(uid);
 	memcpy(&gid, p, sizeof(gid));
+	p += sizeof(gid);
+	memcpy(&grpid, p, sizeof(grpid));
 
-	return control_user_ispriv(ctx, uid, gid);
+	return control_user_ingroup(uid, gid, grpid);
 }
 
 #ifdef AUTH
@@ -583,8 +585,8 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	case PS_LOGREOPEN:
 		err = logopen(ctx->logfile);
 		break;
-	case PS_USER_ISPRIV:
-		err = ps_root_douser_ispriv(ctx, data, len);
+	case PS_USER_INGROUP:
+		err = ps_root_douser_ingroup(data, len);
 		break;
 #ifdef AUTH
 	case PS_AUTH_MONORDM:
@@ -1143,22 +1145,29 @@ ps_root_logreopen(struct dhcpcd_ctx *ctx)
 }
 
 ssize_t
-ps_root_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
+ps_root_user_ingroup(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid, gid_t grpid)
 {
-	struct iovec iov[] = { {
-				   .iov_base = &uid,
-				   .iov_len = sizeof(uid),
-			       },
+	struct iovec iov[] = {
+		{
+		    .iov_base = &uid,
+		    .iov_len = sizeof(uid),
+		},
 		{
 		    .iov_base = &gid,
 		    .iov_len = sizeof(gid),
-		} };
+		},
+		{
+		    .iov_base = &grpid,
+		    .iov_len = sizeof(grpid),
+		},
+
+	};
 	struct msghdr msg = {
 		.msg_iov = iov,
 		.msg_iovlen = __arraycount(iov),
 	};
 
-	if (ps_sendmsg(ctx, PS_ROOT_FD(ctx), PS_USER_ISPRIV, 0, &msg) == -1) {
+	if (ps_sendmsg(ctx, PS_ROOT_FD(ctx), PS_USER_INGROUP, 0, &msg) == -1) {
 		logerr(__func__);
 		return -1;
 	}

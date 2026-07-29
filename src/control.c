@@ -103,7 +103,7 @@ static ssize_t
 control_handle_read(struct fd_list *fd)
 {
 	uid_t uid;
-	gid_t gid;
+	gid_t gid, in_gid;
 	char buf[BUFSIZ];
 	struct iovec iov[] = { {
 	    .iov_base = buf,
@@ -128,25 +128,41 @@ control_handle_read(struct fd_list *fd)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
-		err = ps_root_user_ispriv(fd->ctx, uid, gid);
+		in_gid = fd->ctx->control_group;
+		if (uid == 0)
+			err = 1;
+		else
+			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
 		if (err == -1) {
 			logerr(__func__);
 			return -1;
 		}
-		if (err == 0)
-			fd->flags &= ~FD_PRIV;
-		else
-			fd->flags |= FD_PRIV;
+		if (err == 0) {
+			fd->flags &= ~FD_CONTROL;
+			in_gid = fd->ctx->read_group;
+			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
+			if (err == -1) {
+				logerr(__func__);
+				return -1;
+			}
+			if (err == 0)
+				fd->flags &= ~FD_READ;
+			else
+				fd->flags |= FD_READ;
+		} else
+			fd->flags |= FD_CONTROL | FD_READ;
 
-		fd->flags |= FD_SENDLEN;
 		err = ps_ctl_handleargs(fd, buf, (size_t)bytes);
-		fd->flags &= ~FD_SENDLEN;
-		if (!(fd->flags & FD_LISTEN))
-			fd->flags |= FD_COMMAND;
 		if (err == -1) {
 			logerr(__func__);
 			return 0;
 		}
+
+		if (fd->flags & FD_LISTEN)
+			fd->flags &= ~FD_COMMAND;
+		else
+			fd->flags |= FD_COMMAND;
+
 		iov[0].iov_len = (size_t)bytes;
 		/* If ps_ctl_handleargs returns 0 that means it didn't
 		 * do anything with the command, so pass it to the manager. */
@@ -158,15 +174,26 @@ control_handle_read(struct fd_list *fd)
 	}
 #endif
 
-	err = control_user_ispriv(fd->ctx, uid, gid);
+	in_gid = fd->ctx->control_group;
+	err = control_user_ingroup(uid, gid, in_gid);
 	if (err == -1) {
 		logerr(__func__);
 		return -1;
 	}
-	if (err == 0)
-		fd->flags &= ~FD_PRIV;
-	else
-		fd->flags |= FD_PRIV;
+	if (err == 0) {
+		fd->flags &= ~FD_CONTROL;
+		in_gid = fd->ctx->read_group;
+		err = control_user_ingroup(uid, gid, in_gid);
+		if (err == -1) {
+			logerr(__func__);
+			return -1;
+		}
+		if (err == 0)
+			fd->flags &= ~FD_READ;
+		else
+			fd->flags |= FD_READ;
+	} else
+		fd->flags |= FD_CONTROL | FD_READ;
 	return control_recvmsg(fd, &msg, (size_t)bytes);
 }
 
@@ -180,12 +207,13 @@ control_handle_write(struct fd_list *fd)
 
 	data = TAILQ_FIRST(&fd->queue);
 
-	if (data->data_flags & FD_SENDLEN) {
+	if (data->data_flags & FD_DATA_SENDLEN) {
 		iov[0].iov_base = &data->data_len;
 		iov[0].iov_len = sizeof(data->data_len);
 		iov[1].iov_base = data->data;
 		iov[1].iov_len = data->data_len;
 		msg.msg_iovlen = 2;
+
 	} else {
 		iov[0].iov_base = data->data;
 		iov[0].iov_len = data->data_len;
@@ -306,7 +334,7 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 		}
 		*ap = NULL;
 		if (dhcpcd_handleargs(fd->ctx, fd, argc, argvp) == -1) {
-			logerr(__func__);
+			logerr("%s: dhcpcd_handleargs", __func__);
 			if (errno != EINTR && errno != EAGAIN && errno != EPERM)
 				return -1;
 		}
@@ -379,12 +407,6 @@ control_handle1(struct dhcpcd_ctx *ctx, int lfd, unsigned int fd_flags,
 	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 		goto error;
 
-#ifdef PRIVSEP
-	if (IN_PRIVSEP(ctx) && !IN_PRIVSEP_SE(ctx))
-		;
-	else
-#endif
-		fd_flags |= FD_SENDLEN;
 	l = control_new(ctx, fd, fd_flags);
 	if (l == NULL)
 		goto error;
@@ -590,7 +612,8 @@ control_send(struct dhcpcd_ctx *ctx, int argc, char *const *argv)
 }
 
 ssize_t
-control_queue(struct fd_list *fd, const void *data, size_t data_len)
+control_queuef(struct fd_list *fd, const void *data, size_t data_len,
+    unsigned int flags)
 {
 	struct fd_data *d;
 	unsigned short events;
@@ -635,20 +658,26 @@ control_queue(struct fd_list *fd, const void *data, size_t data_len)
 	}
 	memcpy(d->data, data, data_len);
 	d->data_len = data_len;
-	d->data_flags = fd->flags & FD_SENDLEN;
+	d->data_flags = flags;
 
 	TAILQ_INSERT_TAIL(&fd->queue, d, next);
 	events = ELE_WRITE;
 	if (fd->flags & FD_LISTEN)
 		events |= ELE_READ;
-	if (eloop_event_add(fd->ctx->eloop, fd->fd, events,
-	    control_handle_data, fd) == -1)
+	if (eloop_event_add(fd->ctx->eloop, fd->fd, events, control_handle_data,
+		fd) == -1)
 		return -1;
 	return (ssize_t)d->data_len;
 }
 
+ssize_t
+control_queue(struct fd_list *fd, const void *data, size_t data_len)
+{
+	return control_queuef(fd, data, data_len, FD_DATA_SENDLEN);
+}
+
 int
-control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
+control_user_ingroup(uid_t uid, gid_t gid, gid_t grpid)
 {
 #ifdef __APPLE__
 	/* why is getgrouplist API is different ..... */
@@ -679,7 +708,7 @@ control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
 	}
 
 	for (gp = groups; ngroups != 0; ngroups--, gp++) {
-		if (*gp == GID ctx->control_group) {
+		if (*gp == GID grpid) {
 			err = 1;
 			goto out;
 		}
@@ -689,4 +718,20 @@ control_user_ispriv(struct dhcpcd_ctx *ctx, uid_t uid, gid_t gid)
 out:
 	free(groups);
 	return err;
+}
+
+ssize_t
+control_handle_listen(struct fd_list *fd)
+{
+	int err;
+
+	if (fd->flags & FD_READ) {
+		err = 0;
+		if (!(fd->flags & FD_COMMAND))
+			fd->flags |= FD_LISTEN;
+	} else {
+		err = errno = EPERM;
+		logwarn(__func__);
+	}
+	return control_queuef(fd, &err, sizeof(err), 0);
 }

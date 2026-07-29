@@ -34,7 +34,7 @@
 
 pid_t ps_ctl_start(struct dhcpcd_ctx *);
 int ps_ctl_stop(struct dhcpcd_ctx *);
-ssize_t ps_ctl_handleargs(struct fd_list *, char *, size_t);
+ssize_t ps_ctl_handleargs(struct fd_list *, const char *, size_t);
 ssize_t ps_ctl_sendmsg(struct fd_list *, const struct msghdr *);
 ssize_t ps_ctl_sendeof(struct dhcpcd_ctx *);
 
