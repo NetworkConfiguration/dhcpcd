@@ -1581,7 +1581,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 {
 	struct interface *ifp;
 	struct if_options *ifo;
-	unsigned long long opts, orig_opts;
+	unsigned long long opts = 0, orig_opts;
 	int opt, oi, oifind, af = AF_UNSPEC, error;
 	bool do_getifs = false, do_reboot = false, do_renew = false;
 	size_t len, l, nifaces;
@@ -1631,7 +1631,6 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc,
 	free(tmp);
 
 	oi = 0;
-	opts = 0;
 	do_reboot = do_renew = false;
 	while (
 	    (opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1) {

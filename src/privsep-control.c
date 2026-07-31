@@ -81,19 +81,22 @@ ps_ctl_recvmsg(void *arg, unsigned short events)
 }
 
 ssize_t
-ps_ctl_handleargs(struct fd_list *fd, const char *data, __unused size_t len)
+ps_ctl_handleargs(struct fd_list *fd, const char *data, size_t len)
 {
+#define strclcmp(d, l, c) \
+	((l) >= (__arraycount((c)) - 1) ? strncmp((d), (c), (l)) : -1)
+
 	/* Make any change here in dhcpcd.c as well.
 	 * --version is NOT terminated with \n. */
-	if (strcmp(data, "--version") == 0) {
+	if (strclcmp(data, len, "--version") == 0)
 		return control_queue(fd, VERSION, strlen(VERSION) + 1);
-	} else if (strcmp(data, "--getconfigfile\n") == 0) {
+	else if (strclcmp(data, len, "--getconfigfile\n") == 0)
 		return control_queue(fd, fd->ctx->cffile,
 		    strlen(fd->ctx->cffile) + 1);
-	} else if (strcmp(data, "--isprivileged\n") == 0) {
+	else if (strclcmp(data, len, "--isprivileged\n") == 0) {
 		const char *ret = fd->flags & FD_CONTROL ? "true" : "false";
 		return control_queue(fd, ret, strlen(ret) + 1);
-	} else if (strcmp(data, "--listen\n") == 0)
+	} else if (strclcmp(data, len, "--listen\n") == 0)
 		return control_handle_listen(fd);
 
 	fd->flags |= FD_COMMAND;
