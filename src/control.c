@@ -200,25 +200,42 @@ control_handle_read(struct fd_list *fd)
 static ssize_t
 control_handle_write(struct fd_list *fd)
 {
-	struct iovec iov[2];
+	struct iovec iov[4];
 	struct msghdr msg = { .msg_iov = iov };
 	struct fd_data *data;
 	ssize_t len;
+#ifdef PRIVSEP
+	size_t peer_len;
+#endif
 
 	data = TAILQ_FIRST(&fd->queue);
 
-	if (data->data_flags & FD_DATA_SENDLEN) {
-		iov[0].iov_base = &data->data_len;
-		iov[0].iov_len = sizeof(data->data_len);
-		iov[1].iov_base = data->data;
-		iov[1].iov_len = data->data_len;
-		msg.msg_iovlen = 2;
+#ifdef PRIVSEP
+	if (data->data_peer_fd != -1) {
+		/* Control messages for a peer are prefixed with it's fd
+		 * fd and message length. */
+		iov[msg.msg_iovlen].iov_base = &data->data_peer_fd;
+		iov[msg.msg_iovlen].iov_len = sizeof(data->data_peer_fd);
+		msg.msg_iovlen++;
 
-	} else {
-		iov[0].iov_base = data->data;
-		iov[0].iov_len = data->data_len;
-		msg.msg_iovlen = 1;
+		peer_len = data->data_len;
+		if (data->data_flags & FD_DATA_SENDLEN)
+			peer_len += sizeof(data->data_len);
+		iov[msg.msg_iovlen].iov_base = &peer_len;
+		iov[msg.msg_iovlen].iov_len = sizeof(peer_len);
+		msg.msg_iovlen++;
 	}
+#endif
+
+	if (data->data_flags & FD_DATA_SENDLEN) {
+		iov[msg.msg_iovlen].iov_base = &data->data_len;
+		iov[msg.msg_iovlen].iov_len = sizeof(data->data_len);
+		msg.msg_iovlen++;
+	}
+
+	iov[msg.msg_iovlen].iov_base = data->data;
+	iov[msg.msg_iovlen].iov_len = data->data_len;
+	msg.msg_iovlen++;
 
 	len = sendmsg(fd->fd, &msg, 0);
 	if (len == -1) {
@@ -380,6 +397,9 @@ control_new(struct dhcpcd_ctx *ctx, int fd, unsigned int flags)
 	TAILQ_INIT(&l->queue);
 #ifdef CTL_FREE_LIST
 	TAILQ_INIT(&l->free_queue);
+#endif
+#ifdef PRIVSEP
+	l->peer_fd = -1;
 #endif
 	TAILQ_INSERT_TAIL(&ctx->control_fds, l, next);
 	return l;
@@ -659,6 +679,9 @@ control_queuef(struct fd_list *fd, const void *data, size_t data_len,
 	memcpy(d->data, data, data_len);
 	d->data_len = data_len;
 	d->data_flags = flags;
+#ifdef PRIVSEP
+	d->data_peer_fd = fd->peer_fd;
+#endif
 
 	TAILQ_INSERT_TAIL(&fd->queue, d, next);
 	events = ELE_WRITE;

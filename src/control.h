@@ -51,6 +51,9 @@ struct fd_data {
 	size_t data_len;
 	unsigned int data_flags;
 #define FD_DATA_SENDLEN 0x01
+#ifdef PRIVSEP
+	int data_peer_fd;
+#endif
 };
 TAILQ_HEAD(fd_data_head, fd_data);
 
@@ -63,13 +66,16 @@ struct fd_list {
 #ifdef CTL_FREE_LIST
 	struct fd_data_head free_queue;
 #endif
+#ifdef PRIVSEP
+	int peer_fd;
+#endif
 };
 TAILQ_HEAD(fd_list_head, fd_list);
 
-#define FD_READ	   0x02U
-#define FD_CONTROL 0x08U
+#define FD_READ	   0x01U
+#define FD_CONTROL 0x02U
 #define FD_COMMAND 0x04U
-#define FD_LISTEN  0x01U
+#define FD_LISTEN  0x08U
 
 int control_start(struct dhcpcd_ctx *, const char *, sa_family_t);
 int control_stop(struct dhcpcd_ctx *);

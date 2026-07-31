@@ -106,7 +106,8 @@ ps_ctl_handleargs(struct fd_list *fd, const char *data, size_t len)
 static ssize_t
 ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
-	struct dhcpcd_ctx *ctx = arg;
+	struct ps_process *psp = arg;
+	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 	struct fd_list *fd;
 	unsigned int fd_flags = 0;
 	int err;
@@ -124,6 +125,7 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		fd = control_new(ctx, ctx->ps_ctl->psp_work_fd, fd_flags);
 		if (fd == NULL)
 			return -1;
+		fd->peer_fd = (int)psm->ps_flags;
 		err = control_recvmsg(fd, msg, psm->ps_datalen);
 		if (err == -1 || err == 0)
 			control_free(fd);
@@ -141,7 +143,7 @@ ps_ctl_dodispatch(void *arg, unsigned short events)
 	struct ps_process *psp = arg;
 
 	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events, ps_ctl_dispatch,
-		psp->psp_ctx) == -1)
+		psp) == -1)
 		logerr(__func__);
 }
 
@@ -149,17 +151,18 @@ static void
 ps_ctl_recv(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	char buf[BUFSIZ];
-	struct iovec iov[] = { {
-	    .iov_base = buf,
-	    .iov_len = sizeof(buf),
-	} };
+	int fd, peer_fd;
+	size_t msglen;
+	/* Control messages for a peer are prefixed with fd and message len */
+	struct iovec iov[] = {
+		{ .iov_base = &peer_fd, .iov_len = sizeof(peer_fd), },
+		{ .iov_base = &msglen, .iov_len = sizeof(msglen), },
+	};
 	struct msghdr msg = {
 		.msg_iov = iov,
 		.msg_iovlen = __arraycount(iov),
 	};
-	ssize_t msglen;
-	int fd;
+	ssize_t rlen;
 	struct fd_list *fdl;
 
 	if (events & ELE_HANGUP) {
@@ -172,20 +175,57 @@ ps_ctl_recv(void *arg, unsigned short events)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	fd = ctx->ps_ctl->psp_work_fd;
-	msglen = recvmsg(fd, &msg, 0);
-	if (msglen == 0)
+	rlen = recvmsg(fd, &msg, MSG_WAITALL);
+	if (rlen == 0)
 		goto hangup;
-	if (msglen == -1) {
-		logerr("%s: recvmsg", __func__);
+	if (rlen == -1) {
+		logerr("%s: recvmsg hdr", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+	if (rlen != sizeof(peer_fd) + sizeof(msglen)) {
+		errno = EINVAL;
+		logerr("%s: recvmsg hdr", __func__);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
 	}
 
-	/* Send to our command controls */
+	if (ctx->io_buflen < msglen) {
+		void *n = realloc(ctx->io_buf, msglen);
+		if (n == NULL) {
+			logerr(__func__);
+			eloop_exit(ctx->eloop, EXIT_FAILURE);
+			return;
+		}
+		ctx->io_buf = n;
+		ctx->io_buflen = msglen;
+	}
+
+	iov[0].iov_base = ctx->io_buf;
+	iov[0].iov_len = msglen;
+	msg.msg_iovlen = 1;
+	rlen = recvmsg(fd, &msg, MSG_WAITALL);
+	if (rlen == 0)
+		goto hangup;
+	if (rlen == -1) {
+		logerr("%s: recvmsg msg", __func__);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+	if ((size_t)rlen != msglen) {
+		errno = EINVAL;
+		logerr("%s: recvmsg msg", __func__);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+
+	/* Send to our peer */
 	TAILQ_FOREACH(fdl, &ctx->control_fds, next) {
-		if (!(fdl->flags & FD_COMMAND))
+		if (fdl->fd != peer_fd)
 			continue;
-		if (control_queuef(fdl, buf, (size_t)msglen, 0) == -1)
+		if (control_queuef(fdl, ctx->io_buf, (size_t)msglen, 0) == -1)
 			logerr("%s: control_queue", __func__);
+		break;
 	}
 }
 
