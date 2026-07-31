@@ -1716,8 +1716,10 @@ doauth:
 	send_nifs:
 		if (control_queuef(fd, &nifaces, sizeof(nifaces), 0) == -1)
 			goto dumperr;
-		if (error != 0)
+		if (error != 0) {
+			errno = error;
 			goto dumperr;
+		}
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (!ifp->active)
 				continue;

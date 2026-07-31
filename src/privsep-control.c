@@ -84,7 +84,7 @@ ssize_t
 ps_ctl_handleargs(struct fd_list *fd, const char *data, size_t len)
 {
 #define strclcmp(d, l, c) \
-	((l) >= (__arraycount((c)) - 1) ? strncmp((d), (c), (l)) : -1)
+	((l) == (__arraycount((c))) ? strncmp((d), (c), (l)) : -1)
 
 	/* Make any change here in dhcpcd.c as well.
 	 * --version is NOT terminated with \n. */
