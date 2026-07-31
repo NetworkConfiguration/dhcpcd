@@ -155,8 +155,14 @@ ps_ctl_recv(void *arg, unsigned short events)
 	size_t msglen;
 	/* Control messages for a peer are prefixed with fd and message len */
 	struct iovec iov[] = {
-		{ .iov_base = &peer_fd, .iov_len = sizeof(peer_fd), },
-		{ .iov_base = &msglen, .iov_len = sizeof(msglen), },
+		{
+		    .iov_base = &peer_fd,
+		    .iov_len = sizeof(peer_fd),
+		},
+		{
+		    .iov_base = &msglen,
+		    .iov_len = sizeof(msglen),
+		},
 	};
 	struct msghdr msg = {
 		.msg_iov = iov,
@@ -189,6 +195,9 @@ ps_ctl_recv(void *arg, unsigned short events)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
+
+	if (msglen == 0) /* ulikely */
+		return;
 
 	if (ctx->io_buflen < msglen) {
 		void *n = realloc(ctx->io_buf, msglen);
