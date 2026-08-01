@@ -204,6 +204,7 @@ struct dhcpcd_ctx {
 	struct fd_list *ps_control; /* Queue for the above */
 	void *ps_buf;		    /* IPC buffer */
 	size_t ps_buflen;	    /* IPC buffer length */
+	unsigned int ps_control_id; /* Unique monotonic control ID */
 #endif
 
 #ifdef INET

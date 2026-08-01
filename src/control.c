@@ -211,11 +211,11 @@ control_handle_write(struct fd_list *fd)
 	data = TAILQ_FIRST(&fd->queue);
 
 #ifdef PRIVSEP
-	if (data->data_peer_fd != -1) {
+	if (data->data_peer_id != 0) {
 		/* Control messages for a peer are prefixed with it's fd
 		 * fd and message length. */
-		iov[msg.msg_iovlen].iov_base = &data->data_peer_fd;
-		iov[msg.msg_iovlen].iov_len = sizeof(data->data_peer_fd);
+		iov[msg.msg_iovlen].iov_base = &data->data_peer_id;
+		iov[msg.msg_iovlen].iov_len = sizeof(data->data_peer_id);
 		msg.msg_iovlen++;
 
 		peer_len = data->data_len;
@@ -380,11 +380,34 @@ struct fd_list *
 control_new(struct dhcpcd_ctx *ctx, int fd, unsigned int flags)
 {
 	struct fd_list *l;
+	size_t cnt;
+#ifdef PRIVSEP
+	struct fd_list *n;
+	unsigned int id;
+#endif
 
 	l = control_find(ctx, fd);
 	if (l != NULL) {
 		l->flags = flags;
 		return l;
+	}
+
+#ifdef PRIVSEP
+again:
+	id = ++ctx->ps_control_id;
+	if (id == 0) /* wrapped */
+		id = ++ctx->ps_control_id;
+#endif
+	cnt = 0;
+	TAILQ_FOREACH(n, &ctx->control_fds, next) {
+		if (++cnt >= CONTROL_PEER_MAX) {
+			errno = ENOBUFS;
+			return NULL;
+		}
+#ifdef PRIVSEP
+		if (n->id == id)
+			goto again;
+#endif
 	}
 
 	l = malloc(sizeof(*l));
@@ -399,7 +422,8 @@ control_new(struct dhcpcd_ctx *ctx, int fd, unsigned int flags)
 	TAILQ_INIT(&l->free_queue);
 #endif
 #ifdef PRIVSEP
-	l->peer_fd = -1;
+	l->peer_id = 0;
+	l->id = id;
 #endif
 	TAILQ_INSERT_TAIL(&ctx->control_fds, l, next);
 	return l;
@@ -680,7 +704,7 @@ control_queuef(struct fd_list *fd, const void *data, size_t data_len,
 	d->data_len = data_len;
 	d->data_flags = flags;
 #ifdef PRIVSEP
-	d->data_peer_fd = fd->peer_fd;
+	d->data_peer_id = fd->peer_id;
 #endif
 
 	TAILQ_INSERT_TAIL(&fd->queue, d, next);

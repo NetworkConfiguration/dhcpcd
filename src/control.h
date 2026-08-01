@@ -41,6 +41,9 @@
 #undef CTL_FREE_LIST
 #endif
 
+/* Maximum number of control socket users */
+#define CONTROL_PEER_MAX 10
+
 /* Limit queue size per fd */
 #define CONTROL_QUEUE_MAX 100
 
@@ -52,7 +55,7 @@ struct fd_data {
 	unsigned int data_flags;
 #define FD_DATA_SENDLEN 0x01
 #ifdef PRIVSEP
-	int data_peer_fd;
+	unsigned int data_peer_id;
 #endif
 };
 TAILQ_HEAD(fd_data_head, fd_data);
@@ -67,7 +70,8 @@ struct fd_list {
 	struct fd_data_head free_queue;
 #endif
 #ifdef PRIVSEP
-	int peer_fd;
+	unsigned int id;
+	unsigned int peer_id;
 #endif
 };
 TAILQ_HEAD(fd_list_head, fd_list);

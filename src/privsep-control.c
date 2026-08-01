@@ -125,7 +125,7 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		fd = control_new(ctx, ctx->ps_ctl->psp_work_fd, fd_flags);
 		if (fd == NULL)
 			return -1;
-		fd->peer_fd = (int)psm->ps_flags;
+		fd->peer_id = (unsigned int)psm->ps_flags;
 		err = control_recvmsg(fd, msg, psm->ps_datalen);
 		if (err == -1 || err == 0)
 			control_free(fd);
@@ -151,13 +151,14 @@ static void
 ps_ctl_recv(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	int fd, peer_fd;
+	int fd;
+	unsigned int peer_id;
 	size_t msglen;
 	/* Control messages for a peer are prefixed with fd and message len */
 	struct iovec iov[] = {
 		{
-		    .iov_base = &peer_fd,
-		    .iov_len = sizeof(peer_fd),
+		    .iov_base = &peer_id,
+		    .iov_len = sizeof(peer_id),
 		},
 		{
 		    .iov_base = &msglen,
@@ -189,7 +190,7 @@ ps_ctl_recv(void *arg, unsigned short events)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
-	if (rlen != sizeof(peer_fd) + sizeof(msglen)) {
+	if (rlen != sizeof(peer_id) + sizeof(msglen)) {
 		errno = EINVAL;
 		logerr("%s: recvmsg hdr", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -230,7 +231,7 @@ ps_ctl_recv(void *arg, unsigned short events)
 
 	/* Send to our peer */
 	TAILQ_FOREACH(fdl, &ctx->control_fds, next) {
-		if (fdl->fd != peer_fd)
+		if (fdl->id != peer_id)
 			continue;
 		if (control_queuef(fdl, ctx->io_buf, (size_t)msglen, 0) == -1)
 			logerr("%s: control_queue", __func__);
@@ -373,7 +374,7 @@ ps_ctl_sendmsg(struct fd_list *fd, const struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = fd->ctx;
 	uint16_t cmd;
-	unsigned long flags = (unsigned long)fd->fd;
+	unsigned long flags = (unsigned long)fd->id;
 
 	if (fd->flags & FD_CONTROL)
 		cmd = PS_CTL_CONTROL;
