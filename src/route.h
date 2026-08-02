@@ -139,9 +139,9 @@ struct rt {
 	rb_node_t rt_tree;
 
 #ifdef HAVE_ROUTE_LIFETIME
-	struct timespec rt_aquired; /* timestamp of aquisition */
-	uint32_t rt_lifetime;	    /* current lifetime of route */
-#define RTLIFETIME_DEV_MAX 2	    /* max deviation for cmp */
+	struct timespec rt_acquired; /* timestamp of acquisition */
+	uint32_t rt_lifetime;	     /* current lifetime of route */
+#define RTLIFETIME_DEV_MAX 2	     /* max deviation for cmp */
 #endif
 };
 

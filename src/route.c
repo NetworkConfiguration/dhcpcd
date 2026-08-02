@@ -558,7 +558,7 @@ rt_cmp_lifetime(struct rt *nrt, struct rt *ort)
 	struct timespec ts;
 	uint32_t deviation;
 
-	timespecsub(&nrt->rt_aquired, &ort->rt_aquired, &ts);
+	timespecsub(&nrt->rt_acquired, &ort->rt_acquired, &ts);
 	if (ts.tv_sec < 0)
 		ts.tv_sec = -ts.tv_sec;
 	if (ts.tv_sec > RTLIFETIME_DEV_MAX)
