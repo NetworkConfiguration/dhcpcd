@@ -753,7 +753,12 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    rt_cmp_mtu(rt, or) != 0) {
 			if (!rt_add(kroutes, rt, or))
 				return false;
+		} else {
+#ifdef HAVE_ROUTE_LIFETIME
+			rt->rt_acquired = or->rt_acquired;
+#endif
 		}
+
 		rb_tree_remove_node(&ctx->routes, or);
 		rt_free(or);
 	} else {
