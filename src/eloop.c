@@ -236,7 +236,7 @@ eloop_event_count(const struct eloop *eloop)
 static int
 eloop_signal_kqueue(struct eloop *eloop, const int *signals, size_t nsignals)
 {
-	unsigned int cmd = nsignals == 0 ? EV_DELETE : EV_ADD;
+	unsigned short cmd = nsignals == 0 ? EV_DELETE : EV_ADD;
 	struct kevent *ke, *kep;
 	size_t i;
 	int err;

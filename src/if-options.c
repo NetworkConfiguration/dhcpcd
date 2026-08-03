@@ -158,6 +158,7 @@ const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "dhcp6", no_argument, NULL, O_DHCP6 },
 	{ "nodhcp6", no_argument, NULL, O_NODHCP6 },
 	{ "controlgroup", required_argument, NULL, O_CONTROLGRP },
+	{ "readgroup", required_argument, NULL, O_READGRP },
 	{ "slaac", required_argument, NULL, O_SLAAC },
 	{ "gateway", no_argument, NULL, O_GATEWAY },
 	{ "reject", required_argument, NULL, O_REJECT },
@@ -2431,6 +2432,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options &= ~DHCPCD_DHCP6;
 		break;
 	case O_CONTROLGRP:
+	case O_READGRP:
 		ARG_REQUIRED;
 #ifdef PRIVSEP
 		/* Control group is already set by this point.
@@ -2472,21 +2474,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		if (grp == NULL) {
-			if (!ctx->control_group)
-				logerrx("controlgroup: %s: not found", arg);
+			logerrx("group: %s: not found", arg);
 			free(p);
 			return -1;
 		}
-		ctx->control_group = grp->gr_gid;
+		switch (opt) {
+		case O_CONTROLGRP:
+			ctx->control_group = grp->gr_gid;
+			break;
+		case O_READGRP:
+			ctx->read_group = grp->gr_gid;
+			break;
+		}
 		free(p);
 #else
 		grp = getgrnam(arg);
 		if (grp == NULL) {
-			if (!ctx->control_group)
-				logerrx("controlgroup: %s: not found", arg);
+			logerrx("group: %s: not found", arg);
 			return -1;
 		}
-		ctx->control_group = grp->gr_gid;
+		switch (opt) {
+		case O_CONTROLGRP:
+			ctx->control_group = grp->gr_gid;
+			break;
+		case O_READGRP:
+			ctx->read_group = grp->gr_gid;
+			break;
+		}
 #endif
 		break;
 	case O_GATEWAY:

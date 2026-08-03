@@ -593,7 +593,7 @@ eexit:
 	return -1;
 }
 
-static int
+static ssize_t
 send_interface1(struct fd_list *fd, const struct interface *ifp,
     const char *reason)
 {

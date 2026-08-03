@@ -938,6 +938,29 @@ if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "#include			\"compat/arc4random_uniform.h\"" >>$CONFIG_H
 fi
 
+if [ -z "$GETPEEREID" ]; then
+	printf "Testing for getpeereid ... "
+	cat <<EOF >_getpeereid.c
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+int main(void) {
+	return getpeereid(0, NULL, NULL);
+}
+EOF
+	if $XCC _getpeereid.c -o _getpeereid 2>&3; then
+		GETPEEREID=yes
+	else
+		GETPEEREID=no
+	fi
+	echo "$GETPEEREID"
+	rm -rf _getpeereid.* _getpeereid
+fi
+if [ "$GETPEEREID" = no ]; then
+	echo "COMPAT_SRCS+=	compat/getpeereid.c" >>$CONFIG_MK
+	echo "#include			\"compat/getpeereid.h\"" >>$CONFIG_H
+fi
+
 if [ -z "$MEMSET_EXPLICIT" ]; then
 	printf "Testing for memset_explicit ... "
 	cat <<EOF >_memset_explicit.c

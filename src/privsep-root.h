@@ -53,6 +53,7 @@ ssize_t ps_root_logreopen(struct dhcpcd_ctx *);
 ssize_t ps_root_script(struct dhcpcd_ctx *, const void *, size_t);
 ssize_t ps_root_stopprocesses(struct dhcpcd_ctx *);
 int ps_root_getauthrdm(struct dhcpcd_ctx *, uint64_t *);
+ssize_t ps_root_user_ingroup(struct dhcpcd_ctx *, uid_t, gid_t, gid_t);
 #ifdef PRIVSEP_GETHOSTNAME
 int ps_root_gethostname(struct dhcpcd_ctx *, char *, size_t);
 #endif
