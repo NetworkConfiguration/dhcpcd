@@ -27,8 +27,16 @@ set_zoneinfo()
 		return 1
 	fi
 
+	# disallow directory traversal
+	case "$new_tzdb_timezone" in
+	\.\./*|*/\.\./*)
+		syslog warning "invalid timezone: $new_tzdb_timezone"
+		return 1
+		;;
+	esac
+
 	zone_file="$zoneinfo_dir/$new_tzdb_timezone"
-	if [ ! -e "$zone_file" ]; then
+	if [ ! -f "$zone_file" ]; then
 		syslog warning "no timezone definition for $new_tzdb_timezone"
 		return 1
 	fi

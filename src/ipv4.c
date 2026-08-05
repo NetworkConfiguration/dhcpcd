@@ -338,7 +338,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	/* If configured, install a gateway to the desintion
 	 * for P2P interfaces. */
 	if (ifp->flags & IFF_POINTOPOINT &&
-	    has_option_mask(ifp->options->dstmask, DHO_ROUTER)) {
+	    dho_policy_has(&ifp->options->dhop_destination, DHO_ROUTER)) {
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
 		in.s_addr = INADDR_ANY;
@@ -766,7 +766,7 @@ ipv4_applyaddr(void *arg)
 	}
 
 	/* ipv4_dadaddr() will overwrite this, we need it to purge later */
-	old_ia = state->addr;
+	old_ia = ifp->options->options & DHCPCD_NOALIAS ? NULL : state->addr;
 
 	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	/* If the netmask or broadcast is different, re-add the addresss.
@@ -784,8 +784,11 @@ ipv4_applyaddr(void *arg)
 		/* Linux does not change netmask/broadcast address
 		 * for re-added addresses, so we need to delete the old one
 		 * first. */
-		if (ia != NULL)
+		if (ia != NULL) {
 			ipv4_deladdr(ia, 0);
+			if (ia == old_ia)
+				old_ia = NULL;
+		}
 #endif
 #ifndef IP_LIFETIME
 		if (ipv4_daddaddr(ifp, lease) == -1 && errno != EEXIST)

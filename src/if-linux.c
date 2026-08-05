@@ -170,7 +170,9 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 #endif
 
+#ifdef INET
 static int if_addressexists(struct interface *, struct in_addr *);
+#endif
 
 #define PROC_PROMOTE "/proc/sys/net/ipv4/conf/%s/promote_secondaries"
 #define SYS_BRIDGE   "/sys/class/net/%s/bridge/bridge_id"
@@ -256,12 +258,11 @@ if_machinearch(char *str, size_t len)
 static int
 check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
 {
-	char buf[64];
 	int error, i;
 
-	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
+	if (dhcp_readfile(ctx, path, &ctx->io_buf, &ctx->io_buflen) == -1)
 		return -1;
-	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
+	i = (int)strtoi(ctx->io_buf, NULL, 0, INT_MIN, INT_MAX, &error);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
 		return -1;
@@ -272,12 +273,11 @@ check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
 static int
 check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
 {
-	char buf[64];
 	int error;
 
-	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
+	if (dhcp_readfile(ctx, path, &ctx->io_buf, &ctx->io_buflen) == -1)
 		return -1;
-	*u = (unsigned int)strtou(buf, NULL, 0, 0, UINT_MAX, &error);
+	*u = (unsigned int)strtou(ctx->io_buf, NULL, 0, 0, UINT_MAX, &error);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
 		return error;
@@ -365,10 +365,10 @@ if_conf(struct interface *ifp)
 static bool
 if_bridge(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-	char path[sizeof(SYS_BRIDGE) + IF_NAMESIZE], buf[64];
+	char path[sizeof(SYS_BRIDGE) + IF_NAMESIZE];
 
 	snprintf(path, sizeof(path), SYS_BRIDGE, ifname);
-	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
+	if (dhcp_readfile(ctx, path, &ctx->io_buf, &ctx->io_buflen) == -1)
 		return false;
 	return true;
 }
@@ -1519,7 +1519,7 @@ _if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, void *arg,
 	ie = NLA_DATA(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
 	ie_len = (int)NLA_LEN(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
 	/* ie[0] is type, ie[1] is lenth, ie[2..] is data */
-	while (ie_len >= 2 && ie_len >= ie[1]) {
+	while (ie_len >= 2 && ie_len >= ie[1] + 2) {
 		if (ie[0] == 0) {
 			/* SSID */
 			if (ie[1] > IF_SSIDLEN) {
@@ -1527,7 +1527,8 @@ _if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, void *arg,
 				return -1;
 			}
 			ifp->ssid_len = ie[1];
-			memcpy(ifp->ssid, ie + 2, ifp->ssid_len);
+			if (ifp->ssid_len != 0)
+				memcpy(ifp->ssid, ie + 2, ifp->ssid_len);
 			return (int)ifp->ssid_len;
 		}
 		ie_len -= ie[1] + 2;

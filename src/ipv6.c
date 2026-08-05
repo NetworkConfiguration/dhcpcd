@@ -590,7 +590,7 @@ ipv6_userprefix(const struct in6_addr *prefix, // prefix from router
 		if (prefix_len >= 64)
 			user_high = 0;
 		else
-			user_high = user_number >> (result_len - prefix_len);
+			user_high = user_number >> (result_len - 64);
 		user_low = user_number << (128 - result_len);
 	} else if (result_len == 64) {
 		user_high = user_number;
@@ -785,8 +785,9 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 
 #ifdef IPV6_MANAGETEMPADDR
 	/* RFC4941 Section 3.4 */
-	if (ia->flags & IPV6_AF_TEMPORARY && ia->prefix_pltime &&
-	    ia->prefix_vltime && ifp->options->options & DHCPCD_SLAACTEMP)
+	if (ia->flags & IPV6_AF_TEMPORARY &&
+	    ia->prefix_pltime > REGEN_ADVANCE && ia->prefix_vltime &&
+	    ifp->options->options & DHCPCD_SLAACTEMP)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ia->prefix_pltime - REGEN_ADVANCE, ipv6_regentempaddr, ia);
 #endif
@@ -1984,13 +1985,14 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY && ap->prefix_pltime &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix)) {
-			unsigned int max, ext;
+			unsigned long long elapsed;
+			uint32_t limit, rmtime;
 
 			if (flags == 0) {
-				if (ap->prefix_pltime -
-					(uint32_t)(ia->acquired.tv_sec -
-					    ap->acquired.tv_sec) <
-				    REGEN_ADVANCE)
+				elapsed = eloop_timespec_diff(&ia->acquired,
+				    &ap->acquired, NULL);
+				if (ap->prefix_pltime <= elapsed ||
+				    ap->prefix_pltime - elapsed < REGEN_ADVANCE)
 					continue;
 
 				return ap;
@@ -1999,6 +2001,9 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			if (!(ap->flags & IPV6_AF_ADDED))
 				ap->flags |= IPV6_AF_NEW | IPV6_AF_AUTOCONF;
 			ap->flags &= ~IPV6_AF_STALE;
+
+			elapsed = eloop_timespec_diff(&ia->acquired,
+			    &ap->created, NULL);
 
 			/* RFC4941 Section 3.4
 			 * Deprecated prefix, deprecate the temporary address */
@@ -2013,26 +2018,28 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			/* RFC4941 Section 3.3.2
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
-			ext = (unsigned int)ia->acquired.tv_sec +
-			    ia->prefix_pltime;
-			max = (unsigned int)(ap->created.tv_sec +
-			    TEMP_PREFERRED_LIFETIME - state->desync_factor);
-			if (ext < max)
-				ap->prefix_pltime = ia->prefix_pltime;
-			else
-				ap->prefix_pltime = (uint32_t)(max -
-				    ia->acquired.tv_sec);
+			limit = TEMP_PREFERRED_LIFETIME - state->desync_factor;
+			if (elapsed >= limit)
+				ap->prefix_pltime = 0;
+			else {
+				rmtime = (uint32_t)(limit - elapsed);
+				if (ia->prefix_pltime < rmtime)
+					ap->prefix_pltime = ia->prefix_pltime;
+				else
+					ap->prefix_pltime = rmtime;
+			}
 
 		valid:
-			ext = (unsigned int)ia->acquired.tv_sec +
-			    ia->prefix_vltime;
-			max = (unsigned int)(ap->created.tv_sec +
-			    TEMP_VALID_LIFETIME);
-			if (ext < max)
-				ap->prefix_vltime = ia->prefix_vltime;
-			else
-				ap->prefix_vltime = (uint32_t)(max -
-				    ia->acquired.tv_sec);
+			limit = TEMP_VALID_LIFETIME;
+			if (elapsed >= limit)
+				ap->prefix_vltime = 0;
+			else {
+				rmtime = (uint32_t)(limit - elapsed);
+				if (ia->prefix_vltime < rmtime)
+					ap->prefix_vltime = ia->prefix_vltime;
+				else
+					ap->prefix_vltime = rmtime;
+			}
 
 			/* Just extend the latest matching prefix */
 			ap->acquired = ia->acquired;

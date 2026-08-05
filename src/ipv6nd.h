@@ -115,7 +115,7 @@ struct rs_state {
 
 int ipv6nd_open(bool);
 #ifdef __sun
-int ipv6nd_openif(struct interface *);
+int ipv6nd_openif(unsigned int);
 #endif
 void ipv6nd_recvmsg(struct dhcpcd_ctx *, struct msghdr *);
 int ipv6nd_rtpref(uint8_t);

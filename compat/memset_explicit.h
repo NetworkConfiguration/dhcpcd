@@ -1,7 +1,7 @@
 /*
- * Privilege Separation for dhcpcd
+ * memset_explicit compat
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
+ * Copyright (c) 2026 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -26,16 +26,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PRIVSEP_CTL_H
-#define PRIVSEP_CTL_H
+#ifndef MEMSET_EXPLICIT_H
+#define MEMSET_EXPLICIT_H
 
-#define IN_PRIVSEP_CONTROLLER(ctx) \
-	(IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
+#include <stddef.h>
 
-pid_t ps_ctl_start(struct dhcpcd_ctx *);
-int ps_ctl_stop(struct dhcpcd_ctx *);
-ssize_t ps_ctl_handleargs(struct fd_list *, const char *, size_t);
-ssize_t ps_ctl_sendmsg(struct fd_list *, const struct msghdr *);
-ssize_t ps_ctl_sendeof(struct dhcpcd_ctx *);
+void * memset_explicit(void *, int, size_t);
 
 #endif

@@ -54,6 +54,15 @@
 #define DEFAULT_REQUEST	 180 /* secs to request, mirror DHCP6 */
 #define DEFAULT_FALLBACK 5   /* secs until fallback */
 #define DEFAULT_IPV4LL	 5   /* secs until ipv4ll */
+/* DHCPv4 retransmission backoff defaults (RFC 2131); DHCPv4-only. */
+#define DEFAULT_INITIAL_INTERVAL 4    /* DHCP_BASE per RFC 2131 */
+#define DEFAULT_BACKOFF_CUTOFF	 64   /* DHCP_MAX per RFC 2131 */
+#define DEFAULT_BACKOFF_JITTER	 1000 /* +/- milliseconds */
+
+/* Upper bounds to keep the retransmit timeout arithmetic well within range. */
+#define MAX_INITIAL_INTERVAL 4	  /* DHCP_BASE per RFC 2131 */
+#define MAX_BACKOFF_CUTOFF   64	  /* DHCP_MAX per RFC 2131 */
+#define MAX_BACKOFF_JITTER   1000 /* +/- milliseconds, per RFC 2131 */
 
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN 250 /* 255 - 3 (FQDN) - 2 (DNS enc) */
@@ -191,6 +200,11 @@
 #define O_VSIO		     O_BASE + 57
 #define O_VSIO6		     O_BASE + 58
 #define O_NOSYSLOG	     O_BASE + 59
+#define O_INITIAL_INTERVAL   O_BASE + 60
+#define O_BACKOFF_CUTOFF     O_BASE + 61
+#define O_BACKOFF_JITTER     O_BASE + 62
+#define O_ALLOW		     O_BASE + 63
+#define O_READGRP	     O_BASE + 64
 
 extern const struct option cf_options[];
 
@@ -235,31 +249,47 @@ struct vsio {
 };
 #endif
 
+#define OPTION_POLICY_MAX 5
+struct dho_policy {
+	uint32_t *dhop_policy;
+	size_t dhop_policy_len;
+};
+
+struct dho_policy_group {
+	struct dho_policy dhop_request;
+	struct dho_policy dhop_require;
+	struct dho_policy dhop_allow;
+	struct dho_policy dhop_remove;
+	struct dho_policy dhop_reject;
+};
+
 struct if_options {
 	time_t mtime;
 	uint8_t iaid[4];
 	int metric;
-	uint8_t requestmask[256 / NBBY];
-	uint8_t requiremask[256 / NBBY];
-	uint8_t nomask[256 / NBBY];
-	uint8_t rejectmask[256 / NBBY];
-	uint8_t dstmask[256 / NBBY];
-	uint8_t requestmasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t requiremasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t nomasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t rejectmasknd[(UINT16_MAX + 1) / NBBY];
-	uint8_t requestmask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t requiremask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t rejectmask6[(UINT16_MAX + 1) / NBBY];
 	uint32_t leasetime;
 	uint32_t timeout;
 	uint32_t reboot;
 	uint32_t request_time;
 	uint32_t fallback_time;
 	uint32_t ipv4ll_time;
+	uint32_t initial_interval;
+	uint32_t backoff_cutoff;
+	uint32_t backoff_jitter;
 	unsigned long long options;
 	bool randomise_hwaddr;
+
+#ifdef INET
+	struct dho_policy_group dhopg_dhcp;
+	struct dho_policy dhop_destination;
+#endif
+
+#ifdef INET6
+	struct dho_policy_group dhopg_nd;
+#endif
+#ifdef DHCP6
+	struct dho_policy_group dhopg_dhcp6;
+#endif
 
 	struct in_addr req_addr;
 	struct in_addr req_mask;

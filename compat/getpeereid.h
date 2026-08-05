@@ -1,7 +1,7 @@
 /*
- * Privilege Separation for dhcpcd
+ * compat: getpeereid
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2026 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -26,16 +26,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PRIVSEP_CTL_H
-#define PRIVSEP_CTL_H
+#ifndef GETPEEREID_H
+#define GETPEEREID_H
 
-#define IN_PRIVSEP_CONTROLLER(ctx) \
-	(IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
+#include <sys/types.h>
 
-pid_t ps_ctl_start(struct dhcpcd_ctx *);
-int ps_ctl_stop(struct dhcpcd_ctx *);
-ssize_t ps_ctl_handleargs(struct fd_list *, const char *, size_t);
-ssize_t ps_ctl_sendmsg(struct fd_list *, const struct msghdr *);
-ssize_t ps_ctl_sendeof(struct dhcpcd_ctx *);
+int getpeereid(int, uid_t *, gid_t *);
 
 #endif

@@ -35,8 +35,9 @@
 #include "logerr.h"
 #include "privsep.h"
 
-#warning Solaris privsep should compile but wont work,
-#warning no DLPI support, ioctl support need rework
+#warning Solaris privsep should compile and work, but there is no
+#warning chroot support, dropping to dhcpcd user support,
+#warning no DLPI support, no ioctl validation, etc
 /* We should implement privileges(5) as well.
  * https://illumos.org/man/5/privileges */
 
@@ -76,8 +77,8 @@ ps_root_doroute(void *data, size_t len)
 }
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg, void **rdata,
-    size_t *rlen, __unused bool *free_rdata)
+ps_root_os(__unused struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
+    struct msghdr *msg, void **rdata, size_t *rlen, __unused bool *free_rdata)
 {
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;
@@ -87,6 +88,7 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg, void **rdata,
 	switch (psm->ps_cmd) {
 	case PS_IOCTL6:
 		err = ps_root_doioctl6(psm->ps_flags, data, len);
+		break;
 	case PS_ROUTE:
 		return ps_root_doroute(data, len);
 	default:

@@ -90,9 +90,12 @@ udev_handle_device(void *ctx)
 	action = udev_device_get_action(device);
 
 	/* udev filter documentation says "usually" so double check */
-	if (strcmp(subsystem, "net") == 0) {
+	if (subsystem != NULL && strcmp(subsystem, "net") == 0) {
 		logdebugx("%s: libudev: %s", ifname, action);
-		if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
+		if (action == NULL || ifname == NULL)
+			;
+		else if (strcmp(action, "add") == 0 ||
+		    strcmp(action, "move") == 0)
 			dhcpcd.handle_interface(ctx, 1, ifname);
 		else if (strcmp(action, "remove") == 0)
 			dhcpcd.handle_interface(ctx, -1, ifname);

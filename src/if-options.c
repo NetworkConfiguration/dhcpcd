@@ -158,6 +158,7 @@ const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "dhcp6", no_argument, NULL, O_DHCP6 },
 	{ "nodhcp6", no_argument, NULL, O_NODHCP6 },
 	{ "controlgroup", required_argument, NULL, O_CONTROLGRP },
+	{ "readgroup", required_argument, NULL, O_READGRP },
 	{ "slaac", required_argument, NULL, O_SLAAC },
 	{ "gateway", no_argument, NULL, O_GATEWAY },
 	{ "reject", required_argument, NULL, O_REJECT },
@@ -175,6 +176,10 @@ const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "fallback_time", required_argument, NULL, O_FALLBACK_TIME },
 	{ "ipv4ll_time", required_argument, NULL, O_IPV4LL_TIME },
 	{ "nosyslog", no_argument, NULL, O_NOSYSLOG },
+	{ "initial_interval", required_argument, NULL, O_INITIAL_INTERVAL },
+	{ "backoff_cutoff", required_argument, NULL, O_BACKOFF_CUTOFF },
+	{ "backoff_jitter", required_argument, NULL, O_BACKOFF_JITTER },
+	{ "allow", required_argument, NULL, O_ALLOW },
 	{ NULL, 0, NULL, '\0' } };
 
 static char *
@@ -503,61 +508,49 @@ parse_addr(__unused struct in_addr *addr, __unused struct in_addr *net,
 }
 #endif
 
-static void
-set_option_space(struct dhcpcd_ctx *ctx, const char *arg,
-    const struct dhcp_opt **d, size_t *dl, const struct dhcp_opt **od,
-    size_t *odl, struct if_options *ifo, uint8_t *request[], uint8_t *require[],
-    uint8_t *no[], uint8_t *reject[])
+static int
+set_option_space(struct dhcpcd_ctx *ctx, struct if_options *ifo,
+    const char *arg, struct dho_policy_ctx *pctx, struct dho_policy_group **pg)
 {
-#if !defined(INET) && !defined(INET6)
-	UNUSED(ctx);
-#endif
-
-#ifdef INET6
 	if (strncmp(arg, "nd_", strlen("nd_")) == 0) {
-		*d = ctx->nd_opts;
-		*dl = ctx->nd_opts_len;
-		*od = ifo->nd_override;
-		*odl = ifo->nd_override_len;
-		*request = ifo->requestmasknd;
-		*require = ifo->requiremasknd;
-		*no = ifo->nomasknd;
-		*reject = ifo->rejectmasknd;
-		return;
+#ifdef INET6
+		pctx->dopts = ctx->nd_opts;
+		pctx->dopts_len = ctx->nd_opts_len;
+		pctx->odopts = ifo->nd_override;
+		pctx->odopts_len = ifo->nd_override_len;
+		*pg = &ifo->dhopg_nd;
+		return 0;
+#else
+		errno = EPFNOSUPPORT;
+		return -1;
+#endif
 	}
 
-#ifdef DHCP6
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
-		*d = ctx->dhcp6_opts;
-		*dl = ctx->dhcp6_opts_len;
-		*od = ifo->dhcp6_override;
-		*odl = ifo->dhcp6_override_len;
-		*request = ifo->requestmask6;
-		*require = ifo->requiremask6;
-		*no = ifo->nomask6;
-		*reject = ifo->rejectmask6;
-		return;
-	}
-#endif
+#ifdef DHCP6
+		pctx->dopts = ctx->dhcp6_opts;
+		pctx->dopts_len = ctx->dhcp6_opts_len;
+		pctx->odopts = ifo->dhcp6_override;
+		pctx->odopts_len = ifo->dhcp6_override_len;
+		*pg = &ifo->dhopg_dhcp6;
+		return 0;
 #else
-	UNUSED(arg);
+		errno = EPFNOSUPPORT;
+		return -1;
 #endif
+	}
 
 #ifdef INET
-	*d = ctx->dhcp_opts;
-	*dl = ctx->dhcp_opts_len;
-	*od = ifo->dhcp_override;
-	*odl = ifo->dhcp_override_len;
+	pctx->dopts = ctx->dhcp_opts;
+	pctx->dopts_len = ctx->dhcp_opts_len;
+	pctx->odopts = ifo->dhcp_override;
+	pctx->odopts_len = ifo->dhcp_override_len;
+	*pg = &ifo->dhopg_dhcp;
+	return 0;
 #else
-	*d = NULL;
-	*dl = 0;
-	*od = NULL;
-	*odl = 0;
+	errno = EPFNOSUPPORT;
+	return -1;
 #endif
-	*request = ifo->requestmask;
-	*require = ifo->requiremask;
-	*no = ifo->nomask;
-	*reject = ifo->rejectmask;
 }
 
 void
@@ -631,6 +624,48 @@ strend(char *s)
 #endif
 
 static int
+set_default_allow(struct if_options *ifo, struct dho_policy_group *pg)
+{
+	if (pg->dhop_allow.dhop_policy_len != 0)
+		return 0;
+
+	/* Allow the bare minimum through */
+#ifdef INET
+	if (pg == &ifo->dhopg_dhcp) {
+		struct dho_policy *p = &pg->dhop_allow;
+
+		if (dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
+		    dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
+		    dho_policy_add(p, DHO_CSR) == -1 ||
+		    dho_policy_add(p, DHO_ROUTER) == -1 ||
+		    dho_policy_add(p, DHO_DNSSERVER) == -1 ||
+		    dho_policy_add(p, DHO_DNSDOMAIN) == -1 ||
+		    dho_policy_add(p, DHO_BROADCAST) == -1 ||
+		    dho_policy_add(p, DHO_STATICROUTE) == -1 ||
+		    dho_policy_add(p, DHO_SERVERID) == -1 ||
+		    dho_policy_add(p, DHO_RENEWALTIME) == -1 ||
+		    dho_policy_add(p, DHO_REBINDTIME) == -1 ||
+		    dho_policy_add(p, DHO_DNSSEARCH) == -1)
+			return -1;
+	}
+#endif
+
+#ifdef DHCP6
+	if (pg == &ifo->dhopg_dhcp6) {
+		struct dho_policy *p = &pg->dhop_allow;
+
+		if (dho_policy_add(p, D6_OPTION_DNS_SERVERS) == -1 ||
+		    dho_policy_add(p, D6_OPTION_DOMAIN_LIST) == -1 ||
+		    dho_policy_add(p, D6_OPTION_SOL_MAX_RT) == -1 ||
+		    dho_policy_add(p, D6_OPTION_INF_MAX_RT) == -1)
+			return -1;
+	}
+#endif
+
+	return 0;
+}
+
+static int
 parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
     int opt, char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
 {
@@ -641,10 +676,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	ssize_t s;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
-	const struct dhcp_opt *d, *od;
-	uint8_t *request, *require, *no, *reject;
+	struct dho_policy_group *pg;
+	struct dho_policy_ctx pctx;
 	struct dhcp_opt **dop, *ndop;
-	size_t *dop_len, dl, odl;
+	size_t *dop_len, dl;
 	struct group *grp;
 #ifdef AUTH
 	struct token *token;
@@ -806,11 +841,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, arg, &d, &dl, &od, &odl, ifo, &request,
-		    &require, &no, &reject);
-		if (make_option_mask(d, dl, od, odl, request, arg, 1) != 0 ||
-		    make_option_mask(d, dl, od, odl, no, arg, -1) != 0 ||
-		    make_option_mask(d, dl, od, odl, reject, arg, -1) != 0) {
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (dho_policy_set(&pctx, &pg->dhop_request, arg, 1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_reject, arg, -1) != 0) {
 			logerrx("unknown option: %s", arg);
 			return -1;
 		}
@@ -819,11 +854,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, arg, &d, &dl, &od, &odl, ifo, &request,
-		    &require, &no, &reject);
-		if (make_option_mask(d, dl, od, odl, reject, arg, 1) != 0 ||
-		    make_option_mask(d, dl, od, odl, request, arg, -1) != 0 ||
-		    make_option_mask(d, dl, od, odl, require, arg, -1) != 0) {
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (dho_policy_set(&pctx, &pg->dhop_reject, arg, 1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_request, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_require, arg, -1) != 0) {
 			logerrx("unknown option: %s", arg);
 			return -1;
 		}
@@ -848,7 +883,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			i = parse_addr(&ifo->req_addr, &ifo->req_mask, arg);
 			if (p != NULL) {
-				/* Ensure the original string is preserved */
+				/* Ensure the original string is
+				 * preserved */
 				*p++ = '/';
 				if (i == 0)
 					i = parse_addr(&ifo->req_brd, NULL, p);
@@ -875,7 +911,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		break;
 	case 'u':
-		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 1;
+		if ((size_t)ifo->userclass[0] + 2 > sizeof(ifo->userclass)) {
+			errno = ENOBUFS;
+			logerr("userclass");
+			return -1;
+		}
+		dl = sizeof(ifo->userclass) - ifo->userclass[0] - 2;
 		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
 		    dl, arg);
 		if (s == -1) {
@@ -935,19 +976,18 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 		if (fp != NULL)
 			fp = strskipwhite(fp);
-		if (fp != NULL)
-			p = strchr(fp, ',');
-		else
-			p = NULL;
-		if (p == NULL || p[1] == '\0') {
+		if (fp == NULL) {
 			logerrx("invalid vendor format: %s", arg);
 			return -1;
 		}
 
 		/* Strip and preserve the comma */
-		*p = '\0';
+		p = strchr(fp, ',');
+		if (p != NULL)
+			*p = '\0';
 		i = (int)strtoi(fp, NULL, 0, 1, (intmax_t)opt_max, &e);
-		*p = ',';
+		if (p != NULL)
+			*p = ',';
 		if (e) {
 			logerrx("vendor option should be between"
 				" 1 and %zu inclusive",
@@ -955,9 +995,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 
-		fp = p + 1;
+		if (p != NULL)
+			fp = p + 1;
+		else
+			fp = NULL;
 
-		if (fp) {
+		if (fp != NULL && *fp != '\0') {
 			if (inet_pton(AF_INET, fp, &addr) == 1) {
 				s = sizeof(addr.s_addr);
 				dl = (size_t)s;
@@ -983,12 +1026,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					return -1;
 				}
 				dl = (size_t)s;
-				np = malloc(dl);
-				if (np == NULL) {
-					logerr(__func__);
-					return -1;
+				if (dl == 0)
+					np = NULL;
+				else {
+					np = malloc(dl);
+					if (np == NULL) {
+						logerr(__func__);
+						return -1;
+					}
+					parse_string(np, dl, fp);
 				}
-				parse_string(np, dl, fp);
 			}
 		} else {
 			dl = 0;
@@ -1018,7 +1065,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    sl++, vsio_so++)
 			opt_max -= opt_header + vsio_so->len;
 		if (opt_header + dl > opt_max) {
-			logerrx("vsio is too big: %s", fp);
+			logerrx("vsio is too big: %s", arg);
 			free(np);
 			return -1;
 		}
@@ -1046,7 +1093,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 
-		/* If vendor starts with , then it is not encapsulated */
+		/* If vendor starts with , then it is not encapsulated
+		 */
 		if (p == arg) {
 			arg++;
 			s = parse_string((char *)ifo->vendor + 1,
@@ -1107,7 +1155,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		p = UNCONST(arg);
 		// Generally it's --waitip=46, but some expect
 		// --waitip="4 6" to work as well.
-		// It's easier to allow it rather than have confusing docs.
+		// It's easier to allow it rather than have confusing
+		// docs.
 		while (p != NULL && p[0] != '\0') {
 			if (p[0] == '4' || p[1] == '4')
 				ifo->options |= DHCPCD_WAITIP4;
@@ -1167,13 +1216,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		else {
 			dl = hwaddr_aton(NULL, arg);
 			if (dl != 0) {
-				no = realloc(ctx->duid, dl);
-				if (no == NULL)
+				void *nduid = realloc(ctx->duid, dl);
+				if (nduid == NULL) {
 					logerrx(__func__);
-				else {
-					ctx->duid = no;
-					ctx->duid_len = hwaddr_aton(no, arg);
+					return -1;
 				}
+				ctx->duid = nduid;
+				ctx->duid_len = hwaddr_aton(nduid, arg);
 			}
 		}
 		break;
@@ -1238,11 +1287,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, arg, &d, &dl, &od, &odl, ifo, &request,
-		    &require, &no, &reject);
-		if (make_option_mask(d, dl, od, odl, request, arg, -1) != 0 ||
-		    make_option_mask(d, dl, od, odl, require, arg, -1) != 0 ||
-		    make_option_mask(d, dl, od, odl, no, arg, 1) != 0) {
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (dho_policy_set(&pctx, &pg->dhop_request, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_require, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_remove, arg, 1) != 0) {
 			logerrx("unknown option: %s", arg);
 			return -1;
 		}
@@ -1251,12 +1300,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, arg, &d, &dl, &od, &odl, ifo, &request,
-		    &require, &no, &reject);
-		if (make_option_mask(d, dl, od, odl, require, arg, 1) != 0 ||
-		    make_option_mask(d, dl, od, odl, request, arg, 1) != 0 ||
-		    make_option_mask(d, dl, od, odl, no, arg, -1) != 0 ||
-		    make_option_mask(d, dl, od, odl, reject, arg, -1) != 0) {
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (dho_policy_set(&pctx, &pg->dhop_require, arg, 1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_request, arg, 1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_reject, arg, -1) != 0) {
 			logerrx("unknown option: %s", arg);
 			return -1;
 		}
@@ -1481,35 +1530,41 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case O_NOIPV6:
 		ifo->options &= ~DHCPCD_IPV6;
 		break;
+	case O_ALLOW:
+		ARG_REQUIRED;
+		if (ctx->options & DHCPCD_PRINT_PIDFILE)
+			break;
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (set_default_allow(ifo, pg)) {
+			logerr("%s: set_default_allow", __func__);
+			return -1;
+		}
+		if (dho_policy_set(&pctx, &pg->dhop_allow, arg, 1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_remove, arg, -1) != 0 ||
+		    dho_policy_set(&pctx, &pg->dhop_reject, arg, -1) != 0) {
+			logerrx("unknown option: %s", arg);
+			return -1;
+		}
+		break;
 	case O_ANONYMOUS:
 		ifo->options |= DHCPCD_ANONYMOUS;
 		ifo->options &= ~DHCPCD_HOSTNAME;
 		ifo->fqdn = FQDN_DISABLE;
 
-		/* Block everything */
-		memset(ifo->nomask, 0xff, sizeof(ifo->nomask));
-		memset(ifo->nomask6, 0xff, sizeof(ifo->nomask6));
-
 		/* Allow the bare minimum through */
 #ifdef INET
-		del_option_mask(ifo->nomask, DHO_SUBNETMASK);
-		del_option_mask(ifo->nomask, DHO_CSR);
-		del_option_mask(ifo->nomask, DHO_ROUTER);
-		del_option_mask(ifo->nomask, DHO_DNSSERVER);
-		del_option_mask(ifo->nomask, DHO_DNSDOMAIN);
-		del_option_mask(ifo->nomask, DHO_BROADCAST);
-		del_option_mask(ifo->nomask, DHO_STATICROUTE);
-		del_option_mask(ifo->nomask, DHO_SERVERID);
-		del_option_mask(ifo->nomask, DHO_RENEWALTIME);
-		del_option_mask(ifo->nomask, DHO_REBINDTIME);
-		del_option_mask(ifo->nomask, DHO_DNSSEARCH);
+		if (set_default_allow(ifo, &ifo->dhopg_dhcp) == -1) {
+			logerr("%s: set_defaut_allow DHCP", __func__);
+			return -1;
+		}
 #endif
 
 #ifdef DHCP6
-		del_option_mask(ifo->nomask6, D6_OPTION_DNS_SERVERS);
-		del_option_mask(ifo->nomask6, D6_OPTION_DOMAIN_LIST);
-		del_option_mask(ifo->nomask6, D6_OPTION_SOL_MAX_RT);
-		del_option_mask(ifo->nomask6, D6_OPTION_INF_MAX_RT);
+		if (set_default_allow(ifo, &ifo->dhopg_dhcp6) == -1) {
+			logerr("%s: set_default_allow DHCPv6", __func__);
+			return -1;
+		}
 #endif
 
 		break;
@@ -1539,9 +1594,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
 			break;
-		set_option_space(ctx, arg, &d, &dl, &od, &odl, ifo, &request,
-		    &require, &no, &reject);
-		if (make_option_mask(d, dl, od, odl, ifo->dstmask, arg, 2) !=
+		if (set_option_space(ctx, ifo, arg, &pctx, &pg) == -1)
+			return 0;
+		if (dho_policy_set(&pctx, &ifo->dhop_destination, arg, 2) !=
 		    0) {
 			if (errno == EINVAL)
 				logerrx("option does not take"
@@ -2377,6 +2432,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options &= ~DHCPCD_DHCP6;
 		break;
 	case O_CONTROLGRP:
+	case O_READGRP:
 		ARG_REQUIRED;
 #ifdef PRIVSEP
 		/* Control group is already set by this point.
@@ -2418,21 +2474,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		if (grp == NULL) {
-			if (!ctx->control_group)
-				logerrx("controlgroup: %s: not found", arg);
+			logerrx("group: %s: not found", arg);
 			free(p);
 			return -1;
 		}
-		ctx->control_group = grp->gr_gid;
+		switch (opt) {
+		case O_CONTROLGRP:
+			ctx->control_group = grp->gr_gid;
+			break;
+		case O_READGRP:
+			ctx->read_group = grp->gr_gid;
+			break;
+		}
 		free(p);
 #else
 		grp = getgrnam(arg);
 		if (grp == NULL) {
-			if (!ctx->control_group)
-				logerrx("controlgroup: %s: not found", arg);
+			logerrx("group: %s: not found", arg);
 			return -1;
 		}
-		ctx->control_group = grp->gr_gid;
+		switch (opt) {
+		case O_CONTROLGRP:
+			ctx->control_group = grp->gr_gid;
+			break;
+		case O_READGRP:
+			ctx->read_group = grp->gr_gid;
+			break;
+		}
 #endif
 		break;
 	case O_GATEWAY:
@@ -2552,6 +2620,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		logopts &= ~LOGERR_LOG;
 		logsetopts(logopts);
 	} break;
+	case O_INITIAL_INTERVAL:
+		ARG_REQUIRED;
+		ifo->initial_interval = (uint32_t)strtou(arg, NULL, 0, 1,
+		    MAX_INITIAL_INTERVAL, &e);
+		if (e) {
+			logerrx("invalid initial interval: %s", arg);
+			return -1;
+		}
+		break;
+	case O_BACKOFF_CUTOFF:
+		ARG_REQUIRED;
+		ifo->backoff_cutoff = (uint32_t)strtou(arg, NULL, 0, 1,
+		    MAX_BACKOFF_CUTOFF, &e);
+		if (e) {
+			logerrx("invalid backoff cutoff: %s", arg);
+			return -1;
+		}
+		break;
+	case O_BACKOFF_JITTER:
+		ARG_REQUIRED;
+		ifo->backoff_jitter = (uint32_t)strtou(arg, NULL, 0, 0,
+		    MAX_BACKOFF_JITTER, &e);
+		if (e) {
+			logerrx("invalid backoff jitter: %s", arg);
+			return -1;
+		}
+		break;
 	default:
 		return 0;
 	}
@@ -2618,6 +2713,20 @@ finish_config(struct if_options *ifo)
 	if (!(ifo->options & DHCPCD_IPV6RS))
 		ifo->options &= ~(
 		    DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
+
+#ifdef INET
+	/* The exponential backoff cutoff must not be lower than the
+	 * initial interval, otherwise the retransmission sequence would
+	 * shrink rather than grow up to the cap. Clamp the cutoff up to
+	 * the initial interval to preserve the documented "cap"
+	 * semantics. */
+	if (ifo->backoff_cutoff < ifo->initial_interval) {
+		logwarnx("backoff_cutoff (%u) is less than initial_interval "
+			 "(%u); raising backoff_cutoff to match",
+		    ifo->backoff_cutoff, ifo->initial_interval);
+		ifo->backoff_cutoff = ifo->initial_interval;
+	}
+#endif
 }
 
 static struct if_options *
@@ -2637,6 +2746,9 @@ default_config(struct dhcpcd_ctx *ctx)
 #ifdef INET
 	ifo->fallback_time = DEFAULT_FALLBACK;
 	ifo->ipv4ll_time = DEFAULT_IPV4LL;
+	ifo->initial_interval = DEFAULT_INITIAL_INTERVAL;
+	ifo->backoff_cutoff = DEFAULT_BACKOFF_CUTOFF;
+	ifo->backoff_jitter = DEFAULT_BACKOFF_JITTER;
 #endif
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
@@ -2661,10 +2773,9 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
     const char *profile)
 {
 	struct if_options *ifo;
-	char buf[UDPLEN_MAX], *bp; /* 64k max config file size */
-	char *line, *option, *p;
-	ssize_t buflen;
-	size_t vlen;
+	char *bp, *line, *option, *p;
+	ssize_t nread;
+	size_t buflen, vlen;
 	int skip, have_profile, new_block, had_block;
 #if !defined(INET) || !defined(INET6)
 	size_t i;
@@ -2741,26 +2852,28 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 
 		/* Now load our embedded config */
 #ifdef EMBEDDED_CONFIG
-		buflen = dhcp_readfile(ctx, EMBEDDED_CONFIG, buf, sizeof(buf));
-		if (buflen == -1) {
+		nread = dhcp_readfile(ctx, EMBEDDED_CONFIG, &ctx->io_buf,
+		    &ctx->io_buflen);
+		if (nread == -1) {
 			logerr("%s: %s", __func__, EMBEDDED_CONFIG);
 			return ifo;
 		}
-		if (buf[buflen - 1] != '\0') {
-			if ((size_t)buflen < sizeof(buf) - 1)
-				buflen++;
-			buf[buflen - 1] = '\0';
-		}
+		buflen = (size_t)nread;
 #else
-		buflen = (ssize_t)strlcpy(buf, dhcpcd_embedded_conf,
-		    sizeof(buf));
-		if ((size_t)buflen >= sizeof(buf)) {
-			logerrx("%s: embedded config too big", __func__);
-			return ifo;
+		buflen = strlen(dhcpcd_embedded_conf) + 1;
+		if (ctx->io_buflen < buflen) {
+			void *nbuf = realloc(ctx->io_buf, buflen);
+			if (nbuf == NULL) {
+				logerr("%s: realloc", __func__);
+				return ifo;
+			}
+			ctx->io_buf = nbuf;
+			ctx->io_buflen = buflen;
 		}
-		/* Our embedded config is NULL terminated */
+		buflen = strlcpy(ctx->io_buf, dhcpcd_embedded_conf,
+		    ctx->io_buflen);
 #endif
-		bp = buf;
+		bp = ctx->io_buf;
 		while ((line = get_line(&bp, &buflen)) != NULL) {
 			option = strsep(&line, " \t");
 			if (line)
@@ -2817,24 +2930,20 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 	}
 
 	/* Parse our options file */
-	buflen = dhcp_readfile(ctx, ctx->cffile, buf, sizeof(buf));
-	if (buflen == -1) {
+	nread = dhcp_readfile(ctx, ctx->cffile, &ctx->io_buf, &ctx->io_buflen);
+	if (nread == -1) {
 		/* dhcpcd can continue without it, but no DNS options
 		 * would be requested ... */
 		logerr("%s: %s", __func__, ctx->cffile);
 		return ifo;
 	}
-	if (buf[buflen - 1] != '\0') {
-		if ((size_t)buflen < sizeof(buf) - 1)
-			buflen++;
-		buf[buflen - 1] = '\0';
-	}
+	buflen = (size_t)nread;
 	dhcp_filemtime(ctx, ctx->cffile, &ifo->mtime);
 
 	ldop = edop = NULL;
 	skip = have_profile = new_block = 0;
 	had_block = ifname == NULL ? 1 : 0;
-	bp = buf;
+	bp = ctx->io_buf;
 	while ((line = get_line(&bp, &buflen)) != NULL) {
 		option = strsep(&line, " \t");
 		if (line)
@@ -2904,8 +3013,8 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 				skip = 1;
 			continue;
 		}
-		/* Skip arping if we have selected a profile but not parsing
-		 * one. */
+		/* Skip arping if we have selected a profile but not
+		 * parsing one. */
 		if (profile && !have_profile && strcmp(option, "arping") == 0)
 			continue;
 		if (skip)
@@ -3036,10 +3145,22 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 		free(ifo->config);
 	}
 
+#ifdef INET
+	dho_policy_group_free(ifo->dhopg_dhcp);
+	dho_policy_free(ifo->dhop_destination);
+#endif
+
+#ifdef INET6
+	dho_policy_group_free(ifo->dhopg_nd);
+#endif
+#ifdef DHCP6
+	dho_policy_group_free(ifo->dhopg_dhcp6);
+#endif
+
 #ifdef RT_FREE_ROUTE_TABLE
-	/* Stupidly, we don't know the interface when creating the options.
-	 * As such, make sure each route has one so they can goto the
-	 * free list. */
+	/* Stupidly, we don't know the interface when creating the
+	 * options. As such, make sure each route has one so they can
+	 * goto the free list. */
 	ifp = ctx->ifaces != NULL ? TAILQ_FIRST(ctx->ifaces) : NULL;
 	if (ifp != NULL) {
 		RB_TREE_FOREACH(rt, &ifo->routes)

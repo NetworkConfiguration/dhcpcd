@@ -31,8 +31,8 @@
 
 #include "if.h"
 
-#ifdef PRIVSEP
-#if defined(HAVE_CAPSICUM) || defined(__linux__)
+#if defined(PRIVSEP)
+#if defined(HAVE_CAPSICUM) || defined(__linux__) || defined(__sun)
 #define PRIVSEP_GETIFADDRS
 #endif
 #ifdef __GNU__
@@ -50,13 +50,14 @@ ssize_t ps_root_mreaderror(struct dhcpcd_ctx *, void **, size_t *);
 ssize_t ps_root_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
 ssize_t ps_root_unlink(struct dhcpcd_ctx *, const char *);
 ssize_t ps_root_filemtime(struct dhcpcd_ctx *, const char *, time_t *);
-ssize_t ps_root_readfile(struct dhcpcd_ctx *, const char *, void *, size_t);
+ssize_t ps_root_readfile(struct dhcpcd_ctx *, const char *, void **, size_t *);
 ssize_t ps_root_writefile(struct dhcpcd_ctx *, const char *, mode_t,
     const void *, size_t);
 ssize_t ps_root_logreopen(struct dhcpcd_ctx *);
 ssize_t ps_root_script(struct dhcpcd_ctx *, const void *, size_t);
 ssize_t ps_root_stopprocesses(struct dhcpcd_ctx *);
 int ps_root_getauthrdm(struct dhcpcd_ctx *, uint64_t *);
+ssize_t ps_root_user_ingroup(struct dhcpcd_ctx *, uid_t, gid_t, gid_t);
 #ifdef PRIVSEP_GETHOSTNAME
 int ps_root_gethostname(struct dhcpcd_ctx *, char *, size_t);
 #endif

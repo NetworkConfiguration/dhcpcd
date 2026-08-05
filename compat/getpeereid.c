@@ -1,7 +1,7 @@
 /*
- * Privilege Separation for dhcpcd
+ * compat: getpeereid
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2026 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -26,16 +26,46 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PRIVSEP_CTL_H
-#define PRIVSEP_CTL_H
+#include <sys/types.h>
+#include <sys/socket.h>
 
-#define IN_PRIVSEP_CONTROLLER(ctx) \
-	(IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
-
-pid_t ps_ctl_start(struct dhcpcd_ctx *);
-int ps_ctl_stop(struct dhcpcd_ctx *);
-ssize_t ps_ctl_handleargs(struct fd_list *, const char *, size_t);
-ssize_t ps_ctl_sendmsg(struct fd_list *, const struct msghdr *);
-ssize_t ps_ctl_sendeof(struct dhcpcd_ctx *);
-
+#include <errno.h>
+#ifdef __sun
+#include <ucred.h>
 #endif
+
+#include "common.h"
+#include "getpeereid.h"
+
+int
+getpeereid(int fd, uid_t *uid, gid_t *gid)
+{
+#if defined(SO_PEERCRED)
+	struct ucred creds;
+	socklen_t creds_len = sizeof(creds);
+
+	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &creds_len) == -1)
+		return -1;
+
+	*uid = creds.uid;
+	*gid = creds.gid;
+	return 0;
+#elif defined(__sun)
+	ucred_t *ucred = NULL;
+
+	if (getpeerucred(fd, &ucred) == -1)
+		return -1;
+
+	*uid = ucred_geteuid(ucred);
+	*gid = ucred_getegid(ucred);
+	ucred_free(ucred);
+	return 0;
+#else
+#warning No getpeereid support from OS
+	UNUSED(fd);
+	*uid = (uid_t)-1;
+	*gid = (gid_t)-1;
+	errno = ENOSYS;
+	return -1;
+#endif
+}

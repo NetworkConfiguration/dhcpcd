@@ -274,43 +274,31 @@ eexit:
 
 #ifdef __sun
 int
-ipv6nd_openif(struct interface *ifp)
+ipv6nd_openif(unsigned int ifindex)
 {
 	int fd;
 	struct ipv6_mreq mreq = {
 		.ipv6mr_multiaddr = IN6ADDR_LINKLOCAL_ALLNODES_INIT,
-		.ipv6mr_interface = ifp->index
+		.ipv6mr_interface = ifindex,
 	};
-	struct rs_state *state = RS_STATE(ifp);
-	uint_t ifindex = ifp->index;
-
-	if (state->nd_fd != -1)
-		return state->nd_fd;
 
 	fd = ipv6nd_open(true);
 	if (fd == -1)
 		return -1;
 
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_BOUND_IF, &ifindex,
-		sizeof(ifindex)) == -1) {
-		close(fd);
-		return -1;
-	}
+		sizeof(ifindex)) == -1)
+		goto err;
 
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
-		sizeof(mreq)) == -1) {
-		close(fd);
-		return -1;
-	}
+		sizeof(mreq)) == -1)
+		goto err;
 
-	if (eloop_event_add(ifp->ctx->eloop, fd, ELE_READ, ipv6nd_handledata,
-		ifp) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	state->nd_fd = fd;
 	return fd;
+
+err:
+	close(fd);
+	return -1;
 }
 #endif
 
@@ -405,8 +393,16 @@ ipv6nd_sendrsprobe(void *arg)
 #endif
 #ifdef __sun
 	if (state->nd_fd == -1) {
-		if (ipv6nd_openif(ifp) == -1) {
+		state->nd_fd = ipv6nd_openif(ifp->index);
+		if (state->nd_fd == -1) {
 			logerr(__func__);
+			return;
+		}
+		if (eloop_event_add(ifp->ctx->eloop, state->nd_fd, ELE_READ,
+			ipv6nd_handledata, ifp) == -1) {
+			logerr(__func__);
+			close(state->nd_fd);
+			state->nd_fd = -1;
 			return;
 		}
 	}
@@ -948,28 +944,74 @@ dhcp6_start(__unused struct interface *ifp, __unused enum DH6S init_state)
 }
 #endif
 
+struct nd_policy_ctx {
+	struct dhcpcd_ctx *ctx;
+	int loglevel;
+	const char *ifname;
+	const char *sfrom;
+	struct icmp6_hdr *icp;
+	size_t len;
+};
+
+static int
+nd_require(uint32_t option, void *arg)
+{
+	struct nd_policy_ctx *nd_ctx = arg;
+	size_t len = nd_ctx->len, olen;
+	uint8_t *p;
+	struct nd_opt_hdr ndo;
+
+	struct dhcpcd_ctx *ctx = nd_ctx->ctx;
+	const char *soption;
+
+	len -= sizeof(struct nd_router_advert);
+	p = ((uint8_t *)nd_ctx->icp) + sizeof(struct nd_router_advert);
+	for (; len > 0; p += olen, len -= olen) {
+		if (len < sizeof(ndo))
+			break;
+		memcpy(&ndo, p, sizeof(ndo));
+		olen = (size_t)ndo.nd_opt_len * 8;
+		if (olen > len)
+			break;
+		if (ndo.nd_opt_type == option)
+			return 0;
+	}
+
+	soption = dhcp_option_string(ctx->nd_opts, ctx->nd_opts_len, option);
+	logmessage(nd_ctx->loglevel,
+	    "%s: reject RA (missing option %s) from %s", nd_ctx->ifname,
+	    soption, nd_ctx->sfrom);
+	return -1;
+}
+
 static void
 ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
     const char *sfrom, struct interface *ifp, struct icmp6_hdr *icp, size_t len,
     int hoplimit)
 {
-	size_t i, olen;
+	size_t olen, rlen;
 	struct nd_router_advert *nd_ra;
 	struct nd_opt_hdr ndo;
+	struct nd_policy_ctx policy = {
+		.ctx = ctx,
+		.icp = icp,
+		.len = len,
+		.sfrom = sfrom,
+	};
 	struct nd_opt_prefix_info pi;
 	struct nd_opt_mtu mtu;
 	struct nd_opt_rdnss rdnss;
 	struct nd_opt_ri ri;
 	struct routeinfo *rinfo;
+	struct if_options *ifo;
+	const struct dho_policy_group *pg;
 	uint8_t *p;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
 	struct ipv6_addr *ia;
-	struct dhcp_opt *dho;
 	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
-	int ifmtu;
-	int loglevel;
+	int err, ifmtu, loglevel;
 	unsigned int flags;
 #ifdef IPV6_MANAGETEMPADDR
 	bool new_ia;
@@ -1044,6 +1086,55 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	}
 
 	nd_ra = (struct nd_router_advert *)icp;
+
+	loglevel = rap == NULL || rap->willexpire || !rap->isreachable ?
+	    LOG_ERR :
+	    LOG_DEBUG;
+
+	policy.loglevel = loglevel;
+	policy.ifname = ifp->name;
+	ifo = ifp->options;
+	pg = &ifo->dhopg_nd;
+
+	/* Validate */
+	rlen = len;
+	len -= sizeof(struct nd_router_advert);
+	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
+	for (; len > 0; p += olen, len -= olen) {
+		if (len < sizeof(ndo)) {
+			logmessage(loglevel, "%s: short RA option from %s",
+			    ifp->name, sfrom);
+			break;
+		}
+		memcpy(&ndo, p, sizeof(ndo));
+		olen = (size_t)ndo.nd_opt_len * 8;
+		if (olen == 0) {
+			/* RFC4681 4.6 says we MUST discard this ND packet. */
+			logmessage(loglevel, "%s: zero length RA option %s",
+			    ifp->name, sfrom);
+			return;
+		}
+		if (olen > len) {
+			logmessage(loglevel,
+			    "%s: RA option length exceeds message from %s",
+			    ifp->name, sfrom);
+			break;
+		}
+
+		if (!dho_policy_allowed(pg, ndo.nd_opt_type)) {
+			const char *soption = dhcp_option_string(ctx->nd_opts,
+			    ctx->nd_opts_len, ndo.nd_opt_type);
+			logmessage(loglevel,
+			    "%s: reject RA (option %s) from %s", ifp->name,
+			    soption, sfrom);
+			return;
+		}
+	}
+	len = rlen;
+
+	err = dho_policy_check(&pg->dhop_require, nd_require, &policy);
+	if (err == -1)
+		return;
 
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
@@ -1129,41 +1220,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	for (; len > 0; p += olen, len -= olen) {
-		if (len < sizeof(ndo)) {
-			logerrx("%s: short option", ifp->name);
+		if (len < sizeof(ndo))
 			break;
-		}
 		memcpy(&ndo, p, sizeof(ndo));
 		olen = (size_t)ndo.nd_opt_len * 8;
-		if (olen == 0) {
-			/* RFC4681 4.6 says we MUST discard this ND packet. */
-			logerrx("%s: zero length option", ifp->name);
-			FREE_RAP(rap);
-			return;
-		}
-		if (olen > len) {
-			logerrx("%s: option length exceeds message", ifp->name);
+		if (olen > len)
 			break;
-		}
 
-		if (has_option_mask(ifp->options->rejectmasknd,
-			ndo.nd_opt_type)) {
-			for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len;
-			    i++, dho++) {
-				if (dho->option == ndo.nd_opt_type)
-					break;
-			}
-			if (dho != NULL)
-				logwarnx("%s: reject RA (option %s) from %s",
-				    ifp->name, dho->var, rap->sfrom);
-			else
-				logwarnx("%s: reject RA (option %d) from %s",
-				    ifp->name, ndo.nd_opt_type, rap->sfrom);
-			FREE_RAP(rap);
-			return;
-		}
-
-		if (has_option_mask(ifp->options->nomasknd, ndo.nd_opt_type))
+		if (!dho_policy_allowed(pg, ndo.nd_opt_type))
 			continue;
 
 		switch (ndo.nd_opt_type) {
@@ -1410,15 +1474,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 		}
 	}
 
-	for (i = 0, dho = ctx->nd_opts; i < ctx->nd_opts_len; i++, dho++) {
-		if (has_option_mask(ifp->options->requiremasknd, dho->option)) {
-			logwarnx("%s: reject RA (no option %s) from %s",
-			    ifp->name, dho->var, rap->sfrom);
-			FREE_RAP(rap);
-			return;
-		}
-	}
-
 	TAILQ_FOREACH(ia, &rap->addrs, next) {
 		if (!(ia->flags & IPV6_AF_STALE) || ia->prefix_pltime == 0)
 			continue;
@@ -1578,12 +1633,14 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 	struct ipv6_addr *ia;
 	struct timespec now;
 	int pref;
+	const struct dho_policy_group *pg;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	i = n = 0;
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
 		if (rap->iface != ifp || rap->expired)
 			continue;
+		pg = &rap->iface->options->dhopg_nd;
 		i++;
 		snprintf(ndprefix, sizeof(ndprefix), "nd%zu", i);
 		if (efprintf(fp, "%s_from=%s", ndprefix, rap->sfrom) == -1)
@@ -1631,8 +1688,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 				errno = EINVAL;
 				break;
 			}
-			if (has_option_mask(rap->iface->options->nomasknd,
-				ndo.nd_opt_type))
+			if (!dho_policy_allowed(pg, ndo.nd_opt_type))
 				continue;
 			for (j = 0, opt = rap->iface->options->nd_override;
 			    j < rap->iface->options->nd_override_len;
@@ -1695,6 +1751,7 @@ void
 ipv6nd_expirera(void *arg)
 {
 	struct interface *ifp;
+	const struct dho_policy_group *pg;
 	struct ra *rap, *ran;
 	struct timespec now;
 	bool expired, valid;
@@ -1719,6 +1776,7 @@ ipv6nd_expirera(void *arg)
 		if (rap->iface != ifp || rap->expired)
 			continue;
 		valid = false;
+		pg = &rap->iface->options->dhopg_nd;
 		/* lifetime may be set to infinite by rfc4191 route information
 		 */
 		if (rap->lifetime) {
@@ -1779,6 +1837,7 @@ ipv6nd_expirera(void *arg)
 				logwarnx("%s: expired route %s",
 				    rap->iface->name, rinfo->sprefix);
 				TAILQ_REMOVE(&rap->rinfos, rinfo, next);
+				free(rinfo);
 			}
 		}
 
@@ -1795,8 +1854,7 @@ ipv6nd_expirera(void *arg)
 				break;
 			}
 
-			if (has_option_mask(rap->iface->options->nomasknd,
-				ndo.nd_opt_type))
+			if (!dho_policy_allowed(pg, ndo.nd_opt_type))
 				continue;
 
 			switch (ndo.nd_opt_type) {
@@ -2009,6 +2067,12 @@ ipv6nd_startrs2(void *arg)
 		}
 #ifdef __sun
 		state->nd_fd = -1;
+#ifdef PRIVSEP
+		if (IN_PRIVSEP(ifp->ctx) && ps_inet_opennd(ifp) == -1) {
+			logerr("%s: ps_inet_opennd", ifp->name);
+			return;
+		}
+#endif
 #endif
 	}
 

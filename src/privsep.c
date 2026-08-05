@@ -135,6 +135,9 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_LAUNCHER)
 #ifdef ASAN
 		logwarnx("not chrooting as compiled for ASAN");
+#elif defined(__sun)
+		/* libdpli complains */
+		logwarnx("not chrooting on sun");
 #else
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
 
@@ -146,21 +149,27 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
+#ifdef __sun
+#warning not dropping any privileges on this platform .... eek!
+#else
 	if ((setgroups(1, &pw->pw_gid) == -1 || setgid(pw->pw_gid) == -1 ||
 		setuid(pw->pw_uid) == -1) &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED)) {
 		logerr("failed to drop privileges");
 		return -1;
 	}
+#endif
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
+#ifndef __sun /* RLIMIT_NOFILE and ppoll don't mix */
 	/* Prohibit new files, sockets, etc
 	 * The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
 		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 	}
+#endif
 
 #define DHC_NOCHKIO (DHCPCD_STARTED | DHCPCD_DAEMONISE)
 	/* Prohibit writing to files.
@@ -178,48 +187,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		logerr("setrlimit RLIMIT_NPROC");
 #endif
 
-	return 0;
-}
-
-static int
-ps_setbuf0(int fd, int ctl, int minlen)
-{
-	int len;
-	socklen_t slen;
-
-	slen = sizeof(len);
-	if (getsockopt(fd, SOL_SOCKET, ctl, &len, &slen) == -1)
-		return -1;
-
-#ifdef __linux__
-	len /= 2;
-#endif
-	if (len >= minlen)
-		return 0;
-
-	return setsockopt(fd, SOL_SOCKET, ctl, &minlen, sizeof(minlen));
-}
-
-static int
-ps_setbuf(int fd)
-{
-	/* Ensure we can receive a fully sized privsep message.
-	 * Double the send buffer. */
-	int minlen = (int)sizeof(struct ps_msg);
-
-	if (ps_setbuf0(fd, SO_RCVBUF, minlen) == -1 ||
-	    ps_setbuf0(fd, SO_SNDBUF, minlen * 2) == -1) {
-		logerr(__func__);
-		return -1;
-	}
-	return 0;
-}
-
-int
-ps_setbuf_fdpair(int fd[])
-{
-	if (ps_setbuf(fd[0]) == -1 || ps_setbuf(fd[1]) == -1)
-		return -1;
 	return 0;
 }
 
@@ -343,10 +310,7 @@ ps_startprocess(struct ps_process *psp,
 		logerr("%s: socketpair", __func__);
 		return -1;
 	}
-	if (ps_setbuf_fdpair(fd) == -1) {
-		logerr("%s: ps_setbuf_fdpair", __func__);
-		return -1;
-	}
+
 #ifdef PRIVSEP_RIGHTS
 	if (ps_rights_limit_fdpair(fd) == -1) {
 		logerr("%s: ps_rights_limit_fdpair", __func__);
@@ -398,11 +362,13 @@ ps_startprocess(struct ps_process *psp,
 
 	/* Close things we no longer need */
 	pidfile_unlock();
-	eloop_closefdwaiter(ctx->eloop);
+	if (ctx->ps_ctl != psp)
+		eloop_closefdwaiter(ctx->eloop);
 
 	/* Close more if we are not root */
 	if (ctx->ps_root != psp) {
-		ps_root_close(ctx);
+		if (ctx->ps_ctl != psp)
+			ps_root_close(ctx);
 #ifdef PLUGIN_DEV
 		dev_stop(ctx);
 #endif
@@ -431,7 +397,6 @@ ps_startprocess(struct ps_process *psp,
 
 	if (ctx->ps_root != psp) {
 		ctx->options &= ~DHCPCD_PRIVSEPROOT;
-		ctx->ps_root = NULL;
 		if (ctx->ps_log_root_fd != -1) {
 			/* Already removed from eloop thanks to above clear. */
 			close(ctx->ps_log_root_fd);
@@ -518,12 +483,34 @@ ps_stopprocess(struct ps_process *psp)
 }
 
 int
+ps_bufalloc(struct dhcpcd_ctx *ctx, size_t len)
+{
+	void *nbuf;
+
+	if (ctx->ps_buflen >= len)
+		return 0;
+
+	nbuf = realloc(ctx->ps_buf, len);
+	if (nbuf == NULL)
+		return -1;
+
+	ctx->ps_buf = nbuf;
+	ctx->ps_buflen = len;
+	return 0;
+}
+
+int
 ps_start(struct dhcpcd_ctx *ctx)
 {
 	pid_t pid;
 	uint32_t rnd;
 
 	TAILQ_INIT(&ctx->ps_processes);
+	/* Alloc a reasonable buffer up front */
+	if (ps_bufalloc(ctx, BUFSIZ) == -1) {
+		logerr("%s: ps_bufalloc", __func__);
+		return -1;
+	}
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
@@ -532,7 +519,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	case 0:
 		return 0;
 	default:
-		logdebugx("spawned privileged proxy on PID %d", pid);
+		logdebugx("spawned privileged proxy on PID %ld", (long)pid);
 	}
 
 	/* No point in spawning the generic network listener if we're
@@ -546,7 +533,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	case 0:
 		return 0;
 	default:
-		logdebugx("spawned network proxy on PID %d", pid);
+		logdebugx("spawned network proxy on PID %ld", (long)pid);
 	}
 
 started_net:
@@ -557,7 +544,8 @@ started_net:
 		case 0:
 			return 0;
 		default:
-			logdebugx("spawned controller proxy on PID %d", pid);
+			logdebugx("spawned controller proxy on PID %ld",
+			    (long)pid);
 		}
 	}
 
@@ -593,7 +581,11 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 	return ps_seccomp_enter();
 #else
 	if (sandbox != NULL)
+#ifdef __sun
+		*sandbox = "none";
+#else
 		*sandbox = "posix resource limited";
+#endif
 	return 0;
 #endif
 }
@@ -1063,7 +1055,6 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
     void *cbctx)
 {
 	struct ps_msghdr psm;
-	uint8_t ps_data[PS_BUFLEN];
 	ssize_t len;
 	size_t dlen;
 	struct iovec iov[1];
@@ -1116,18 +1107,16 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	dlen = psm.ps_namelen + psm.ps_controllen + cmsg_padlen +
 	    psm.ps_datalen;
 	if (dlen != 0) {
-		if (dlen > sizeof(ps_data)) {
-			errno = EMSGSIZE;
+		if (ps_bufalloc(ctx, dlen) == -1)
 			goto stop;
-		}
-		len = recv(fd, ps_data, dlen, MSG_WAITALL);
+		len = recv(fd, ctx->ps_buf, dlen, MSG_WAITALL);
 		if ((size_t)len != dlen) {
 			errno = EINVAL;
 			goto stop;
 		}
 	}
 
-	if (ps_unrollmsg(&msg, &psm, ps_data, dlen) == -1)
+	if (ps_unrollmsg(&msg, &psm, ctx->ps_buf, dlen) == -1)
 		return -1;
 
 	if (callback == NULL)
@@ -1181,8 +1170,14 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	psp->psp_pfd = -1;
 #endif
 
-	if (!(ctx->options & DHCPCD_MANAGER))
-		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_ifname));
+	if (psid->psi_ifindex != 0) {
+		psp->psp_ifindex = psid->psi_ifindex;
+		if_indextoname(psid->psi_ifindex, psp->psp_ifname);
+	} else {
+		if (!(ctx->options & DHCPCD_MANAGER) && ctx->ifc != 0)
+			strlcpy(psp->psp_ifname, ctx->ifv[0],
+			    sizeof(psp->psp_ifname));
+	}
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }
@@ -1194,6 +1189,9 @@ ps_freeprocesses(struct dhcpcd_ctx *ctx, struct ps_process *notthis)
 
 	TAILQ_FOREACH_SAFE(psp, &ctx->ps_processes, next, psn) {
 		if (psp == notthis)
+			continue;
+		/* control needs root access to work out user group */
+		if (ctx->ps_ctl == notthis && psp == ctx->ps_root)
 			continue;
 		ps_freeprocess(psp);
 	}

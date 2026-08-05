@@ -1,4 +1,6 @@
 name: Build
+permissions:
+  contents: read
 
 on:
   push:
@@ -15,13 +17,24 @@ jobs:
     strategy:
       matrix:
         os: [ macos-26 ]
+        args:
+          - --sanitize
+          - --disable-ipv4
+          - --disable-arp
+          - --disable-ipv4ll
+          - --disable-ipv6
+          - --disable-dhcp6
+          - --disable-privsep
+        cppflags:
+          -
+          - -DSMALL
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v6
 
     - name: Configure
-      run: ./configure --sanitize
+      run: CPPFLAGS="${{ matrix.cppflags }}" ./configure ${{ matrix.args }}
 
     - name: Build
       run: make
@@ -36,6 +49,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - name: Install libudev-dev
+      run: sudo apt install -y libudev-dev
+
     - uses: actions/checkout@v6
     
     - name: Configure

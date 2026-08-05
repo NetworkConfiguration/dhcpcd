@@ -52,10 +52,12 @@
 #define PS_FILEMTIME	0x0016
 #define PS_AUTH_MONORDM 0x0017
 #define PS_CTL		0x0018
-#define PS_CTL_EOF	0x0019
-#define PS_LOGREOPEN	0x0020
-#define PS_STOPPROCS	0x0021
-#define PS_DAEMONISED	0x0022
+#define PS_CTL_CONTROL	0x0019
+#define PS_CTL_READ	0x0020
+#define PS_LOGREOPEN	0x0021
+#define PS_STOPPROCS	0x0022
+#define PS_DAEMONISED	0x0023
+#define PS_USER_INGROUP 0x0024
 
 /* Domains */
 #define PS_ROOT	   0x0101
@@ -82,28 +84,13 @@
 #define PS_DEV_IFREMOVED 0x0002
 #define PS_DEV_IFUPDATED 0x0003
 
-/* Control Type (via flags) */
-#define PS_CTL_PRIV   0x0004
-#define PS_CTL_UNPRIV 0x0005
-
 /* Sysctl Needs (via flags) */
 #define PS_SYSCTL_OLEN	0x0001
 #define PS_SYSCTL_ODATA 0x0002
 
 /* Process commands */
-#define PS_START 0x4000
-#define PS_STOP	 0x8000
-
-#ifdef INET6
-#define PS_BUFLEN6 CMSG_SPACE(sizeof(struct in6_pktinfo) + sizeof(int))
-#else
-#define PS_BUFLEN6 0
-#endif
-
-/* Max INET message size + meta data for IPC */
-#define PS_BUFLEN                                                         \
-	((64 * 1024) + sizeof(struct ps_msghdr) + sizeof(struct msghdr) + \
-	    PS_BUFLEN6)
+#define PS_START     0x4000
+#define PS_STOP	     0x8000
 
 #define PSP_NAMESIZE 16 + INET_MAX_ADDRSTRLEN
 
@@ -169,11 +156,6 @@ struct ps_msghdr {
 	size_t ps_datalen;
 };
 
-struct ps_msg {
-	struct ps_msghdr psm_hdr;
-	uint8_t psm_data[PS_BUFLEN];
-};
-
 struct bpf;
 
 struct ps_process {
@@ -209,6 +191,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #include "privsep-bpf.h"
 #endif
 
+int ps_bufalloc(struct dhcpcd_ctx *, size_t);
 int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
@@ -231,9 +214,6 @@ ssize_t ps_sendcmdmsg(struct dhcpcd_ctx *, int fd, uint16_t cmd,
 ssize_t ps_recvmsg(int, unsigned short, uint16_t, int);
 ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
-
-/* Internal privsep functions. */
-int ps_setbuf_fdpair(int[]);
 
 #ifdef PRIVSEP_RIGHTS
 int ps_rights_limit_ioctl(int);

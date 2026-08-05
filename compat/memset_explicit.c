@@ -1,7 +1,7 @@
 /*
- * Privilege Separation for dhcpcd
+ * memset_explicit compat
  * SPDX-License-Identifier: BSD-2-Clause
- * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
+ * Copyright (c) 2026 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -26,16 +26,28 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PRIVSEP_CTL_H
-#define PRIVSEP_CTL_H
 
-#define IN_PRIVSEP_CONTROLLER(ctx) \
-	(IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
+#include "config.h"
 
-pid_t ps_ctl_start(struct dhcpcd_ctx *);
-int ps_ctl_stop(struct dhcpcd_ctx *);
-ssize_t ps_ctl_handleargs(struct fd_list *, const char *, size_t);
-ssize_t ps_ctl_sendmsg(struct fd_list *, const struct msghdr *);
-ssize_t ps_ctl_sendeof(struct dhcpcd_ctx *);
+#define	__STDC_WANT_LIB_EXT1__ 1
+#include <string.h>
 
+void *
+memset_explicit(void *b, int c, size_t len)
+{
+#if defined(HAVE_EXPLICIT_MEMSET)
+	return explicit_memset(b, c, len);
+#else
+#if defined(HAVE_MEMSET_S)
+	if (memset_s(b, len, c, len) == 0)
+		return b;
+#elif defined(HAVE_EXPLICIT_BZERO)
+	if (c == 0) {
+		explicit_bzero(b, len);
+		return b;
+	}
 #endif
+	void * (* const volatile vmemset)(void *, int, size_t) = memset;
+	return vmemset(b, c, len);
+#endif
+}
