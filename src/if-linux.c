@@ -1783,7 +1783,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (rt->rt_lifetime != 0) {
 		uint32_t expires;
 
-		expires = lifetime_left(rt->rt_lifetime, &rt->rt_acquired, NULL);
+		expires = lifetime_left(rt->rt_lifetime, &rt->rt_acquired,
+		    NULL);
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_EXPIRES, expires);
 	}
 #endif
