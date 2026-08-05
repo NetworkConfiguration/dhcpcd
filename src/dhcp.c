@@ -2827,6 +2827,9 @@ dhcp_deconfigure(void *arg)
 	struct if_options *ifo = ifp->options;
 	const char *reason;
 
+	if (state == NULL || state->state == DHS_NONE)
+		goto deconfigured;
+
 #ifdef AUTH
 	dhcp_auth_reset(&state->auth);
 #endif
@@ -2855,6 +2858,8 @@ dhcp_deconfigure(void *arg)
 	state->old = NULL;
 	state->old_len = 0;
 	state->lease.addr.s_addr = 0;
+
+deconfigured:
 	ifo->options &= ~(DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 
 	if (ifo->options & DHCPCD_STOPPING) {
@@ -2872,12 +2877,8 @@ dhcp_drop(struct interface *ifp, const char *reason)
 
 	/* dhcp_start may just have been called and we don't yet have a state
 	 * but we do have a timeout, so punt it. */
-	if (state == NULL || state->state == DHS_NONE) {
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		dhcp_free(ifp);
-		dhcpcd_dropped(ifp);
-		return;
-	}
+	if (state == NULL || state->state == DHS_NONE)
+		goto deconfigure;
 
 #ifdef ARP
 	if (state->addr != NULL)
@@ -2928,6 +2929,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	}
 #endif
 
+deconfigure:
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	dhcp_deconfigure(ifp);
 }
