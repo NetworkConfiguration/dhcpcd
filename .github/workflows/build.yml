@@ -24,6 +24,7 @@ jobs:
           - --disable-ipv4ll
           - --disable-ipv6
           - --disable-dhcp6
+          - --disable-privsep
         cppflags:
           -
           - -DSMALL
