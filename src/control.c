@@ -386,7 +386,6 @@ control_new(struct dhcpcd_ctx *ctx, int fd, unsigned int flags)
 	unsigned int id;
 #endif
 
-
 	l = control_find(ctx, fd);
 	if (l != NULL) {
 		l->flags = flags;
