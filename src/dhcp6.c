@@ -2616,9 +2616,10 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 	struct ipv6_addr *ia, *ian;
 #ifndef SMALL
 	bool again;
-#endif
 
 again:
+#endif
+
 	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
 		if (ia->flags & IPV6_AF_EXTENDED)
 			;
