@@ -381,10 +381,11 @@ control_new(struct dhcpcd_ctx *ctx, int fd, unsigned int flags)
 {
 	struct fd_list *l;
 	size_t cnt;
-#ifdef PRIVSEP
 	struct fd_list *n;
+#ifdef PRIVSEP
 	unsigned int id;
 #endif
+
 
 	l = control_find(ctx, fd);
 	if (l != NULL) {
