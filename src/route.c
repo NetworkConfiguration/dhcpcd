@@ -755,6 +755,11 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 				return false;
 		} else {
 #ifdef HAVE_ROUTE_LIFETIME
+			/* The existing kernel route matches what we want
+			 * and the lifetime is inside the allowed deviation.
+			 * Persist the original acquisition time so the
+			 * deviaton can drop outside what is allowed and the
+			 * kernel route is re-added with a new lifetime. */
 			rt->rt_acquired = or->rt_acquired;
 #endif
 		}
