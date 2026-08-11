@@ -2308,7 +2308,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
 #ifdef HAVE_ROUTE_LIFETIME
-			rt->rt_aquired = rinfo->acquired;
+			rt->rt_acquired = rinfo->acquired;
 			rt->rt_lifetime = rinfo->lifetime,
 #endif
 			rt_proto_add(routes, rt);
@@ -2325,7 +2325,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 				rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
 #ifdef HAVE_ROUTE_LIFETIME
-				rt->rt_aquired = addr->acquired;
+				rt->rt_acquired = addr->acquired;
 				rt->rt_lifetime = addr->prefix_vltime;
 #endif
 
@@ -2361,7 +2361,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		rt->rt_pref = ipv6nd_rtpref(rap->flags);
 #endif
 #ifdef HAVE_ROUTE_LIFETIME
-		rt->rt_aquired = rap->acquired;
+		rt->rt_acquired = rap->acquired;
 		rt->rt_lifetime = rap->lifetime;
 #endif
 
@@ -2400,7 +2400,7 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, enum DH6S dstate)
 				continue;
 			rt->rt_dflags |= RTDF_DHCP;
 #ifdef HAVE_ROUTE_LIFETIME
-			rt->rt_aquired = ia->acquired;
+			rt->rt_acquired = ia->acquired;
 			rt->rt_lifetime = ia->prefix_vltime;
 #endif
 			rt_proto_add(routes, rt);

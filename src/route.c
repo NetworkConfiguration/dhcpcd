@@ -558,7 +558,7 @@ rt_cmp_lifetime(struct rt *nrt, struct rt *ort)
 	struct timespec ts;
 	uint32_t deviation;
 
-	timespecsub(&nrt->rt_aquired, &ort->rt_aquired, &ts);
+	timespecsub(&nrt->rt_acquired, &ort->rt_acquired, &ts);
 	if (ts.tv_sec < 0)
 		ts.tv_sec = -ts.tv_sec;
 	if (ts.tv_sec > RTLIFETIME_DEV_MAX)
@@ -753,7 +753,17 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    rt_cmp_mtu(rt, or) != 0) {
 			if (!rt_add(kroutes, rt, or))
 				return false;
+		} else {
+#ifdef HAVE_ROUTE_LIFETIME
+			/* The existing kernel route matches what we want
+			 * and the lifetime is inside the allowed deviation.
+			 * Persist the original acquisition time so the
+			 * deviaton can drop outside what is allowed and the
+			 * kernel route is re-added with a new lifetime. */
+			rt->rt_acquired = or->rt_acquired;
+#endif
 		}
+
 		rb_tree_remove_node(&ctx->routes, or);
 		rt_free(or);
 	} else {
