@@ -122,7 +122,8 @@ void dho_policy_group_free(struct dho_policy_group);
 int dho_policy_check(const struct dho_policy *, int (*)(uint32_t, void *),
     void *);
 
-int dho_policy_requested(const struct dho_policy_group *,
+int dho_policy_requested(const struct dho_policy_group *, uint32_t);
+int dho_policy_opt_requested(const struct dho_policy_group *,
     const struct dhcp_opt *);
 int dho_policy_removed(const struct dho_policy_group *, uint32_t);
 int dho_policy_allowed(const struct dho_policy_group *, uint32_t);

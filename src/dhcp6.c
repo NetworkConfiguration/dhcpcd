@@ -797,7 +797,7 @@ dhcp6_makemessage(struct interface *ifp)
 			}
 			if (n < ifo->dhcp6_override_len)
 				continue;
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -805,7 +805,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -1128,7 +1128,7 @@ dhcp6_makemessage(struct interface *ifp)
 			if (n < ifo->dhcp6_override_len)
 				continue;
 #endif
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));
@@ -1138,7 +1138,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));

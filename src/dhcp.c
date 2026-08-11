@@ -975,7 +975,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			    (opt->option == DHO_RENEWALTIME ||
 				opt->option == DHO_REBINDTIME))
 				continue;
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			AREA_FIT(1);
 			*p++ = (uint8_t)opt->option;
@@ -992,7 +992,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			    (opt->option == DHO_RENEWALTIME ||
 				opt->option == DHO_REBINDTIME))
 				continue;
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			AREA_FIT(1);
 			*p++ = (uint8_t)opt->option;
@@ -1035,7 +1035,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (type == DHCP_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    dho_policy_allowed(pg, DHO_RAPIDCOMMIT)) {
+	    dho_policy_requested(pg, DHO_RAPIDCOMMIT)) {
 		/* RFC 4039 Section 3 */
 		AREA_CHECK(0);
 		*p++ = DHO_RAPIDCOMMIT;
@@ -3469,8 +3469,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 		if (state->state == DHS_DISCOVER) {
 			/* We only allow ACK of rapid commit DISCOVER. */
-			if (dho_policy_has(&pg->dhop_request,
-				DHO_RAPIDCOMMIT) &&
+			if (dho_policy_requested(pg, DHO_RAPIDCOMMIT) &&
 			    get_option(ifp->ctx, bootp, bootp_len,
 				DHO_RAPIDCOMMIT, NULL))
 				state->state = DHS_REQUEST;
