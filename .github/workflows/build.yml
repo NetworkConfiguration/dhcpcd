@@ -51,9 +51,6 @@ jobs:
     - name: Update packages
       run: sudo apt update
 
-    - name: Upgrade packages
-      run: sudo apt upgrade -y
-
     - name: Install libudev-dev
       run: sudo apt install -y libudev-dev
 
