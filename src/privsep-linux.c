@@ -376,6 +376,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_llseek
 	SECCOMP_ALLOW(__NR_llseek),
 #endif
+#ifdef __NR__llseek
+	SECCOMP_ALLOW(__NR__llseek),
+#endif
 #ifdef __NR_madvise /* needed for musl */
 	SECCOMP_ALLOW(__NR_madvise),
 #endif
