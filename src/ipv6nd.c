@@ -454,17 +454,31 @@ ipv6nd_expire(void *arg)
 	ipv6nd_expirera(ifp);
 }
 
+static void
+ipv6nd_cancelexpire(struct interface *ifp)
+{
+	eloop_q_timeout_delete(ifp->ctx->eloop, ELOOP_IPV6RA_EXPIRE,
+	    ipv6nd_expire, ifp);
+}
+
 void
 ipv6nd_startexpire(struct interface *ifp)
 {
 	struct ra *rap;
+	bool found = false;
 
 	if (ifp->ctx->ra_routers == NULL)
 		return;
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp)
+		if (rap->iface == ifp) {
 			rap->willexpire = true;
+			found = true;
+		}
+	}
+	if (!found) {
+		ipv6nd_cancelexpire(ifp);
+		return;
 	}
 	eloop_q_timeout_add_sec(ifp->ctx->eloop, ELOOP_IPV6RA_EXPIRE,
 	    RTR_CARRIER_EXPIRE, ipv6nd_expire, ifp);
@@ -681,8 +695,6 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 {
 	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 
-	eloop_q_timeout_delete(ctx->eloop, ELOOP_IPV6RA_EXPIRE, NULL,
-	    rap->iface);
 	eloop_timeout_delete(ctx->eloop, NULL, rap->iface);
 	eloop_timeout_delete(ctx->eloop, NULL, rap);
 	if (remove_ra)
@@ -712,6 +724,7 @@ ipv6nd_free(struct interface *ifp)
 		return 0;
 
 	ctx = ifp->ctx;
+	ipv6nd_cancelexpire(ifp);
 #ifdef __sun
 	eloop_event_delete(ctx->eloop, state->nd_fd);
 	close(state->nd_fd);
@@ -1935,6 +1948,7 @@ ipv6nd_drop(struct interface *ifp)
 	struct ra *rap, *ran;
 	bool expired = false;
 
+	ipv6nd_cancelexpire(ifp);
 	if (ifp->ctx->ra_routers == NULL)
 		return;
 
