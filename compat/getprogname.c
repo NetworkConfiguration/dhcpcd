@@ -53,23 +53,14 @@ progname_exit(void)
 	free(progname.progname_free);
 }
 
-static bool
-progname_init(void)
-{
-	if (!progname.progname_init) {
-		if (atexit(progname_exit) != 0)
-			return false;
-		progname.progname_init = true;
-	}
-
-	return true;
-}
-
 const char *
 getprogname(void)
 {
-	if (!progname_init())
-		return NULL;
+	if (!progname.progname_init) {
+		/* If this fails, we will leak progname.progname_free */
+		if (atexit(progname_exit) == 0)
+			progname.progname_init = true;
+	}
 
 	if (progname.progname_set)
 		return progname.progname;
@@ -92,16 +83,11 @@ getprogname(void)
 void
 setprogname(const char *name)
 {
-	const char *p;
+	progname.progname = strrchr(name, '/');
 
-	/* We might be given a path */
-	for (p = name + (strlen(name) - 1); p != name; p--) {
-		if (*p == '/') {
-			name = p + 1;
-			break;
-		}
-	}
-
-	progname.progname = name;
+	if (progname.progname == NULL)
+		progname.progname = name;
+	else
+		progname.progname++;
 	progname.progname_set = true;
 }
