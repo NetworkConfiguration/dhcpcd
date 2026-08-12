@@ -199,6 +199,7 @@ setproctitle_init(int argc, char *argv[], char *envp[])
 		SPT.error = errno;
 		return;
 	}
+	setprogname(SPT.arg0);
 
 	error = spt_copyenv(envc, envp);
 	if (error) {

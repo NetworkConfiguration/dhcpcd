@@ -1,5 +1,5 @@
 /*
- * getprogname: compat
+ * progname: compat
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -26,10 +26,25 @@
  * SUCH DAMAGE.
  */
 
-#ifndef GETPROGNAME_H
-#define GETPROGNAME_H
+#include <string.h>
 
-const char *getprogname(void);
-void setprogname(const char *);
+#include "progname.h"
 
-#endif
+static const char *progname;
+
+const char *
+getprogname(void)
+{
+	return progname;
+}
+
+void
+setprogname(const char *name)
+{
+	progname = strrchr(name, '/');
+
+	if (progname == NULL)
+		progname = name;
+	else
+		progname++;
+}
