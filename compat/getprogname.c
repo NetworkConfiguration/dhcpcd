@@ -39,47 +39,60 @@
 
 /* Although progname functions are desgined to work with a constant pointer,
  * we know setproctitle might abuse argv[0] so we take a copy of it. */
-static char *progname;
-static bool progname_free = false;
-static bool progname_init = false;
+struct progname {
+	char *progname;
+	bool progname_free;
+	bool progname_init;
+	bool progname_set;
+};
+static struct progname progname = { .progname = NULL };
 
 static void
 progname_exit(void)
 {
-	if (progname_free)
-		free(progname);
+	if (progname.progname_free)
+		free(progname.progname);
 }
 
 const char *
 getprogname(void)
 {
-	if (!progname_init) {
-		if (atexit(progname_exit) == -1)
+	if (!progname.progname_init) {
+		if (atexit(progname_exit) != 0)
 			return NULL;
-		progname_init = true;
+		progname.progname_init = true;
 	}
 
+	if (progname.progname_set)
+		return progname.progname;
+
 #if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
-	if (progname == NULL) {
-		progname = strdup(program_invocation_short_name);
-		progname_free = true;
-	}
-	return progname;
+	progname.progname = strdup(program_invocation_short_name);
+	if (progname.progname == NULL)
+		progname.progname = UNCONST(PACKAGE); /* fallback */
+	else
+		progname.progname_free = true;
 #else
 #warning "no OS support for getprogname(3)"
-	if (progname == NULL)
-		progname = PACKAGE;
-	return progname;
+	progname.progname = UNCONST(PACKAGE);
 #endif
+
+	progname.progname_set = true;
+	return progname.progname;
 }
 
 void
 setprogname(const char *name)
 {
-	if (progname_free) {
-		free(progname);
-		progname_free = false;
-	}
+	char *n = strdup(name);
 
-	progname = UNCONST(name);
+	if (n == NULL)
+		return;
+
+	if (progname.progname_free)
+		free(progname.progname);
+	else
+		progname.progname_free = true;
+	progname.progname = n;
+	progname.progname_set = true;
 }
