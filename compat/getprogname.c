@@ -27,20 +27,43 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
+#include "common.h"
 #include "defs.h"
 #include "getprogname.h"
 
-static const char *progname;
+/* Although progname functions are desgined to work with a constant pointer,
+ * we know setproctitle might abuse argv[0] so we take a copy of it. */
+static char *progname;
+static bool progname_free = false;
+static bool progname_init = false;
+
+static void
+progname_exit(void)
+{
+	if (progname_free)
+		free(progname);
+}
 
 const char *
 getprogname(void)
 {
+	if (!progname_init) {
+		if (atexit(progname_exit) == -1)
+			return NULL;
+		progname_init = true;
+	}
+
 #if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
-	if (progname == NULL)
-		progname = program_invocation_short_name;
+	if (progname == NULL) {
+		progname = strdup(program_invocation_short_name);
+		progname_free = true;
+	}
 	return progname;
 #else
 #warning "no OS support for getprogname(3)"
@@ -53,5 +76,10 @@ getprogname(void)
 void
 setprogname(const char *name)
 {
-	progname = name;
+	if (progname_free) {
+		free(progname);
+		progname_free = false;
+	}
+
+	progname = UNCONST(name);
 }
