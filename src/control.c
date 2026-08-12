@@ -55,7 +55,11 @@
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
+#ifdef __GNU__
+#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
+#else
 #define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#endif
 
 #define LISTEN_BACKLOG 5
 
@@ -122,16 +126,19 @@ control_handle_read(struct fd_list *fd)
 		return bytes;
 
 	if (getpeereid(fd->fd, &uid, &gid) == -1) {
-		logerr("%s: getpeereid", __func__);
 #ifdef __GNU__
-		/* What else can we do? SCM_CREDS is the only thing that
-		 * is defined but it does not work. */
+		/* We don't really expect this to work on Hurd */
 		if (errno == ENOSYS) {
 			uid = 0;
 			gid = 0;
-		} else
-#endif
+		} else {
+			logerr("%s: getpeereid", __func__);
+			return -1;
+		}
+#else
+		logerr("%s: getpeereid", __func__);
 		return -1;
+#endif
 	}
 
 #ifdef PRIVSEP
@@ -530,6 +537,11 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 	len = (socklen_t)SUN_LEN(&sa);
 	unlink(sa.sun_path);
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
+	#ifdef __GNU__
+	    /* Hurd has no means of working out who sent the message.
+	     * We must rely on filesystem support. */
+	    chown(sa.sun_path, 0, ctx->control_group) == -1 ||
+	#endif
 	    chmod(sa.sun_path, SUN_MODE) == -1 ||
 	    listen(fd, LISTEN_BACKLOG) == -1)
 		goto err;

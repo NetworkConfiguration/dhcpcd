@@ -2483,6 +2483,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ctx->control_group = grp->gr_gid;
 			break;
 		case O_READGRP:
+#ifdef __GNU__
+			logwarnx("read_group is not supported on Hurd");
+#endif
 			ctx->read_group = grp->gr_gid;
 			break;
 		}
@@ -2498,6 +2501,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ctx->control_group = grp->gr_gid;
 			break;
 		case O_READGRP:
+#ifdef __GNU__
+			logwarnx("read_group is not supported on Hurd");
+#endif
 			ctx->read_group = grp->gr_gid;
 			break;
 		}
