@@ -56,9 +56,9 @@
 #endif
 
 #ifdef __GNU__
-#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
+#define SUN_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
 #else
-#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define SUN_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 #endif
 
 #define LISTEN_BACKLOG 5
@@ -537,11 +537,11 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 	len = (socklen_t)SUN_LEN(&sa);
 	unlink(sa.sun_path);
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
-	#ifdef __GNU__
+#ifdef __GNU__
 	    /* Hurd has no means of working out who sent the message.
 	     * We must rely on filesystem support. */
 	    chown(sa.sun_path, 0, ctx->control_group) == -1 ||
-	#endif
+#endif
 	    chmod(sa.sun_path, SUN_MODE) == -1 ||
 	    listen(fd, LISTEN_BACKLOG) == -1)
 		goto err;
