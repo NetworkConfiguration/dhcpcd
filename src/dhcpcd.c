@@ -2092,6 +2092,9 @@ main(int argc, char **argv, char **envp)
 #ifdef SETPROCTITLE_H
 	setproctitle_init(argc, argv, envp);
 #else
+#ifdef PROGNAME_H
+	setprogname(argv[0]);
+#endif
 	UNUSED(envp);
 #endif
 

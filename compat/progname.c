@@ -1,5 +1,5 @@
 /*
- * getprogname: compat
+ * progname: compat
  * SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -26,32 +26,25 @@
  * SUCH DAMAGE.
  */
 
-#include <errno.h>
-#include <stddef.h>
+#include <string.h>
 
-#include "config.h"
-#include "defs.h"
-#include "getprogname.h"
+#include "progname.h"
 
 static const char *progname;
 
 const char *
 getprogname(void)
 {
-#if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
-	if (progname == NULL)
-		progname = program_invocation_short_name;
 	return progname;
-#else
-#warning "no OS support for getprogname(3)"
-	if (progname == NULL)
-		progname = PACKAGE;
-	return progname;
-#endif
 }
 
 void
 setprogname(const char *name)
 {
-	progname = name;
+	progname = strrchr(name, '/');
+
+	if (progname == NULL)
+		progname = name;
+	else
+		progname++;
 }
