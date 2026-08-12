@@ -40,8 +40,8 @@
 /* Although progname functions are desgined to work with a constant pointer,
  * we know setproctitle might abuse argv[0] so we take a copy of it. */
 struct progname {
-	char *progname;
-	bool progname_free;
+	const char *progname;
+	char *progname_free;
 	bool progname_init;
 	bool progname_set;
 };
@@ -50,31 +50,39 @@ static struct progname progname = { .progname = NULL };
 static void
 progname_exit(void)
 {
-	if (progname.progname_free)
-		free(progname.progname);
+	free(progname.progname_free);
+}
+
+static bool
+progname_init(void)
+{
+	if (!progname.progname_init) {
+		if (atexit(progname_exit) != 0)
+			return false;
+		progname.progname_init = true;
+	}
+
+	return true;
 }
 
 const char *
 getprogname(void)
 {
-	if (!progname.progname_init) {
-		if (atexit(progname_exit) != 0)
-			return NULL;
-		progname.progname_init = true;
-	}
+	if (!progname_init())
+		return NULL;
 
 	if (progname.progname_set)
 		return progname.progname;
 
 #if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
-	progname.progname = strdup(program_invocation_short_name);
-	if (progname.progname == NULL)
-		progname.progname = UNCONST(PACKAGE); /* fallback */
+	progname.progname_free = strdup(program_invocation_short_name);
+	if (progname.progname_free == NULL)
+		progname.progname = PACKAGE; /* fallback */
 	else
-		progname.progname_free = true;
+		progname.progname = progname.progname_free;
 #else
 #warning "no OS support for getprogname(3)"
-	progname.progname = UNCONST(PACKAGE);
+	progname.progname = PACKAGE;
 #endif
 
 	progname.progname_set = true;
@@ -84,15 +92,16 @@ getprogname(void)
 void
 setprogname(const char *name)
 {
-	char *n = strdup(name);
+	const char *p;
 
-	if (n == NULL)
-		return;
+	/* We might be given a path */
+	for (p = name + (strlen(name) - 1); p != name; p--) {
+		if (*p == '/') {
+			name = p + 1;
+			break;
+		}
+	}
 
-	if (progname.progname_free)
-		free(progname.progname);
-	else
-		progname.progname_free = true;
-	progname.progname = n;
+	progname.progname = name;
 	progname.progname_set = true;
 }
