@@ -49,6 +49,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - name: Update packages
+      run: sudo apt update
+
     - name: Install libudev-dev
       run: sudo apt install -y libudev-dev
 

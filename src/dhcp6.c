@@ -797,7 +797,7 @@ dhcp6_makemessage(struct interface *ifp)
 			}
 			if (n < ifo->dhcp6_override_len)
 				continue;
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -805,7 +805,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			n_options++;
 			len += sizeof(o.len);
@@ -922,7 +922,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
+	    dho_policy_requested(pg, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
 	if (m == NULL) {
@@ -1128,7 +1128,7 @@ dhcp6_makemessage(struct interface *ifp)
 			if (n < ifo->dhcp6_override_len)
 				continue;
 #endif
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));
@@ -1138,7 +1138,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len; l++, opt++) {
-			if (!dho_policy_requested(pg, opt))
+			if (!dho_policy_opt_requested(pg, opt))
 				continue;
 			o.code = htons((uint16_t)opt->option);
 			memcpy(p, &o.code, sizeof(o.code));
@@ -1160,7 +1160,7 @@ dhcp6_makemessage(struct interface *ifp)
 	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
 
 	if (state->state == DH6S_DISCOVER && !(ctx->options & DHCPCD_TEST) &&
-	    dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT))
+	    dho_policy_requested(pg, D6_OPTION_RAPID_COMMIT))
 		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
 	if (dho_policy_allowed(pg, D6_OPTION_USER_CLASS))
@@ -3542,7 +3542,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom, struct dhcp6_message *r,
 		case DH6S_DISCOVER:
 			/* Only accept REPLY in DISCOVER for RAPID_COMMIT.
 			 * Normally we get an ADVERTISE for a DISCOVER. */
-			if (!dho_policy_allowed(pg, D6_OPTION_RAPID_COMMIT) ||
+			if (!dho_policy_requested(pg, D6_OPTION_RAPID_COMMIT) ||
 			    !dhcp6_findmoption(r, len, D6_OPTION_RAPID_COMMIT,
 				NULL)) {
 				valid_op = false;

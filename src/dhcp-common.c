@@ -236,7 +236,19 @@ dho_policy_allowed(const struct dho_policy_group *pg, uint32_t option)
 }
 
 int
-dho_policy_requested(const struct dho_policy_group *pg,
+dho_policy_requested(const struct dho_policy_group *pg, uint32_t option)
+{
+	if (!dho_policy_has(&pg->dhop_request, option))
+		return 0;
+	if (dho_policy_has(&pg->dhop_allow, option))
+		return 1;
+	if (dho_policy_has(&pg->dhop_remove, option))
+		return 0;
+	return 1;
+}
+
+int
+dho_policy_opt_requested(const struct dho_policy_group *pg,
     const struct dhcp_opt *dho)
 {
 	if (dho->type & OT_NOREQ)
