@@ -2640,8 +2640,6 @@ main(int argc, char **argv, char **envp)
 	logdebugx("spawned manager process on PID %d", (int)getpid());
 
 start_manager:
-
-	logdebugx("spawned manager process on PID %d", (int)getpid());
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, (int)pid);
