@@ -1286,7 +1286,7 @@ add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 	unsigned short len = (unsigned short)RTA_LENGTH(alen);
 	struct rtattr *rta;
 
-	if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen) {
+	if (NLMSG_ALIGN(n->nlmsg_len + len) > maxlen) {
 		errno = ENOBUFS;
 		return -1;
 	}
@@ -1296,7 +1296,7 @@ add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 	rta->rta_len = len;
 	if (alen)
 		memcpy(RTA_DATA(rta), data, alen);
-	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len);
+	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len + len);
 
 	return 0;
 }
@@ -1596,7 +1596,7 @@ if_getssid(struct interface *ifp)
 struct nlma {
 	struct nlmsghdr hdr;
 	struct ifaddrmsg ifa;
-	char buffer[64];
+	char buffer[256];
 };
 
 #ifdef INET
