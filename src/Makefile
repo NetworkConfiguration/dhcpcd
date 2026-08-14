@@ -53,10 +53,10 @@ CLEANFILES+=	*.tar.xz
 		$< > $@
 
 all: ${TOP}/config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 dev:
-	cd dev && ${MAKE}
+	${MAKE} -C $@
 
 ../vendor/rbtree.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} ${RBTREE_CFLAGS} ${RBTREE_CPPFLAGS} -c ../vendor/rbtree.c -o $@
@@ -95,7 +95,7 @@ _proginstall: ${PROG}
 	${INSTALL} -m ${DBMODE} -d ${DESTDIR}${DBDIR}
 
 proginstall: _proginstall ${EMBEDDEDINSTALL}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 _maninstall: ${MAN5} ${MAN8}
 	${INSTALL} -d ${DESTDIR}${MANDIR}/man5
@@ -121,7 +121,7 @@ install: proginstall _maninstall _confinstall eginstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 distclean: clean
 	rm -f .depend

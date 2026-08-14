@@ -47,4 +47,4 @@ install: proginstall
 clean:
 	rm -f ${CLEANFILES}
 
-include ${TOP}/src//Makefile.inc
+include ${TOP}/src/Makefile.inc

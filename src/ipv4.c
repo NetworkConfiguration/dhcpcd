@@ -44,9 +44,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h" // IWYU pragma: keep
 #include "arp.h"
 #include "common.h"
-#include "config.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
 #include "eloop.h"
@@ -757,6 +757,8 @@ ipv4_applyaddr(void *arg)
 				/* Someone might have deleted our address */
 				if (state->addr != NULL)
 					ipv4_deladdr(state->addr, 0);
+				/* No address, ensure state is cleared  */
+				state->added = 0;
 				rt_build(ifp->ctx, AF_INET);
 			}
 			script_runreason(ifp, state->reason);

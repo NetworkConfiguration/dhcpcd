@@ -25,37 +25,37 @@ CLEANFILES+=	*.tar.xz
 .SUFFIXES:	.in
 
 all: config.h
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 depend: config.h
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 tests:
-	cd $@; ${MAKE} $@
+	${MAKE} -C $@ $@
 
 test: tests
 
 hooks:
-	cd $@; ${MAKE}
+	${MAKE} -C $@
 
 eginstall:
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 install:
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 proginstall:
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 clean:
 	rm -rf cov-int dhcpcd.xz
-	for x in ${SUBDIRS} tests; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS} tests; do ${MAKE} -C $$x $@ || exit $$?; done
 
 distclean: clean
 	rm -f config.h config.mk config.log \
 		${DISTFILE} ${DISTINFO} ${DISTINFOMD} ${DISTSIGN}
 	rm -f *.diff *.patch *.orig *.rej
-	for x in ${SUBDIRS} tests; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS} tests; do ${MAKE} -C $$x $@ || exit $$?; done
 
 dist-git:
 	git archive --prefix=${DISTPREFIX}/ v${VERSION} | xz >${DISTFILE}
@@ -113,7 +113,7 @@ _import-src: clean
 	rm -rf ${DESTDIR}/*
 	${INSTALL} -d ${DESTDIR}
 	cp LICENSE README.md ${DESTDIR};
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=${DESTDIR} $@ || exit $$?; cd ..; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x DESTDIR=${DESTDIR} $@ || exit $$?; done
 	@${ECHO}
 	@${ECHO} "============================================================="
 	@${ECHO} "${PACKAGE}-${VERSION} imported to ${DESTDIR}"

@@ -45,8 +45,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h" // IWYU pragma: keep
 #include "common.h"
-#include "config.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd-embedded.h"
@@ -2485,8 +2485,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		case O_READGRP:
 #ifdef __GNU__
 			logwarnx("read_group is not supported on Hurd");
-#endif
+#else
 			ctx->read_group = grp->gr_gid;
+#endif
 			break;
 		}
 		free(p);
@@ -2503,8 +2504,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		case O_READGRP:
 #ifdef __GNU__
 			logwarnx("read_group is not supported on Hurd");
-#endif
+#else
 			ctx->read_group = grp->gr_gid;
+#endif
 			break;
 		}
 #endif

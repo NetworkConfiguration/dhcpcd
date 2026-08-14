@@ -46,7 +46,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #ifdef USE_LIBPCAP
 #include <pcap/bpf.h>
 #elif defined(__GNU__)

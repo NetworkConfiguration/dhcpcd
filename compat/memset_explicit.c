@@ -26,11 +26,10 @@
  * SUCH DAMAGE.
  */
 
-
-#include "config.h"
-
 #define	__STDC_WANT_LIB_EXT1__ 1
 #include <string.h>
+
+#include "config.h"
 
 void *
 memset_explicit(void *b, int c, size_t len)

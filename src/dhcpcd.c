@@ -50,9 +50,9 @@ static const char dhcpcd_copyright[] = "Copyright (c) 2006-2025 Roy Marples";
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "arp.h"
 #include "common.h"
-#include "config.h"
 #include "control.h"
 #include "dev.h"
 #include "dhcp-common.h"
@@ -2143,6 +2143,7 @@ main(int argc, char **argv, char **envp)
 	ctx.cffile = CONFIG;
 	ctx.script = UNCONST(dhcpcd_default_script);
 	ctx.control_fd = ctx.link_fd = -1;
+	ctx.control_group = ctx.read_group = (gid_t)-1;
 	ctx.pf_inet_fd = -1;
 #ifdef PF_LINK
 	ctx.pf_link_fd = -1;
@@ -2640,8 +2641,6 @@ main(int argc, char **argv, char **envp)
 	logdebugx("spawned manager process on PID %d", (int)getpid());
 
 start_manager:
-
-	logdebugx("spawned manager process on PID %d", (int)getpid());
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, (int)pid);
