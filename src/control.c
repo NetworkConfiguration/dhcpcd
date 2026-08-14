@@ -132,12 +132,7 @@ control_handle_read(struct fd_list *fd)
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
 		in_gid = fd->ctx->control_group;
-		if (uid == 0)
-			err = 1;
-		else if (!GID_SET(in_gid))
-			err = 0;
-		else
-			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
+		err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
 		if (err == -1) {
 			logerr(__func__);
 			return -1;
@@ -145,9 +140,7 @@ control_handle_read(struct fd_list *fd)
 		if (err == 0) {
 			fd->flags &= ~FD_CONTROL;
 			in_gid = fd->ctx->read_group;
-			err = GID_SET(in_gid) ?
-			    ps_root_user_ingroup(fd->ctx, uid, gid, in_gid) :
-			    0;
+			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
 			if (err == -1) {
 				logerr(__func__);
 				return -1;
@@ -182,7 +175,7 @@ control_handle_read(struct fd_list *fd)
 #endif
 
 	in_gid = fd->ctx->control_group;
-	err = GID_SET(in_gid) ? control_user_ingroup(uid, gid, in_gid) : 0;
+	err = control_user_ingroup(uid, gid, in_gid);
 	if (err == -1) {
 		logerr(__func__);
 		return -1;
@@ -190,7 +183,7 @@ control_handle_read(struct fd_list *fd)
 	if (err == 0) {
 		fd->flags &= ~FD_CONTROL;
 		in_gid = fd->ctx->read_group;
-		err = GID_SET(in_gid) ? control_user_ingroup(uid, gid, in_gid) : 0;
+		err = control_user_ingroup(uid, gid, in_gid);
 		if (err == -1) {
 			logerr(__func__);
 			return -1;
@@ -520,7 +513,7 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
 	struct sockaddr_un sa;
 	mode_t mode;
-	uid_t grp = getgid();
+	gid_t grp = getgid();
 	int fd;
 	socklen_t len;
 
@@ -529,9 +522,13 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 		return -1;
 
 	len = (socklen_t)SUN_LEN(&sa);
-	if (GID_SET(ctx->control_group) && GID_SET(ctx->read_group))
-		mode = SUN_MODE_ALL;
-	else if (!GID_SET(ctx->control_group) && !GID_SET(ctx->read_group))
+	if (GID_SET(ctx->control_group) && GID_SET(ctx->read_group)) {
+		if (ctx->control_group == ctx->read_group) {
+			mode = SUN_MODE_GRP;
+			grp = ctx->control_group;
+		} else
+			mode = SUN_MODE_ALL;
+	} else if (!GID_SET(ctx->control_group) && !GID_SET(ctx->read_group))
 		mode = SUN_MODE_USR;
 	else if (GID_SET(ctx->control_group)) {
 		mode = SUN_MODE_GRP;
@@ -758,6 +755,12 @@ control_user_ingroup(uid_t uid, gid_t gid, gid_t grpid)
 #endif
 	struct passwd *pw;
 	int ngroups = 10, err = -1;
+
+	/* Allow root */
+	if (uid == 0)
+		return 1;
+	if (!GID_SET(grpid))
+		return 0;
 
 	pw = getpwuid(uid);
 	if (pw == NULL)
