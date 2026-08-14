@@ -62,9 +62,9 @@
  * From libsocket_priv.h, which is not always distributed so is here. */
 extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
+#include "config.h" // IWYU pragma: keep
 #include "bpf.h"
 #include "common.h"
-#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "if-options.h"
 #include "if.h"

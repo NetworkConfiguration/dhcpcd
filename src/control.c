@@ -41,8 +41,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "common.h"
 #include "config.h" // IWYU pragma: keep
+#include "common.h"
 #include "control.h"
 #include "dhcpcd.h"
 #include "eloop.h"

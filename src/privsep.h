@@ -121,8 +121,8 @@
 #endif
 #endif
 
-#include "arp.h"
 #include "config.h"
+#include "arp.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
 

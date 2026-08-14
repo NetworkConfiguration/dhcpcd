@@ -47,8 +47,8 @@
 #include <unistd.h>
 
 #define ELOOP_QUEUE ELOOP_DHCP6
-#include "common.h"
 #include "config.h" // IWYU pragma: keep
+#include "common.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "duid.h"

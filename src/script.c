@@ -43,8 +43,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "common.h"
 #include "config.h"
+#include "common.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "eloop.h"

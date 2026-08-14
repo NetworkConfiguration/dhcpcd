@@ -9,12 +9,12 @@ CompileFlags:
   Add: [-I.., -I../compat, -I../vendor]
 ---
 If:
-  PathMatch: compat/.*\.(c|h)
+  PathMatch: compat/[^/]+\.(c|h)
 CompileFlags:
   Add: [-I.., -I../src]
 ---
 If:
-  PathMatch: compat/*/.*\.(c|h)
+  PathMatch: compat/[^/]+/.*\.(c|h)
 CompileFlags:
   Add: [-I../..]
 ---

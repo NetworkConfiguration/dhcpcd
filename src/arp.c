@@ -41,10 +41,10 @@
 #include <unistd.h>
 
 #define ELOOP_QUEUE ELOOP_ARP
+#include "config.h" // IWYU pragma: keep
 #include "arp.h"
 #include "bpf.h"
 #include "common.h"
-#include "config.h" // IWYU pragma: keep
 #include "dhcpcd.h"
 #include "eloop.h"
 #include "if-options.h"

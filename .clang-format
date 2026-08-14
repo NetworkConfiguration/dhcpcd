@@ -162,6 +162,9 @@ IncludeCategories:
   - Regex: '^<[^/].*\.h'
     Priority: 9
     SortPriority: 90
+  - Regex: '^\"config.h\"'
+    Priority: 10
+    SortPriority: 99
   - Regex: '^\".*\.h\"'
     Priority: 10
     SortPriority: 100

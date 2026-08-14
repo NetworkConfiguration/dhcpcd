@@ -44,8 +44,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "common.h"
 #include "config.h" // IWYU pragma: keep
+#include "common.h"
 #include "sa.h"
 
 #ifndef NDEBUG

@@ -44,9 +44,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h" // IWYU pragma: keep
 #include "arp.h"
 #include "common.h"
-#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "dhcpcd.h"
 #include "eloop.h"

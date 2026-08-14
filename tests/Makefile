@@ -4,7 +4,7 @@
 SUBDIRS=	crypt eloop-bench
 
 all: 
-	for x in ${SUBDIRS}; do ${MAKE} -C $xx $@ || exit $$?; done
+	for x in ${SUBDIRS}; do ${MAKE} -C $$x $@ || exit $$?; done
 
 install:
 
