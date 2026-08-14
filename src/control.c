@@ -55,7 +55,10 @@
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
-#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define SUN_MODE_USR   (S_IRUSR | S_IWUSR)
+#define SUN_MODE_GRP   (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
+#define SUN_MODE_ALL   (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define GID_SET(gid)   ((gid) != (gid_t) - 1)
 
 #define LISTEN_BACKLOG 5
 
@@ -129,10 +132,7 @@ control_handle_read(struct fd_list *fd)
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
 		in_gid = fd->ctx->control_group;
-		if (uid == 0)
-			err = 1;
-		else
-			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
+		err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
 		if (err == -1) {
 			logerr(__func__);
 			return -1;
@@ -512,6 +512,8 @@ static int
 control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
 	struct sockaddr_un sa;
+	mode_t mode;
+	gid_t grp = getgid();
 	int fd;
 	socklen_t len;
 
@@ -520,9 +522,26 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 		return -1;
 
 	len = (socklen_t)SUN_LEN(&sa);
+	if (GID_SET(ctx->control_group) && GID_SET(ctx->read_group)) {
+		if (ctx->control_group == ctx->read_group) {
+			mode = SUN_MODE_GRP;
+			grp = ctx->control_group;
+		} else
+			mode = SUN_MODE_ALL;
+	} else if (!GID_SET(ctx->control_group) && !GID_SET(ctx->read_group))
+		mode = SUN_MODE_USR;
+	else if (GID_SET(ctx->control_group)) {
+		mode = SUN_MODE_GRP;
+		grp = ctx->control_group;
+	} else {
+		mode = SUN_MODE_GRP;
+		grp = ctx->read_group;
+	}
+
 	unlink(sa.sun_path);
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
-	    chmod(sa.sun_path, SUN_MODE) == -1 ||
+	    chmod(sa.sun_path, mode) == -1 ||
+	    chown(sa.sun_path, geteuid(), grp) == -1 ||
 	    listen(fd, LISTEN_BACKLOG) == -1)
 		goto err;
 
@@ -736,6 +755,12 @@ control_user_ingroup(uid_t uid, gid_t gid, gid_t grpid)
 #endif
 	struct passwd *pw;
 	int ngroups = 10, err = -1;
+
+	/* Allow root */
+	if (uid == 0)
+		return 1;
+	if (!GID_SET(grpid))
+		return 0;
 
 	pw = getpwuid(uid);
 	if (pw == NULL)

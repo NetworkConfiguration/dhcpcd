@@ -2143,6 +2143,7 @@ main(int argc, char **argv, char **envp)
 	ctx.cffile = CONFIG;
 	ctx.script = UNCONST(dhcpcd_default_script);
 	ctx.control_fd = ctx.link_fd = -1;
+	ctx.control_group = ctx.read_group = (gid_t)-1;
 	ctx.pf_inet_fd = -1;
 #ifdef PF_LINK
 	ctx.pf_link_fd = -1;
