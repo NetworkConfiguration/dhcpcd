@@ -64,7 +64,7 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #include "bpf.h"
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "if-options.h"
 #include "if.h"

@@ -1,4 +1,5 @@
-/*	$OpenBSD: arc4random_uniform.c,v 1.3 2019/01/20 02:59:07 bcook Exp $	*/
+/*	$OpenBSD: arc4random_uniform.c,v 1.3 2019/01/20 02:59:07 bcook Exp $
+ */
 
 /*
  * SPDX-License-Identifier: ISC
@@ -22,7 +23,7 @@
 
 /* We need to include config.h so we pickup either the system arc4random
  * or our compat one. */
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 
 /*
  * Calculate a uniformly distributed random number less than upper_bound

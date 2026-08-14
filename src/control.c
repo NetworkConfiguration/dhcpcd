@@ -42,7 +42,7 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "control.h"
 #include "dhcpcd.h"
 #include "eloop.h"

@@ -37,7 +37,7 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcpcd.h"
 #include "if-options.h"
 #include "if.h"

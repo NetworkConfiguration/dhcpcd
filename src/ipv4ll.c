@@ -38,7 +38,7 @@
 #define ELOOP_QUEUE IPV4LL
 #include "arp.h"
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "eloop.h"
 #include "if-options.h"

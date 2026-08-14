@@ -44,13 +44,12 @@
 #include "arp.h"
 #include "bpf.h"
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcpcd.h"
 #include "eloop.h"
 #include "if-options.h"
 #include "if.h"
 #include "ipv4.h"
-#include "ipv4ll.h"
 #include "logerr.h"
 #include "privsep.h"
 

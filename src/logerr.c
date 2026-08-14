@@ -39,7 +39,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "logerr.h"
 
 #ifndef LOGERR_SYSLOG_FACILITY
@@ -361,7 +361,7 @@ logsetfd(int fd)
 		closelog();
 #ifndef SMALL
 	if (fd != -1 && ctx->log_file != NULL) {
-		fclose(ctx->log_file);
+		(void)fclose(ctx->log_file);
 		ctx->log_file = NULL;
 	}
 #endif

@@ -46,7 +46,7 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd-embedded.h"

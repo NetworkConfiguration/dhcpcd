@@ -46,7 +46,7 @@
 
 #include "arp.h"
 #include "common.h"
-#include "config.h"
+#include "config.h" // IWYU pragma: keep
 #include "dhcp.h"
 #include "dhcpcd.h"
 #include "eloop.h"
