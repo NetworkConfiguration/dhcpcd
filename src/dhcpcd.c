@@ -2487,9 +2487,10 @@ main(int argc, char **argv, char **envp)
 		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
 		if (!(ctx.options & DHCPCD_MANAGER))
 			ctx.control_fd = control_open(argv[optind], family);
-		if (!(ctx.options & DHCPCD_MANAGER) && ctx.control_fd == -1)
+		if (!(ctx.options & DHCPCD_MANAGER) && ctx.control_fd == -1 &&
+		    errno != EACCES)
 			ctx.control_fd = control_open(argv[optind], AF_UNSPEC);
-		if (ctx.control_fd == -1)
+		if (ctx.control_fd == -1 && errno != EACCES)
 			ctx.control_fd = control_open(NULL, AF_UNSPEC);
 		if (ctx.control_fd != -1) {
 			if (!(ctx.options & DHCPCD_DUMPLEASE))

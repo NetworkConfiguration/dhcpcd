@@ -199,6 +199,18 @@ ps_rights_limit_ioctl(int fd)
 }
 
 int
+ps_rights_limit_fd_getsockopt(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_ACCEPT,
+	    CAP_GETSOCKOPT | CAP_FCNTL);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
 ps_rights_limit_fd_fctnl(int fd)
 {
 	cap_rights_t rights;
