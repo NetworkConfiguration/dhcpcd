@@ -580,6 +580,7 @@ fi
 
 if [ -z "$PRIVSEP" ] || [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Privilege Separation"
+	PRIVSEP=yes
 
 	# Try and work out system user
 	if [ -z "$PRIVSEP_USER" ]; then
