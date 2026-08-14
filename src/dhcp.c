@@ -2825,7 +2825,6 @@ dhcp_deconfigure(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
-	const char *reason;
 
 	if (state == NULL || state->state == DHS_NONE)
 		goto deconfigured;
@@ -2835,9 +2834,7 @@ dhcp_deconfigure(void *arg)
 #endif
 
 	if (state->state == DHS_RELEASE)
-		reason = "RELEASE";
-	else
-		reason = state->reason;
+		state->reason = "RELEASE";
 	state->state = DHS_NONE;
 	free(state->offer);
 	state->offer = NULL;
@@ -2852,7 +2849,7 @@ dhcp_deconfigure(void *arg)
 	else {
 		state->addr = NULL;
 		state->added = 0;
-		script_runreason(ifp, reason);
+		script_runreason(ifp, state->reason);
 	}
 	free(state->old);
 	state->old = NULL;
