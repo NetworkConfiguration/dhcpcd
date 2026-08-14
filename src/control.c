@@ -55,7 +55,10 @@
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
-#define SUN_MODE       (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define SUN_MODE_USR   (S_IRUSR | S_IWUSR)
+#define SUN_MODE_GRP   (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP)
+#define SUN_MODE_ALL   (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define GID_SET(gid)   ((gid) != (gid_t) - 1)
 
 #define LISTEN_BACKLOG 5
 
@@ -131,6 +134,8 @@ control_handle_read(struct fd_list *fd)
 		in_gid = fd->ctx->control_group;
 		if (uid == 0)
 			err = 1;
+		else if (!GID_SET(in_gid))
+			err = 0;
 		else
 			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
 		if (err == -1) {
@@ -140,7 +145,9 @@ control_handle_read(struct fd_list *fd)
 		if (err == 0) {
 			fd->flags &= ~FD_CONTROL;
 			in_gid = fd->ctx->read_group;
-			err = ps_root_user_ingroup(fd->ctx, uid, gid, in_gid);
+			err = GID_SET(in_gid) ?
+			    ps_root_user_ingroup(fd->ctx, uid, gid, in_gid) :
+			    0;
 			if (err == -1) {
 				logerr(__func__);
 				return -1;
@@ -175,7 +182,7 @@ control_handle_read(struct fd_list *fd)
 #endif
 
 	in_gid = fd->ctx->control_group;
-	err = control_user_ingroup(uid, gid, in_gid);
+	err = GID_SET(in_gid) ? control_user_ingroup(uid, gid, in_gid) : 0;
 	if (err == -1) {
 		logerr(__func__);
 		return -1;
@@ -183,7 +190,7 @@ control_handle_read(struct fd_list *fd)
 	if (err == 0) {
 		fd->flags &= ~FD_CONTROL;
 		in_gid = fd->ctx->read_group;
-		err = control_user_ingroup(uid, gid, in_gid);
+		err = GID_SET(in_gid) ? control_user_ingroup(uid, gid, in_gid) : 0;
 		if (err == -1) {
 			logerr(__func__);
 			return -1;
@@ -512,6 +519,8 @@ static int
 control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
 	struct sockaddr_un sa;
+	mode_t mode;
+	uid_t grp = getgid();
 	int fd;
 	socklen_t len;
 
@@ -520,9 +529,22 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 		return -1;
 
 	len = (socklen_t)SUN_LEN(&sa);
+	if (GID_SET(ctx->control_group) && GID_SET(ctx->read_group))
+		mode = SUN_MODE_ALL;
+	else if (!GID_SET(ctx->control_group) && !GID_SET(ctx->read_group))
+		mode = SUN_MODE_USR;
+	else if (GID_SET(ctx->control_group)) {
+		mode = SUN_MODE_GRP;
+		grp = ctx->control_group;
+	} else {
+		mode = SUN_MODE_GRP;
+		grp = ctx->read_group;
+	}
+
 	unlink(sa.sun_path);
 	if (bind(fd, (struct sockaddr *)&sa, len) == -1 ||
-	    chmod(sa.sun_path, SUN_MODE) == -1 ||
+	    chmod(sa.sun_path, mode) == -1 ||
+	    chown(sa.sun_path, geteuid(), grp) == -1 ||
 	    listen(fd, LISTEN_BACKLOG) == -1)
 		goto err;
 
