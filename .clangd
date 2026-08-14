@@ -8,5 +8,15 @@ If:
 CompileFlags:
   Add: [-I.., -I../compat, -I../vendor]
 ---
+If:
+  PathMatch: compat/[^/]+\.(c|h)
+CompileFlags:
+  Add: [-I.., -I../src]
+---
+If:
+  PathMatch: compat/[^/]+/.*\.(c|h)
+CompileFlags:
+  Add: [-I../..]
+---
 CompileFlags:
   Add: [-DINET, -DARP, -DARPING, -DIPV4LL, -DINET6, -DDHCP6, -DPLUGIN_DEV, -DAUTH, -DPRIVSEP]

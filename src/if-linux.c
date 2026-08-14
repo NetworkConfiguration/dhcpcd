@@ -71,9 +71,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "bpf.h"
 #include "common.h"
-#include "config.h"
 #include "dev.h"
 #include "dhcp.h"
 #include "if.h"

@@ -39,8 +39,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "auth.h"
 #include "config.h"
+#include "auth.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd.h"

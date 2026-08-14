@@ -60,10 +60,10 @@
 #include <unistd.h>
 
 #define ELOOP_QUEUE ELOOP_DHCP
+#include "config.h" // IWYU pragma: keep
 #include "arp.h"
 #include "bpf.h"
 #include "common.h"
-#include "config.h"
 #include "dhcp-common.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
@@ -2348,10 +2348,8 @@ dhcp_bound(struct interface *ifp, uint8_t old_state)
 	/* If not in manager mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MANAGER ||
 	    ifp->options->options & DHCPCD_STATIC ||
-	    (state->old != NULL &&
-		state->old->yiaddr ==
-		    state->new->yiaddr &&old_state &STATE_ADDED &&
-		!(old_state & STATE_FAKE)))
+	    (state->old != NULL && state->old->yiaddr == state->new->yiaddr &&
+		old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
 		return;
 
 	dhcp_closeinet(ifp);
@@ -3867,9 +3865,7 @@ dhcp_handleifudp(void *arg, unsigned short events)
 static int
 dhcp_openbpf(struct interface *ifp)
 {
-	struct dhcp_state *state;
-
-	state = D_STATE(ifp);
+	struct dhcp_state *state = D_STATE(ifp);
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ifp->ctx)) {

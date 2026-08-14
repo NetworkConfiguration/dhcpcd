@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        # This is pinned to clang-format v19
-      - uses: RafikFarhad/clang-format-github-action@v5
+        # This is pinned to clang-format v21
+      - uses: RafikFarhad/clang-format-github-action@v6
         with:
           style: "file"
           sources: "src/*.h,src/*.c,src/**/*.h,src/**/*.c"

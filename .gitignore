@@ -37,7 +37,8 @@ dhcpcd*.xz*
 # Ignore Coverity
 cov-int
 
-# Ignore VSCode
+# Ignore IDEs
+.idea
 .vscode
 
 # Ignore macOS hidden files

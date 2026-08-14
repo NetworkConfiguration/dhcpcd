@@ -50,9 +50,9 @@ static const char dhcpcd_copyright[] = "Copyright (c) 2006-2025 Roy Marples";
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "arp.h"
 #include "common.h"
-#include "config.h"
 #include "control.h"
 #include "dev.h"
 #include "dhcp-common.h"

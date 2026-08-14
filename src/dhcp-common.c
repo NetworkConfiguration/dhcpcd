@@ -36,8 +36,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h" // IWYU pragma: keep
 #include "common.h"
-#include "config.h"
 #include "dhcp-common.h"
 #include "dhcp.h"
 #include "if.h"
