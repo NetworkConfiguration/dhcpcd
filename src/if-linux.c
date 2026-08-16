@@ -413,8 +413,67 @@ if_vlanid(const struct interface *ifp)
 	return (unsigned short)v.u.VID;
 }
 
+#ifdef SO_ATTACH_FILTER
+/*
+ * Reject route messages for tables we do not manage before the kernel queues
+ * them.  if_copyrt() already discards everything outside RT_TABLE_MAIN, but by
+ * then the message has been allocated, queued and charged against SO_RCVBUF.
+ * A routing daemon churning a large foreign table -- a full BGP feed in its own
+ * "kernel table N" -- can therefore overflow the socket in milliseconds and
+ * cost us the link and address messages we actually need.
+ *
+ * A broadcast rejected here is never queued and never charged, so no amount of
+ * foreign-table churn can overflow us.  The test mirrors if_copyrt() exactly,
+ * so nothing dhcpcd would have acted upon is affected.
+ *
+ * A table id wider than rtm_table's 8 bits is reported as RT_TABLE_COMPAT with
+ * the real id in RTA_TABLE, which cBPF cannot walk.  That needs no special
+ * case: accepting nothing but RT_TABLE_MAIN is the same test if_copyrt() makes,
+ * so the widest tables are kept out of the queue along with the rest.
+ */
+/*
+ * htons() is not a constant expression, so swap the comparands at compile
+ * time; BPF loads big endian while netlink is host endian.
+ */
+#if BYTE_ORDER == BIG_ENDIAN
+#define BPF_NLMSG_TYPE(t) (t)
+#else
+#define BPF_NLMSG_TYPE(t) ((((t) & 0xff) << 8) | (((t) >> 8) & 0xff))
+#endif
+
+static int
+if_linkfilter(int fd)
+{
+	/* A constant program; keep it out of the stack frame. */
+	static struct sock_filter filter[] = {
+		/* A = nlmsghdr.nlmsg_type. */
+		BPF_STMT(BPF_LD | BPF_H | BPF_ABS,
+		    offsetof(struct nlmsghdr, nlmsg_type)),
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+		    BPF_NLMSG_TYPE(RTM_NEWROUTE), 1, 0),
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+		    BPF_NLMSG_TYPE(RTM_DELROUTE), 0, 2), /* not a route */
+
+		/* A = rtmsg.rtm_table. */
+		BPF_STMT(BPF_LD | BPF_B | BPF_ABS,
+		    NLMSG_LENGTH(0) + offsetof(struct rtmsg, rtm_table)),
+		BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, RT_TABLE_MAIN, 0, 1),
+
+		BPF_STMT(BPF_RET | BPF_K, (uint32_t)-1), /* accept */
+		BPF_STMT(BPF_RET | BPF_K, 0),		 /* drop */
+	};
+	struct sock_fprog prog = {
+		.len = __arraycount(filter),
+		.filter = filter,
+	};
+
+	return setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &prog,
+	    sizeof(prog));
+}
+#endif
+
 int
-if_linksocket(struct sockaddr_nl *nl, int protocol, int flags)
+if_linksocket(struct sockaddr_nl *nl, int protocol, int flags, bool filter)
 {
 	int fd;
 
@@ -422,6 +481,16 @@ if_linksocket(struct sockaddr_nl *nl, int protocol, int flags)
 	if (fd == -1)
 		return -1;
 	nl->nl_family = AF_NETLINK;
+#ifdef SO_ATTACH_FILTER
+	/*
+	 * Attach before bind(2) so that not even the leading messages of a
+	 * flood already in progress can be queued unfiltered.
+	 */
+	if (filter && if_linkfilter(fd) == -1)
+		logerr("%s: SO_ATTACH_FILTER", __func__);
+#else
+	UNUSED(filter);
+#endif
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1) {
 		close(fd);
 		return -1;
@@ -501,7 +570,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR | RTMGRP_NEIGH;
 #endif
 
-	ctx->link_fd = if_linksocket(&snl, NETLINK_ROUTE, SOCK_NONBLOCK);
+	ctx->link_fd = if_linksocket(&snl, NETLINK_ROUTE, SOCK_NONBLOCK, true);
 	if (ctx->link_fd == -1)
 		return -1;
 #ifdef NETLINK_BROADCAST_ERROR
@@ -518,7 +587,7 @@ setup_priv:
 
 	ctx->priv = priv;
 	memset(&snl, 0, sizeof(snl));
-	priv->route_fd = if_linksocket(&snl, NETLINK_ROUTE, 0);
+	priv->route_fd = if_linksocket(&snl, NETLINK_ROUTE, 0, false);
 	if (priv->route_fd == -1)
 		return -1;
 	len = sizeof(snl);
@@ -527,7 +596,7 @@ setup_priv:
 	priv->route_pid = snl.nl_pid;
 
 	memset(&snl, 0, sizeof(snl));
-	priv->generic_fd = if_linksocket(&snl, NETLINK_GENERIC, 0);
+	priv->generic_fd = if_linksocket(&snl, NETLINK_GENERIC, 0, false);
 	if (priv->generic_fd == -1)
 		return -1;
 
