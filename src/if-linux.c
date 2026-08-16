@@ -546,7 +546,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	struct priv *priv;
 	struct sockaddr_nl snl;
 	socklen_t len;
-#ifdef NETLINK_BROADCAST_ERROR
+#if defined(NETLINK_BROADCAST_ERROR) || defined(NETLINK_GET_STRICT_CHK)
 	int on = 1;
 #endif
 
@@ -590,6 +590,26 @@ setup_priv:
 	priv->route_fd = if_linksocket(&snl, NETLINK_ROUTE, 0, false);
 	if (priv->route_fd == -1)
 		return -1;
+#ifdef NETLINK_GET_STRICT_CHK
+	/*
+	 * Ask the kernel to honour the filters we put in dump requests.
+	 * Without this it ignores them: if_initrt() asks for RT_TABLE_MAIN and
+	 * gets every table, and if_addrflags6() asks for one interface and gets
+	 * every address on the system.  Both then filter in userland, so the
+	 * result is unchanged -- but on a host whose routing daemon holds a
+	 * full BGP feed in its own kernel table, that is a quarter of a million
+	 * messages per dump to keep a handful, and rt_build() dumps on events
+	 * as frequent as a Router Advertisement.
+	 *
+	 * This must be done here rather than around each dump because the
+	 * privsep sandbox does not permit setsockopt(2) once it is in force.
+	 * Kernels without the option simply keep the old behaviour.
+	 */
+	if (setsockopt(priv->route_fd, SOL_NETLINK, NETLINK_GET_STRICT_CHK, &on,
+		sizeof(on)) == -1 &&
+	    errno != ENOPROTOOPT)
+		logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
+#endif
 	len = sizeof(snl);
 	if (getsockname(priv->route_fd, (struct sockaddr *)&snl, &len) == -1)
 		return -1;
