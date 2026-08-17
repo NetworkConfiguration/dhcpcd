@@ -1963,15 +1963,9 @@ printf "CompileFlags:\n" >.clangd
 printf "  Add: [-DINET, -DARP, -DARPING, -DIPV4LL, -DINET6, -DDHCP6, -DPLUGIN_DEV, -DAUTH, -DPRIVSEP" >>.clangd
 TOP=$(pwd)
 printf ", -I%s, -I%s, -I%s, -I%s" "$TOP" "$TOP/src" "$TOP/compat" "$TOP/vendor" >>.clangd
-if [ -n "$LIBCRYPTO_CFLAGS" ]; then
-  printf ", %s" "$LIBCRYPTO_CFLAGS" >>.clangd
-fi
-if [ -n "$LIBPCAP_CFLAGS" ]; then
-  printf ", %s" "$LIBPCAP_CFLAGS" >>.clangd
-fi
-if [ -n "$LIBUDEV_CFLAGS" ]; then
-  printf ", %s" "$LIBUDEV_CFLAGS" >>.clangd
-fi
+for x in $LIBCRYPTO_CFLAGS $LIBPCAP_CFLAGS $LIBUDEV_CFLAGS; do
+  printf ", %s" "$x" >>.clangd
+done
 printf "]\n" >>.clangd
 
 find_hook()
