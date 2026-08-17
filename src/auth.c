@@ -445,7 +445,7 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 		if (fp == NULL)
 			return -1;
 		if (chmod(RDM_MONOFILE, 0400) == -1) {
-			fclose(fp);
+			(void)fclose(fp);
 			unlink(RDM_MONOFILE);
 			return -1;
 		}
@@ -458,7 +458,7 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 		flocked = flock(fileno(fp), LOCK_EX);
 #endif
 		if (fscanf(fp, "0x%016" PRIu64, rdm) != 1) {
-			fclose(fp);
+			(void)fclose(fp);
 			return -1;
 		}
 	}
@@ -473,7 +473,8 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 	if (flocked == 0)
 		flock(fileno(fp), LOCK_UN);
 #endif
-	fclose(fp);
+	if (fclose(fp) == EOF)
+		err = -1;
 	return err;
 }
 

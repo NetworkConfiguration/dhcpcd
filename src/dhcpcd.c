@@ -1840,7 +1840,7 @@ dhcpcd_readdump2(void *arg, unsigned short events)
 	if (ctx->ctl_buf[ctx->ctl_buflen - 1] != '\0') /* unlikely */
 		ctx->ctl_buf[ctx->ctl_buflen - 1] = '\0';
 	script_dump(ctx->ctl_buf, ctx->ctl_buflen);
-	fflush(stdout);
+	(void)fflush(stdout);
 	if (--ctx->ctl_extra != 0) {
 		putchar('\n');
 		if (eloop_event_add(ctx->eloop, ctx->control_fd, ELE_READ,
@@ -2391,8 +2391,13 @@ main(int argc, char **argv, char **envp)
 	}
 
 #ifdef USE_SIGNALS
-	for (si = 0; si < dhcpcd_signals_ignore_len; si++)
-		signal(dhcpcd_signals_ignore[si], SIG_IGN);
+	for (si = 0; si < dhcpcd_signals_ignore_len; si++) {
+		if (signal(dhcpcd_signals_ignore[si], SIG_IGN) == SIG_ERR) {
+			logerr("%s: signal %d", __func__,
+			    dhcpcd_signals_ignore[si]);
+			goto exit_failure;
+		}
+	}
 
 	/* Save signal mask, block and redirect signals to our handler */
 	if (eloop_signal_set_cb(ctx.eloop, dhcpcd_signals, dhcpcd_signals_len,
@@ -2867,7 +2872,7 @@ exit1:
 	free_options(&ctx, ifo);
 #ifdef HAVE_OPEN_MEMSTREAM
 	if (ctx.script_fp)
-		fclose(ctx.script_fp);
+		(void)fclose(ctx.script_fp);
 #endif
 	free(ctx.script_buf);
 	free(ctx.script_env);
@@ -2907,7 +2912,7 @@ exit1:
 	eloop_free(ctx.eloop);
 	logclose();
 	free(ctx.logfile);
-	fflush(stdout);
+	(void)fflush(stdout);
 	free(ctx.ctl_buf);
 #ifdef SETPROCTITLE_H
 	setproctitle_fini();
