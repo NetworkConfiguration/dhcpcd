@@ -34,6 +34,9 @@ dhcpcd*.xz*
 # Ignore swap files
 *.swp
 
+# Ignore IDE helpers
+.clangd
+
 # Ignore Coverity
 cov-int
 

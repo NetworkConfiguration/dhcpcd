@@ -217,6 +217,7 @@ ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
 
 #ifdef PRIVSEP_RIGHTS
 int ps_rights_limit_ioctl(int);
+int ps_rights_limit_fd_getsockopt(int);
 int ps_rights_limit_fd_fctnl(int);
 int ps_rights_limit_fd_rdonly(int);
 int ps_rights_limit_fd_sockopt(int);

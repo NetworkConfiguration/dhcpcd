@@ -557,7 +557,7 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 		goto err;
 
 #ifdef PRIVSEP_RIGHTS
-	if (IN_PRIVSEP(ctx) && ps_rights_limit_fd_fctnl(fd) == -1)
+	if (IN_PRIVSEP(ctx) && ps_rights_limit_fd_getsockopt(fd) == -1)
 		goto err;
 #endif
 
