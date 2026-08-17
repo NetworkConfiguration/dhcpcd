@@ -473,7 +473,7 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 	if (flocked == 0)
 		flock(fileno(fp), LOCK_UN);
 #endif
-	if (fclose(fp) == -1)
+	if (fclose(fp) == EOF)
 		err = -1;
 	return err;
 }
