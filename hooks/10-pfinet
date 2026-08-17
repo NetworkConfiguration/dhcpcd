@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: BSD-2-Clause
 # Copyright (c) 2026 Roy Marples <roy@marples.name>
 
-# Configure the Hurd PFINET translator.
+# Configure the Hurd network translator (pfinet or lwip).
 # It always on socket 2.
 
-case "$(showtrans /servers/socket/2)" in
-/hurd/pfinet" "*) pfinet=true;;
-*) pfinet=false;;
+trans=$(showtrans /servers/socket/2 2>/dev/null)
+[ -z "$trans" ] && trans=$(fsysopts /servers/socket/2 2>/dev/null)
+
+case "$trans" in
+*/pfinet" "*|*/lwip" "*) hurd_net=true;;
+*) hurd_net=false;;
 esac
 
-if $pfinet && $if_configured && [ "$ifxname" != "lo" ] ; then
+if $hurd_net && $if_configured && [ "$ifxname" != "lo" ] ; then
 	if $if_up && [ -n "$new_ip_address" ]; then
 		flags=
 		if [ -n "$new_subnet_mask" ]; then
@@ -20,7 +23,7 @@ if $pfinet && $if_configured && [ "$ifxname" != "lo" ] ; then
 		fi
 		fsysopts /servers/socket/2 -i "$ifxname" \
 			-a "$new_ip_address" $flags
-	elif $if_down; then
+	elif $if_down || { [ "$reason" = STOPPED ] && ! $if_persistent; }; then
 		fsysopts /servers/socket/2 -i "$ifxname" -a 0.0.0.0
 	fi
 fi
