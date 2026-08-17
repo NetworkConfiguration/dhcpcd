@@ -1102,7 +1102,9 @@ EOF
 fi
 if [ "$PIDFILE_LOCK" = no ]; then
 	echo "CPPFLAGS+=	-DPIDFILE_LOCAL" >>$CONFIG_MK
+	echo "#ifndef PIDFILE_H" >>$CONFIG_H
 	echo "#include			\"compat/pidfile.h\"" >>$CONFIG_H
+	echo "#endif" >>$CONFIG_H
 	echo "COMPAT_SRCS+=	compat/pidfile.c" >>$CONFIG_MK
 else
 	echo "#define	HAVE_UTIL_H" >>$CONFIG_H
@@ -1956,6 +1958,21 @@ fi
 
 echo >>$CONFIG_H
 echo "#endif /*CONFIG_H*/">>$CONFIG_H
+
+printf "CompileFlags:\n" >.clangd
+printf "  Add: [-DINET, -DARP, -DARPING, -DIPV4LL, -DINET6, -DDHCP6, -DPLUGIN_DEV, -DAUTH, -DPRIVSEP" >>.clangd
+TOP=$(pwd)
+printf ", -I%s, -I%s, -I%s, -I%s" "$TOP" "$TOP/src" "$TOP/compat" "$TOP/vendor" >>.clangd
+if [ -n "$LIBCRYPTO_CFLAGS" ]; then
+  printf ", %s" "$LIBCRYPTO_CFLAGS" >>.clangd
+fi
+if [ -n "$LIBPCAP_CFLAGS" ]; then
+  printf ", %s" "$LIBPCAP_CFLAGS" >>.clangd
+fi
+if [ -n "$LIBUDEV_CFLAGS" ]; then
+  printf ", %s" "$LIBUDEV_CFLAGS" >>.clangd
+fi
+printf "]\n" >>.clangd
 
 find_hook()
 {

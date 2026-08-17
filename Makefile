@@ -52,7 +52,7 @@ clean:
 	for x in ${SUBDIRS} tests; do ${MAKE} -C $$x $@ || exit $$?; done
 
 distclean: clean
-	rm -f config.h config.mk config.log \
+	rm -f .clangd config.h config.mk config.log \
 		${DISTFILE} ${DISTINFO} ${DISTINFOMD} ${DISTSIGN}
 	rm -f *.diff *.patch *.orig *.rej
 	for x in ${SUBDIRS} tests; do ${MAKE} -C $$x $@ || exit $$?; done
