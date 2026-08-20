@@ -1134,7 +1134,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			break;
 		}
 
-		if (!dho_policy_allowed(pg, ndo.nd_opt_type)) {
+		if (dho_policy_has(&pg->dhop_reject, ndo.nd_opt_type)) {
 			const char *soption = dhcp_option_string(ctx->nd_opts,
 			    ctx->nd_opts_len, ndo.nd_opt_type);
 			logmessage(loglevel,
