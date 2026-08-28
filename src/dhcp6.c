@@ -3157,8 +3157,15 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		loglevel = LOG_DEBUG;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
 			if (ia->flags & IPV6_AF_NEW) {
-				if (ia->ia_type == D6_OPTION_IA_PD &&
-				    ia->flags & IPV6_AF_STALE &&
+				/*
+				 * Ignore unfulfilled requested addresses
+				 * and Prefix Delegations.
+				 * This can be normal behaviour if you hint
+				 * at a property such as an address or prefix
+				 * length and get something slightly different
+				 * back.
+				 */
+				if (ia->flags & IPV6_AF_STALE &&
 				    ia->flags & IPV6_AF_REQUEST)
 					continue;
 				loglevel = LOG_INFO;
