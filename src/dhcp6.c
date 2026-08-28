@@ -3154,23 +3154,23 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 	struct timespec now;
 
 	if (state->state == DH6S_RENEW) {
+		/*
+		 * Ignore unfulfilled requested addresses
+		 * and Prefix Delegations.
+		 * As most requests will be the unspecified address and
+		 * optionally prefix length, this is expected behaviour.
+		 */
 		loglevel = LOG_DEBUG;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if (ia->flags & IPV6_AF_NEW) {
-				/*
-				 * Ignore unfulfilled requested addresses
-				 * and Prefix Delegations.
-				 * This can be normal behaviour if you hint
-				 * at a property such as an address or prefix
-				 * length and get something slightly different
-				 * back.
-				 */
-				if (ia->flags & IPV6_AF_STALE &&
-				    ia->flags & IPV6_AF_REQUEST)
-					continue;
-				loglevel = LOG_INFO;
-				break;
-			}
+			if (!(ia->flags & IPV6_AF_NEW))
+				continue;
+			if (ia->flags & IPV6_AF_STALE &&
+			    ia->flags & IPV6_AF_REQUEST)
+				continue;
+			/* This address is either coming or going, so promote
+			 * the priority. */
+			loglevel = LOG_INFO;
+			break;
 		}
 	} else if (state->state == DH6S_INFORM)
 		loglevel = state->new_start ? LOG_INFO : LOG_DEBUG;
