@@ -264,11 +264,16 @@ static bool
 ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
     size_t len)
 {
+	size_t dbdirlen, rundirlen;
+
 	/* path must be a valid string */
 	if (memchr(path, '\0', len) == NULL) {
 		errno = EINVAL;
 		return false;
 	}
+
+	dbdirlen = strlen(dhcpcd_dbdir);
+	rundirlen = strlen(dhcpcd_rundir);
 
 	/* Avoid a previous directory attack to avoid /proc/../
 	 * dhcpcd should never use a path with double dots. */
@@ -283,9 +288,11 @@ ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
 		if (strcmp(ctx->cffile, path) == 0)
 			return true;
 	}
-	if (strncmp(DBDIR, path, strlen(DBDIR)) == 0)
+	if (strncmp(dhcpcd_dbdir, path, dbdirlen) == 0 &&
+	    (path[dbdirlen] == '\0' || path[dbdirlen] == '/'))
 		return true;
-	if (strncmp(RUNDIR, path, strlen(RUNDIR)) == 0)
+	if (strncmp(dhcpcd_rundir, path, rundirlen) == 0 &&
+	    (path[rundirlen] == '\0' || path[rundirlen] == '/'))
 		return true;
 
 #ifdef __linux__

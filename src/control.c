@@ -491,7 +491,7 @@ make_path(char *path, size_t len, const char *ifname, sa_family_t family)
 		per = "";
 		break;
 	}
-	return snprintf(path, len, CONTROLSOCKET, ifname ? ifname : "",
+	return snprintf(path, len, dhcpcd_controlsock, ifname ? ifname : "",
 	    ifname ? per : "", "", ifname ? "." : "");
 }
 
@@ -520,6 +520,8 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 	fd = make_sock(&sa, ifname, family);
 	if (fd == -1)
 		return -1;
+
+	ensure_dir(sa.sun_path, 0755);
 
 	len = (socklen_t)SUN_LEN(&sa);
 	if (GID_SET(ctx->control_group) && GID_SET(ctx->read_group)) {
