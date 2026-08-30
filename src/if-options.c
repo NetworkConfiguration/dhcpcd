@@ -180,6 +180,10 @@ const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "backoff_cutoff", required_argument, NULL, O_BACKOFF_CUTOFF },
 	{ "backoff_jitter", required_argument, NULL, O_BACKOFF_JITTER },
 	{ "allow", required_argument, NULL, O_ALLOW },
+	{ "dbdir", required_argument, NULL, O_DBDIR },
+	{ "rundir", required_argument, NULL, O_RUNDIR },
+	{ "devdir", required_argument, NULL, O_DEVDIR },
+	{ "instance", required_argument, NULL, O_INSTANCE },
 	{ NULL, 0, NULL, '\0' } };
 
 static char *
@@ -2646,6 +2650,26 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerrx("invalid backoff jitter: %s", arg);
 			return -1;
 		}
+		break;
+	case O_DBDIR:
+		ARG_REQUIRED;
+		if (!(ctx->options & DHCPCD_STARTED))
+			dhcpcd_paths_set_dbdir(arg);
+		break;
+	case O_RUNDIR:
+		ARG_REQUIRED;
+		if (!(ctx->options & DHCPCD_STARTED))
+			dhcpcd_paths_set_rundir(arg);
+		break;
+	case O_DEVDIR:
+		ARG_REQUIRED;
+		if (!(ctx->options & DHCPCD_STARTED))
+			dhcpcd_paths_set_devdir(arg);
+		break;
+	case O_INSTANCE:
+		ARG_REQUIRED;
+		if (!(ctx->options & DHCPCD_STARTED))
+			dhcpcd_paths_set_instance(arg);
 		break;
 	default:
 		return 0;

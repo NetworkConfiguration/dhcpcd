@@ -66,6 +66,32 @@
 #define RDM_MONOFILE DBDIR "/rdm_monotonic"
 #endif
 
+/*
+ * Runtime configurable paths.
+ * These default to the compiled in values but can be overridden at runtime
+ * with the corresponding command line options (--instance, --dbdir, --rundir,
+ * --devdir). The individual file paths are derived from these and rebuilt
+ * whenever a base directory is changed (see dhcpcd_paths_update()).
+ */
+extern const char *dhcpcd_dbdir;
+extern const char *dhcpcd_rundir;
+extern const char *dhcpcd_devdir;
+extern const char *dhcpcd_instance;
+extern const char *dhcpcd_duidfile;
+extern const char *dhcpcd_secretfile;
+extern const char *dhcpcd_rdm_monofile;
+extern const char *dhcpcd_leasefile;
+extern const char *dhcpcd_leasefile6;
+extern const char *dhcpcd_pidfile;
+extern const char *dhcpcd_controlsock;
+
+void dhcpcd_paths_init(void);
+void dhcpcd_paths_update(void);
+void dhcpcd_paths_set_dbdir(const char *);
+void dhcpcd_paths_set_rundir(const char *);
+void dhcpcd_paths_set_devdir(const char *);
+void dhcpcd_paths_set_instance(const char *);
+
 #ifndef NO_SIGNALS
 #define USE_SIGNALS
 #endif

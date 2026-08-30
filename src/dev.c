@@ -99,7 +99,7 @@ dev_start2(struct dhcpcd_ctx *ctx, const struct dev_dhcpcd *dev_dhcpcd,
 	void (*fptr)(struct dev *, const struct dev_dhcpcd *);
 	int r;
 
-	snprintf(file, sizeof(file), DEVDIR "/%s", name);
+	snprintf(file, sizeof(file), "%s/%s", dhcpcd_devdir, name);
 	h = dlopen(file, RTLD_LAZY);
 	if (h == NULL) {
 		logerrx("dlopen: %s", dlerror());
@@ -143,9 +143,9 @@ dev_start1(struct dhcpcd_ctx *ctx, const struct dev_dhcpcd *dev_dhcpcd)
 	if (ctx->dev_load)
 		return dev_start2(ctx, dev_dhcpcd, ctx->dev_load);
 
-	dp = opendir(DEVDIR);
+	dp = opendir(dhcpcd_devdir);
 	if (dp == NULL) {
-		logdebug("dev: %s", DEVDIR);
+		logdebug("dev: %s", dhcpcd_devdir);
 		return -1;
 	}
 

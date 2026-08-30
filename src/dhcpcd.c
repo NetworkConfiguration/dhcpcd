@@ -101,6 +101,179 @@ const size_t dhcpcd_signals_ignore_len = __arraycount(dhcpcd_signals_ignore);
 
 const char *dhcpcd_default_script = SCRIPT;
 
+/*
+ * Runtime configurable paths.
+ * The base directories (dbdir, rundir, devdir) default to the compiled in
+ * values but may be overridden on the command line. When dhcpcd_instance is
+ * set, all files dhcpcd writes (lease, DUID, secret, RDM, PID and control
+ * socket files) are placed under the instance directory and named after the
+ * state or runtime directory. The file paths are derived from the base
+ * directories by dhcpcd_paths_update().
+ */
+const char *dhcpcd_dbdir;
+const char *dhcpcd_rundir;
+const char *dhcpcd_devdir;
+const char *dhcpcd_instance;
+const char *dhcpcd_duidfile;
+const char *dhcpcd_secretfile;
+const char *dhcpcd_rdm_monofile;
+const char *dhcpcd_leasefile;
+const char *dhcpcd_leasefile6;
+const char *dhcpcd_pidfile;
+const char *dhcpcd_controlsock;
+
+/* Initialise the runtime paths to the compiled in defaults and derive the
+ * file paths. Must be called before any other dhcpcd_paths_* function. */
+void
+dhcpcd_paths_init(void)
+{
+	dhcpcd_dbdir = strdup(DBDIR);
+	dhcpcd_rundir = strdup(RUNDIR);
+	dhcpcd_devdir = strdup(DEVDIR);
+	if (dhcpcd_dbdir == NULL || dhcpcd_rundir == NULL ||
+	    dhcpcd_devdir == NULL) {
+		logerrx("out of memory");
+		exit(EXIT_FAILURE);
+	}
+	dhcpcd_paths_update();
+}
+
+/* Replace *var with a copy of value, freeing the previous string. */
+static void
+path_set_str(const char **var, const char *value)
+{
+	free(UNCONST(*var));
+	*var = strdup(value);
+	if (*var == NULL) {
+		logerrx("out of memory");
+		exit(EXIT_FAILURE);
+	}
+}
+
+/* Set the state/lease database directory and rebuild the derived paths. */
+void
+dhcpcd_paths_set_dbdir(const char *dir)
+{
+	path_set_str(&dhcpcd_dbdir, dir);
+	dhcpcd_paths_update();
+}
+
+/* Set the runtime directory and rebuild the derived paths. */
+void
+dhcpcd_paths_set_rundir(const char *dir)
+{
+	path_set_str(&dhcpcd_rundir, dir);
+	dhcpcd_paths_update();
+}
+
+/* Set the directory from which /dev management modules are loaded. */
+void
+dhcpcd_paths_set_devdir(const char *dir)
+{
+	path_set_str(&dhcpcd_devdir, dir);
+}
+
+/* Set the instance directory and rebuild the derived paths. The instance
+ * must be a single path component without '/'. */
+void
+dhcpcd_paths_set_instance(const char *instance)
+{
+	if (strchr(instance, '/') != NULL) {
+		logerrx("--instance must not contain a '/': %s", instance);
+		exit(EXIT_FAILURE);
+	}
+	path_set_str(&dhcpcd_instance, instance);
+	dhcpcd_paths_update();
+}
+
+/* Rebuild all derived file paths from the current base directories and
+ * instance. The lease, lease6, PID and control socket paths are returned
+ * as printf-style format strings. */
+void
+dhcpcd_paths_update(void)
+{
+	char *duidfile = NULL, *secretfile = NULL, *rdm_monofile = NULL;
+	char *leasefile = NULL, *leasefile6 = NULL, *pidfile = NULL;
+	char *controlsock = NULL;
+	char *einstance, *edbdir, *erundir;
+
+	free(UNCONST(dhcpcd_duidfile));
+	free(UNCONST(dhcpcd_secretfile));
+	free(UNCONST(dhcpcd_rdm_monofile));
+	free(UNCONST(dhcpcd_leasefile));
+	free(UNCONST(dhcpcd_leasefile6));
+	free(UNCONST(dhcpcd_pidfile));
+	free(UNCONST(dhcpcd_controlsock));
+
+	/* lease, lease6, pid and controlsock are later used as printf-style
+	 * format strings, so escape '%' in the configured directories. */
+	einstance = escape_percent(dhcpcd_instance);
+	edbdir = escape_percent(dhcpcd_dbdir);
+	erundir = escape_percent(dhcpcd_rundir);
+	if (einstance == NULL || edbdir == NULL || erundir == NULL)
+		goto oom;
+
+	if (dhcpcd_instance != NULL && dhcpcd_instance[0] != '\0') {
+		/*
+		 * The instance name is used as a file name base inside the
+		 * state and runtime directories, e.g. <dbdir>/<instance>.duid.
+		 */
+		if (asprintf(&duidfile, "%s/%s.duid", dhcpcd_dbdir,
+			dhcpcd_instance) == -1 ||
+		    asprintf(&secretfile, "%s/%s.secret", dhcpcd_dbdir,
+			dhcpcd_instance) == -1 ||
+		    asprintf(&rdm_monofile, "%s/%s.rdm_monotonic", dhcpcd_dbdir,
+			dhcpcd_instance) == -1 ||
+		    asprintf(&leasefile, "%s/%s.%%s%%s.lease", edbdir,
+			einstance) == -1 ||
+		    asprintf(&leasefile6, "%s/%s.%%s%%s.lease6", edbdir,
+			einstance) == -1 ||
+		    asprintf(&pidfile, "%s/%s.%%s%%s%%spid", erundir,
+			einstance) == -1 ||
+		    asprintf(&controlsock, "%s/%s.%%s%%s%%s%%ssock", erundir,
+			einstance) == -1)
+			goto oom;
+	} else {
+		if (asprintf(&duidfile, "%s/duid", dhcpcd_dbdir) == -1 ||
+		    asprintf(&secretfile, "%s/secret", dhcpcd_dbdir) == -1 ||
+		    asprintf(&rdm_monofile, "%s/rdm_monotonic", dhcpcd_dbdir) ==
+			-1 ||
+		    asprintf(&leasefile, "%s/%%s%%s.lease", edbdir) == -1 ||
+		    asprintf(&leasefile6, "%s/%%s%%s.lease6", edbdir) == -1 ||
+		    asprintf(&pidfile, "%s/%%s%%s%%spid", erundir) == -1 ||
+		    asprintf(&controlsock, "%s/%%s%%s%%s%%ssock", erundir) ==
+			-1)
+			goto oom;
+	}
+
+	free(einstance);
+	free(edbdir);
+	free(erundir);
+
+	dhcpcd_duidfile = duidfile;
+	dhcpcd_secretfile = secretfile;
+	dhcpcd_rdm_monofile = rdm_monofile;
+	dhcpcd_leasefile = leasefile;
+	dhcpcd_leasefile6 = leasefile6;
+	dhcpcd_pidfile = pidfile;
+	dhcpcd_controlsock = controlsock;
+	return;
+
+oom:
+	free(duidfile);
+	free(secretfile);
+	free(rdm_monofile);
+	free(leasefile);
+	free(leasefile6);
+	free(pidfile);
+	free(controlsock);
+	free(einstance);
+	free(edbdir);
+	free(erundir);
+	logerrx("out of memory");
+	exit(EXIT_FAILURE);
+}
+
 static void
 usage(void)
 {
@@ -119,7 +292,8 @@ usage(void)
 	    "\t\t[-v, --vendor code, value] [-W, --whitelist address[/cidr]] [-w]\n"
 	    "\t\t[--waitip [4 | 6]] [-y, --reboot seconds]\n"
 	    "\t\t[-X, --blacklist address[/cidr]] [-Z, --denyinterfaces pattern]\n"
-	    "\t\t[-z, --allowinterfaces pattern] [--inactive] [interface] [...]\n"
+	    "\t\t[-z, --allowinterfaces pattern] [--inactive] [--instance instance]\n"
+	    "\t\t[--dbdir dir] [--rundir dir] [--devdir dir] [interface] [...]\n"
 	    "       " PACKAGE "\t-n, --rebind [interface]\n"
 	    "       " PACKAGE "\t-k, --release [interface]\n"
 	    "       " PACKAGE "\t-U, --dumplease interface\n"
@@ -2138,6 +2312,7 @@ main(int argc, char **argv, char **envp)
 
 	memset(&ctx, 0, sizeof(ctx));
 	closefrom(STDERR_FILENO + 1);
+	dhcpcd_paths_init();
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
@@ -2247,6 +2422,18 @@ main(int argc, char **argv, char **envp)
 		case 'V':
 			i = 2;
 			break;
+		case O_DBDIR:
+			dhcpcd_paths_set_dbdir(optarg);
+			break;
+		case O_RUNDIR:
+			dhcpcd_paths_set_rundir(optarg);
+			break;
+		case O_DEVDIR:
+			dhcpcd_paths_set_devdir(optarg);
+			break;
+		case O_INSTANCE:
+			dhcpcd_paths_set_instance(optarg);
+			break;
 		case '?':
 			if (ctx.options & DHCPCD_PRINT_PIDFILE)
 				continue;
@@ -2354,13 +2541,14 @@ main(int argc, char **argv, char **envp)
 			default:
 				per = "";
 			}
-			if (asprintf(&ctx.pidfile, PIDFILE, ifname, per, ".") ==
-			    -1) {
+			if (asprintf(&ctx.pidfile, dhcpcd_pidfile, ifname, per,
+				".") == -1) {
 				logerr("%s: asprintf", __func__);
 				goto exit_failure;
 			}
 		} else {
-			if (asprintf(&ctx.pidfile, PIDFILE, "", "", "") == -1) {
+			if (asprintf(&ctx.pidfile, dhcpcd_pidfile, "", "",
+				"") == -1) {
 				logerr("%s: asprintf", __func__);
 				goto exit_failure;
 			}
@@ -2539,10 +2727,7 @@ main(int argc, char **argv, char **envp)
 
 	if (!(ctx.options & DHCPCD_TEST)) {
 		/* Ensure we have the needed directories */
-		if (mkdir(DBDIR, 0750) == -1 && errno != EEXIST)
-			logerr("%s: mkdir: %s", __func__, DBDIR);
-		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			logerr("%s: mkdir: %s", __func__, RUNDIR);
+		ensure_dir(ctx.pidfile, 0755);
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			if (pid == -1)
 				logerr("%s: pidfile_lock: %s", __func__,
@@ -2648,6 +2833,7 @@ main(int argc, char **argv, char **envp)
 
 start_manager:
 	ctx.options |= DHCPCD_STARTED;
+	ensure_dir(ctx.pidfile, 0755);
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, (int)pid);
 #ifdef PRIVSEP

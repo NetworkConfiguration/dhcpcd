@@ -41,6 +41,7 @@
 
 #include "config.h"
 #include "auth.h"
+#include "common.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd.h"
@@ -437,16 +438,17 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 	int flocked;
 #endif
 
-	fp = fopen(RDM_MONOFILE, "r+");
+	ensure_dir(dhcpcd_rdm_monofile, 0750);
+	fp = fopen(dhcpcd_rdm_monofile, "r+");
 	if (fp == NULL) {
 		if (errno != ENOENT)
 			return -1;
-		fp = fopen(RDM_MONOFILE, "w");
+		fp = fopen(dhcpcd_rdm_monofile, "w");
 		if (fp == NULL)
 			return -1;
-		if (chmod(RDM_MONOFILE, 0400) == -1) {
+		if (chmod(dhcpcd_rdm_monofile, 0400) == -1) {
 			(void)fclose(fp);
-			unlink(RDM_MONOFILE);
+			unlink(dhcpcd_rdm_monofile);
 			return -1;
 		}
 #ifdef LOCK_EX
