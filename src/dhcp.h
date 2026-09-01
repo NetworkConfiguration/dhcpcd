@@ -236,7 +236,7 @@ struct dhcp_state {
 #ifdef ARPING
 	ssize_t arping_index;
 #endif
-	char *message; /* RFC 2132 option 56 from NAK */
+	char *message; /* RFC 2132 option 56 from DHCPv4 NAK */
 };
 
 #ifdef INET
