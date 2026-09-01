@@ -1481,7 +1481,10 @@ dhcp6_sendinform(void *arg)
 static void
 dhcp6_senddiscover2(void *arg)
 {
-	dhcp6_sendmessage(arg, dhcp6_senddiscover2);
+	struct interface *ifp = arg;
+
+	dhcp6_sendmessage(ifp, dhcp6_senddiscover2);
+	script_runreason(ifp, "SOLICIT_NO_ADVERT");
 }
 
 static void
@@ -1495,9 +1498,10 @@ dhcp6_senddiscover1(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp6_state *state = D6_STATE(ifp);
 
-	if (state->recv == NULL || state->recv->type != DHCP6_ADVERTISE)
-		dhcp6_sendmessage(arg, dhcp6_senddiscover2);
-	else
+	if (state->recv == NULL || state->recv->type != DHCP6_ADVERTISE) {
+		dhcp6_sendmessage(ifp, dhcp6_senddiscover2);
+		script_runreason(ifp, "SOLICIT_NO_ADVERT");
+	} else
 		dhcp6_startrequest(ifp);
 }
 
@@ -1863,6 +1867,7 @@ dhcp6_failrequest(void *arg)
 	int llevel = dhcp6_failloglevel(ifp);
 
 	logmessage(llevel, "%s: failed to request DHCPv6 address", ifp->name);
+	script_runreason(ifp, "REQ6_NO_REPLY");
 	dhcp6_fail(ifp, true);
 }
 
@@ -1927,9 +1932,10 @@ dhcp6_startrebind(void *arg)
 	state->RTC = 0;
 	state->MRC = 0;
 
-	if (state->state == DH6S_RENEW)
+	if (state->state == DH6S_RENEW) {
 		logwarnx("%s: failed to renew DHCPv6, rebinding", ifp->name);
-	else {
+		script_runreason(ifp, "RENEW6_NO_RESP");
+	} else {
 		loginfox("%s: rebinding prior DHCPv6 lease", ifp->name);
 
 #ifndef SMALL
