@@ -3274,7 +3274,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			if (state->message)
 				free(state->message);
 			state->message = get_option_string(ifp->ctx, bootp,
-				bootp_len, DHO_MESSAGE);
+			    bootp_len, DHO_MESSAGE);
 			dhcp_drop(ifp, "NAK");
 			dhcp_unlink(ifp->ctx, state->leasefile);
 		}
