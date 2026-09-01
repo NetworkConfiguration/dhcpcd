@@ -925,8 +925,7 @@ ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
 		if ((addr->flags & (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
 		    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
 			return 1;
-	} else if (addr->prefix_vltime &&
-	    IN6_ARE_ADDR_EQUAL(&addr->addr, match) &&
+	} else if (IN6_ARE_ADDR_EQUAL(&addr->addr, match) &&
 	    (!flags || addr->flags & flags))
 		return 1;
 
@@ -971,11 +970,7 @@ ipv6_doaddr(struct ipv6_addr *ia, struct timespec *now)
 			ipv6_deleteaddr(ia);
 		eloop_q_timeout_delete(ia->iface->ctx->eloop, ELOOP_QUEUE_ALL,
 		    NULL, ia);
-		if (ia->flags & IPV6_AF_REQUEST) {
-			ia->flags &= ~IPV6_AF_ADDED;
-			return 0;
-		}
-		return -1;
+		return ia->flags & IPV6_AF_REQUEST ? 0 : -1;
 	}
 
 	if (ia->flags & IPV6_AF_STALE || IN6_IS_ADDR_UNSPECIFIED(&ia->addr))
