@@ -1950,8 +1950,7 @@ send_discover(void *arg)
 	 * Retransmits: interval already 4/8/... - mirror ISC's dhclient. */
 	int retransmit = state->interval != 0;
 
-	send_message(ifp, DHCP_DISCOVER, send_discover);
-	if (retransmit)
+	if (send_message(ifp, DHCP_DISCOVER, send_discover) && retransmit)
 		script_runreason(ifp, "DISC_NO_OFFER");
 }
 
