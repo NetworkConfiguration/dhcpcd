@@ -3271,6 +3271,10 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		if (state->state == DHS_INFORM) /* INFORM should not be NAKed */
 			return;
 		if (!(ifp->ctx->options & DHCPCD_TEST)) {
+			if (state->message)
+				free(state->message);
+			state->message = get_option_string(ifp->ctx, bootp,
+				bootp_len, DHO_MESSAGE);
 			dhcp_drop(ifp, "NAK");
 			dhcp_unlink(ifp->ctx, state->leasefile);
 		}
@@ -3914,6 +3918,7 @@ dhcp_free(struct interface *ifp)
 		free(state->new);
 		free(state->offer);
 		free(state->clientid);
+		free(state->message);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP] = NULL;
 	}

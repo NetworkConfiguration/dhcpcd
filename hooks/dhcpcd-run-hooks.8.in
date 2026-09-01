@@ -124,6 +124,9 @@ dhcpcd's lease or state expired and it failed to obtain a new one.
 .It Dv NAK
 dhcpcd received a NAK from the DHCP server.
 This should be treated as EXPIRE.
+If the server included a Message option (RFC 2132 option 56),
+.Ev $message
+is set to that text.
 .It Dv RECONFIGURE
 dhcpcd has been instructed to reconfigure an interface.
 .It Dv ROUTERADVERT
@@ -158,6 +161,10 @@ the name of the interface.
 the protocol that triggered the event.
 .It Ev $reason
 as described above.
+.It Ev $message
+the RFC 2132 Message option (code 56) included with a
+.Dv NAK
+reason, if present.
 .It Ev $pid
 the pid of
 .Nm dhcpcd .
