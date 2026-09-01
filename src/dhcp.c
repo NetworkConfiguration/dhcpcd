@@ -3128,13 +3128,33 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		return;
 	}
 
-	if (state->xid != ntohl(bootp->xid)) {
-		if (IS_STATE_ACTIVE(state))
-			logdebugx("%s: wrong xid 0x%x (expecting 0x%x) from %s",
-			    ifp->name, ntohl(bootp->xid), state->xid,
-			    inet_ntoa(*from));
-		dhcp_redirect_dhcp(ifp, bootp, bootp_len, from);
+	/* We may have found a BOOTP server */
+	if (get_option_uint8(ifp->ctx, &type, bootp, bootp_len,
+		DHO_MESSAGETYPE) == -1)
+		type = 0;
+	else if (ifo->options & DHCPCD_BOOTP) {
+		logdebugx("%s: ignoring DHCP reply (expecting BOOTP)",
+		    ifp->name);
 		return;
+	}
+
+	if (state->xid != ntohl(bootp->xid)) {
+		/* If the xid is 0 in a BOOTP reply FORCERENEW, move on and
+		 * check AUTH. MikroTik dhpc servers send xid 0. */
+		if (bootp->xid == 0 && type == DHCP_FORCERENEW) {
+			if (IS_STATE_ACTIVE(state))
+				logdebugx(
+				    "%s: xid 0 in a BOOTP reply FORCERENEW from %s",
+				    ifp->name, inet_ntoa(*from));
+		} else {
+			if (IS_STATE_ACTIVE(state))
+				logdebugx(
+				    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
+				    ifp->name, ntohl(bootp->xid), state->xid,
+				    inet_ntoa(*from));
+			dhcp_redirect_dhcp(ifp, bootp, bootp_len, from);
+			return;
+		}
 	}
 
 	if (ifp->hwlen <= sizeof(bootp->chaddr) &&
@@ -3168,16 +3188,6 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			    ifp->name, inet_ntoa(*from));
 			return;
 		}
-	}
-
-	/* We may have found a BOOTP server */
-	if (get_option_uint8(ifp->ctx, &type, bootp, bootp_len,
-		DHO_MESSAGETYPE) == -1)
-		type = 0;
-	else if (ifo->options & DHCPCD_BOOTP) {
-		logdebugx("%s: ignoring DHCP reply (expecting BOOTP)",
-		    ifp->name);
-		return;
 	}
 
 #ifdef AUTH
