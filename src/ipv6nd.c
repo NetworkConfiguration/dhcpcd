@@ -434,8 +434,10 @@ sent:
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    RTR_SOLICITATION_INTERVAL, ipv6nd_sendrsprobe, ifp);
-	else
+	else {
 		logwarnx("%s: no IPv6 Routers available", ifp->name);
+		script_runreason(ifp, "RS_TIMEOUT_NO_RA");
+	}
 }
 
 static void

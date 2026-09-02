@@ -124,6 +124,30 @@ dhcpcd's lease or state expired and it failed to obtain a new one.
 .It Dv NAK
 dhcpcd received a NAK from the DHCP server.
 This should be treated as EXPIRE.
+.It Dv DISC_NO_OFFER
+dhcpcd retransmitted a DHCP DISCOVER because no OFFER was received.
+This is a notification only and does not configure or deconfigure.
+.It Dv SOLICIT_NO_ADVERT
+dhcpcd retransmitted a DHCPv6 Solicit because no Advertise was received.
+This is a notification only and does not configure or deconfigure.
+.It Dv REQ_NO_RESP
+dhcpcd failed to receive a response to a DHCP REQUEST and is falling back
+to DISCOVER.
+This is a notification only and does not configure or deconfigure.
+.It Dv REQ6_NO_REPLY
+dhcpcd failed to receive a Reply to a DHCPv6 Request and is falling back
+to Solicit.
+This is a notification only and does not configure or deconfigure.
+.It Dv RENEW_NO_RESP
+dhcpcd failed to renew its DHCPv4 lease at T2 and is entering REBIND.
+This is a notification only and does not configure or deconfigure.
+.It Dv RENEW6_NO_RESP
+dhcpcd failed to renew its DHCPv6 lease at T2 and is entering REBIND.
+This is a notification only and does not configure or deconfigure.
+.It Dv RS_TIMEOUT_NO_RA
+dhcpcd sent the maximum number of Router Solicitations without receiving
+a Router Advertisement.
+This is a notification only and does not configure or deconfigure.
 .It Dv RECONFIGURE
 dhcpcd has been instructed to reconfigure an interface.
 .It Dv ROUTERADVERT
