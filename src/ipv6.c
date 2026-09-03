@@ -934,8 +934,7 @@ ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
 		    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
 			return 1;
 	} else if (IN6_ARE_ADDR_EQUAL(&addr->addr, match) &&
-	    (!flags || addr->flags & flags) &&
-	    (!vltime || addr->prefix_vltime))
+	    (!flags || addr->flags & flags) && (!vltime || addr->prefix_vltime))
 		return 1;
 
 	return 0;
