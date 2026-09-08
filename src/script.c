@@ -393,7 +393,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 	if (efprintf(fp, "ifmtu=%d", if_getmtu(ifp)) == -1)
 		goto eexit;
 	if (ifp->wireless) {
-		char pssid[IF_SSIDLEN * 4];
+		char pssid[IF_SSIDSTRLEN];
 
 		if (print_string(pssid, sizeof(pssid), OT_ESCSTRING, ifp->ssid,
 			ifp->ssid_len) != -1) {

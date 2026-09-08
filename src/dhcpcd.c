@@ -628,7 +628,7 @@ int
 dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 {
 	struct if_options *ifo;
-	char pssid[PROFILE_LEN];
+	char pssid[IF_SSIDSTRLEN];
 
 	if (ifp->ssid_len) {
 		ssize_t r;
@@ -717,7 +717,7 @@ dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 static void
 dhcpcd_reportssid(struct interface *ifp)
 {
-	char pssid[IF_SSIDLEN * 4];
+	char pssid[IF_SSIDSTRLEN];
 
 	if (print_string(pssid, sizeof(pssid), OT_ESCSTRING, ifp->ssid,
 		ifp->ssid_len) == -1) {

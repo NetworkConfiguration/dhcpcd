@@ -41,10 +41,12 @@
 #include "if-options.h"
 #include "queue.h"
 
-#define HWADDR_LEN     20
-#define IF_SSIDLEN     32
-#define PROFILE_LEN    64
-#define SECRET_LEN     64
+#define HWADDR_LEN  20
+#define IF_SSIDLEN  32
+#define PROFILE_LEN 64
+#define SECRET_LEN  64
+/* An escaped SSID needs four characters per-octet, plus terminating NUL */
+#define IF_SSIDSTRLEN  ((IF_SSIDLEN * 4) + 1)
 
 #define IF_INACTIVE    0
 #define IF_ACTIVE      1
