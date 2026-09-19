@@ -212,7 +212,7 @@ struct dhcp6_state {
 	struct ipv6_addrhead addrs;
 	uint32_t lowpl;
 	/* The +3 is for the possible .pd extension for prefix delegation */
-	char leasefile[sizeof(LEASEFILE6) + IF_NAMESIZE + (IF_SSIDLEN * 4) + 3];
+	char leasefile[sizeof(LEASEFILE6) + IF_NAMESIZE + IF_SSIDSTRLEN + 3];
 	const char *reason;
 	uint16_t lerror; /* Last error received from DHCPv6 reply. */
 	bool has_no_binding;

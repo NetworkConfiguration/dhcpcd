@@ -1013,7 +1013,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
     const struct interface *ifp)
 {
 	char ifname[(sizeof(ifp->name) * 4) + 1];
-	char ssid[1 + (IF_SSIDLEN * 4) + 1]; /* - prefix and NUL terminated. */
+	char ssid[1 + IF_SSIDSTRLEN]; /* - prefix and escaped SSID. */
 
 	if (ifp->name[0] == '\0') {
 		strlcpy(leasefile, ifp->ctx->pidfile, len);
