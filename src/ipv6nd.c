@@ -1851,7 +1851,16 @@ ipv6nd_expirera(void *arg)
 				    rap->iface->name, rinfo->sprefix);
 				TAILQ_REMOVE(&rap->rinfos, rinfo, next);
 				free(rinfo);
+				expired = true;
+				continue;
 			}
+
+			/* A non expired route information option keeps the RA
+			 * valid. */
+			valid = true;
+			if (ltime != ND6_INFINITE_LIFETIME &&
+			    (next == 0 || ltime < next))
+				next = ltime;
 		}
 
 		/* Work out expiry for ND options */
