@@ -287,7 +287,7 @@ struct interface *if_findifpfromcmsg(struct dhcpcd_ctx *, struct msghdr *,
     int *);
 
 #ifdef __linux__
-int if_linksocket(struct sockaddr_nl *, int, int);
+int if_linksocket(struct sockaddr_nl *, int, int, bool);
 int if_getnetlink(struct dhcpcd_ctx *, struct iovec *, int, int,
     int (*)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *);
 #endif
