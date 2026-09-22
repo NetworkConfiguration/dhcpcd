@@ -1126,6 +1126,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 		arg = p + 1;
 		s = (ssize_t)sizeof(ifo->vendor) - 1 - ifo->vendor[0] - 2;
+		if (s < 0) {
+			errno = ENOBUFS;
+			logerr("vendor");
+			return -1;
+		}
 		if (inet_aton(arg, &addr) == 1) {
 			if (s < 6) {
 				s = -1;
