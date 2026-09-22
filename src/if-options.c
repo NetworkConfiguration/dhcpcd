@@ -2119,7 +2119,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				*fp++ = '\0';
 			if (arg == NULL) {
 				if (!(t & OT_OPTION) || opt != O_ENCAP) {
-					logerrx("type requires a variable name");
+					logerrx(
+					    "type requires a variable name");
 					return -1;
 				}
 				np = NULL;
