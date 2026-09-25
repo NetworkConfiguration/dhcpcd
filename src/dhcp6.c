@@ -2276,7 +2276,8 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 		a->acquired = *acquired;
 		a->prefix_pltime = ia.pltime;
 		if (a->prefix_vltime != ia.vltime) {
-			a->flags |= IPV6_AF_NEW;
+			if (ia.vltime == 0)
+				a->flags |= IPV6_AF_NEW;
 			a->prefix_vltime = ia.vltime;
 		}
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
@@ -2365,7 +2366,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid, uint8_t *d, size_t l,
 			if (!(a->flags & IPV6_AF_PFXDELEGATION))
 				a->flags |= IPV6_AF_NEW | IPV6_AF_PFXDELEGATION;
 			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_EXTENDED);
-			if (a->prefix_vltime != pdp_vltime)
+			if (pdp_vltime == 0 && a->prefix_vltime != pdp_vltime)
 				a->flags |= IPV6_AF_NEW;
 		}
 
@@ -3153,12 +3154,23 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 	struct timespec now;
 
 	if (state->state == DH6S_RENEW) {
+		/*
+		 * Ignore unfulfilled requested addresses
+		 * and Prefix Delegations.
+		 * As most requests will be the unspecified address and
+		 * optionally prefix length, this is expected behaviour.
+		 */
 		loglevel = LOG_DEBUG;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if (ia->flags & IPV6_AF_NEW) {
-				loglevel = LOG_INFO;
-				break;
-			}
+			if (!(ia->flags & IPV6_AF_NEW))
+				continue;
+			if (ia->flags & IPV6_AF_STALE &&
+			    ia->flags & IPV6_AF_REQUEST)
+				continue;
+			/* This address is either coming or going, so promote
+			 * the priority. */
+			loglevel = LOG_INFO;
+			break;
 		}
 	} else if (state->state == DH6S_INFORM)
 		loglevel = state->new_start ? LOG_INFO : LOG_DEBUG;
