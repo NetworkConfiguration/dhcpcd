@@ -205,6 +205,10 @@
 #define O_BACKOFF_JITTER     O_BASE + 62
 #define O_ALLOW		     O_BASE + 63
 #define O_READGRP	     O_BASE + 64
+#define O_DBDIR		     O_BASE + 65
+#define O_RUNDIR	     O_BASE + 66
+#define O_DEVDIR	     O_BASE + 67
+#define O_INSTANCE	     O_BASE + 68
 
 extern const struct option cf_options[];
 

@@ -1041,7 +1041,8 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 	} else
 		ssid[0] = '\0';
 	return snprintf(leasefile, len,
-	    family == AF_INET ? LEASEFILE : LEASEFILE6, ifname, ssid);
+	    family == AF_INET ? dhcpcd_leasefile : dhcpcd_leasefile6, ifname,
+	    ssid);
 }
 
 void
