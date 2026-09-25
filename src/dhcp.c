@@ -3091,6 +3091,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	bool bootp_copied;
 	uint32_t v6only_time = 0;
 	bool use_v6only = false, has_auto_conf = false;
+	bool bootp_must_reject_dhcp = false;
 	struct dhcp_policy dp = {
 		.ctx = ifp->ctx,
 		.bootp = bootp,
@@ -3128,13 +3129,53 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		return;
 	}
 
+	/* We may have found a BOOTP server */
+	if (get_option_uint8(ifp->ctx, &type, bootp, bootp_len,
+		DHO_MESSAGETYPE) == -1)
+		type = 0;
+	else
+		bootp_must_reject_dhcp = (ifo->options & DHCPCD_BOOTP) != 0;
+
+#ifdef AUTH
+	if (type == DHCP_FORCERENEW) {
+		auth = get_option(ifp->ctx, bootp, bootp_len,
+		    DHO_AUTHENTICATION, &auth_len);
+		if (auth == NULL) {
+			LOGDHCP(LOG_ERR, "unauthenticated Force Renew");
+			return;
+		}
+		if (dhcp_auth_validate(&state->auth, &ifo->auth,
+			(uint8_t *)bootp, bootp_len, 4, type, auth,
+			auth_len) == NULL) {
+			LOGDHCP0(LOG_ERR, "authentication failed");
+			return;
+		}
+		if (state->auth.token)
+			logdebugx("%s: validated using 0x%08" PRIu32, ifp->name,
+			    state->auth.token->secretid);
+		else
+			loginfox("%s: accepted reconfigure key", ifp->name);
+	}
+#endif
+
 	if (state->xid != ntohl(bootp->xid)) {
-		if (IS_STATE_ACTIVE(state))
-			logdebugx("%s: wrong xid 0x%x (expecting 0x%x) from %s",
-			    ifp->name, ntohl(bootp->xid), state->xid,
-			    inet_ntoa(*from));
-		dhcp_redirect_dhcp(ifp, bootp, bootp_len, from);
-		return;
+		/* AUTH has already run; this only skips redirect for
+		 * MikroTik xid 0 FORCERENEW. Non-FORCERENEW xid
+		 * mismatches still redirect. */
+		if (bootp->xid == 0 && type == DHCP_FORCERENEW) {
+			if (IS_STATE_ACTIVE(state))
+				logdebugx(
+				    "%s: xid 0 in a BOOTP reply FORCERENEW from %s",
+				    ifp->name, inet_ntoa(*from));
+		} else {
+			if (IS_STATE_ACTIVE(state))
+				logdebugx(
+				    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
+				    ifp->name, ntohl(bootp->xid), state->xid,
+				    inet_ntoa(*from));
+			dhcp_redirect_dhcp(ifp, bootp, bootp_len, from);
+			return;
+		}
 	}
 
 	if (ifp->hwlen <= sizeof(bootp->chaddr) &&
@@ -3170,38 +3211,31 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 	}
 
-	/* We may have found a BOOTP server */
-	if (get_option_uint8(ifp->ctx, &type, bootp, bootp_len,
-		DHO_MESSAGETYPE) == -1)
-		type = 0;
-	else if (ifo->options & DHCPCD_BOOTP) {
-		logdebugx("%s: ignoring DHCP reply (expecting BOOTP)",
-		    ifp->name);
-		return;
-	}
-
 #ifdef AUTH
-	/* Authenticate the message */
-	auth = get_option(ifp->ctx, bootp, bootp_len, DHO_AUTHENTICATION,
-	    &auth_len);
-	if (auth) {
-		if (dhcp_auth_validate(&state->auth, &ifo->auth,
-			(uint8_t *)bootp, bootp_len, 4, type, auth,
-			auth_len) == NULL) {
-			LOGDHCP0(LOG_ERR, "authentication failed");
-			return;
+	if (type != DHCP_FORCERENEW) {
+		/* Authenticate the message */
+		auth = get_option(ifp->ctx, bootp, bootp_len,
+		    DHO_AUTHENTICATION, &auth_len);
+		if (auth) {
+			if (dhcp_auth_validate(&state->auth, &ifo->auth,
+				(uint8_t *)bootp, bootp_len, 4, type, auth,
+				auth_len) == NULL) {
+				LOGDHCP0(LOG_ERR, "authentication failed");
+				return;
+			}
+			if (state->auth.token)
+				logdebugx("%s: validated using 0x%08" PRIu32,
+				    ifp->name, state->auth.token->secretid);
+			else
+				loginfox("%s: accepted reconfigure key",
+				    ifp->name);
+		} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
+			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
+				LOGDHCP0(LOG_ERR, "no authentication");
+				return;
+			}
+			LOGDHCP0(LOG_WARNING, "no authentication");
 		}
-		if (state->auth.token)
-			logdebugx("%s: validated using 0x%08" PRIu32, ifp->name,
-			    state->auth.token->secretid);
-		else
-			loginfox("%s: accepted reconfigure key", ifp->name);
-	} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
-			LOGDHCP0(LOG_ERR, "no authentication");
-			return;
-		}
-		LOGDHCP0(LOG_WARNING, "no authentication");
 	}
 #endif
 
@@ -3213,11 +3247,6 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			return;
 		}
 #ifdef AUTH
-		if (auth == NULL) {
-			LOGDHCP(LOG_ERR, "unauthenticated Force Renew");
-			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE)
-				return;
-		}
 		if (state->state != DHS_BOUND && state->state != DHS_INFORM) {
 			LOGDHCP(LOG_DEBUG, "not bound, ignoring Force Renew");
 			return;
@@ -3234,6 +3263,12 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #else
 		LOGDHCP(LOG_ERR, "unauthenticated Force Renew");
 #endif
+		return;
+	}
+
+	if (bootp_must_reject_dhcp) {
+		logdebugx("%s: ignoring DHCP reply (expecting BOOTP)",
+		    ifp->name);
 		return;
 	}
 
