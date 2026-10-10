@@ -159,10 +159,18 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
 #ifndef __sun /* RLIMIT_NOFILE and ppoll don't mix */
+#ifdef __linux__
+	/* Linux dup2(2) fails EBADF if RLIMIT_NOFILE is 0 */
+	struct rlimit rnofile = { .rlim_cur = STDERR_FILENO + 1,
+		.rlim_max = STDERR_FILENO + 1 };
+#else
+	struct rlimit rnofile = { .rlim_cur = 0, .rlim_max = 0 };
+#endif
+
 	/* Prohibit new files, sockets, etc
 	 * The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
-		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
+		if (setrlimit(RLIMIT_NOFILE, &rnofile) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 	}
 #endif
