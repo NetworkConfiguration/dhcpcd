@@ -340,8 +340,10 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 	 * We know that stdin is already mapped to /dev/null.
 	 * TODO: Capture script output and log it to the logfile and/or syslog.
 	 */
-	dup2(STDIN_FILENO, STDOUT_FILENO);
-	dup2(STDIN_FILENO, STDERR_FILENO);
+	if (dup2(STDIN_FILENO, STDOUT_FILENO) == -1)
+		logwarn("%s: dup2 %d", __func__, STDOUT_FILENO);
+	if (dup2(STDIN_FILENO, STDERR_FILENO) == -1)
+		logwarn("%s: dup2 %d", __func__, STDERR_FILENO);
 
 	ctx->options |= DHCPCD_DAEMONISED;
 }
@@ -2040,7 +2042,7 @@ dup_null(int fd)
 	}
 
 	if ((err = dup2(fd_null, fd)) == -1)
-		logwarn("dup2 %d", fd);
+		logwarn("%s: dup2 %d", __func__, fd);
 	close(fd_null);
 	return err;
 }
