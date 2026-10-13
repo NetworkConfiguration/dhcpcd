@@ -61,6 +61,10 @@
 .Op Fl Z , Fl Fl denyinterfaces Ar pattern
 .Op Fl z , Fl Fl allowinterfaces Ar pattern
 .Op Fl Fl inactive
+.Op Fl Fl instance Ar instance
+.Op Fl Fl dbdir Ar dir
+.Op Fl Fl rundir Ar dir
+.Op Fl Fl devdir Ar dir
 .Op Fl Fl configure
 .Op Fl Fl noconfigure
 .Op interface
@@ -271,9 +275,9 @@ Use a DHCP Unique Identifier.
 If persistent storage is available then a DUID-LLT
 (link local address + time) is generated,
 otherwise DUID-LL is generated (link local address).
-The DUID type can be hinted as an optional parameter if the file
-.Pa @DBDIR@/duid
-does not exist.
+ The DUID type can be hinted as an optional parameter if the default DUID file
+ .Pa @DBDIR@/duid
+ does not exist.
 If not
 .Va ll ,
 .Va lt
@@ -284,9 +288,9 @@ then
 will be converted from 00:11:22:33 format.
 This, plus the IAID will be used as the
 .Fl I , Fl Fl clientid .
-The DUID generated will be held in
-.Pa @DBDIR@/duid
-and should not be copied to other hosts.
+ The DUID generated will be held in the default DUID file
+ .Pa @DBDIR@/duid
+ and should not be copied to other hosts.
 This file also takes precedence over the above rules except for setting a value.
 .It Fl d , Fl Fl debug
 Echo debug messages to the stderr and syslog.
@@ -778,6 +782,51 @@ addition of
 Don't load any
 .Pa /dev
 management modules.
+.It Fl Fl instance Ar instance
+Prefix the state and runtime files that
+.Nm
+writes, namely the DUID, secret, lease, RDM, PID and control socket files,
+with the
+.Ar instance
+name inside the state and runtime directories.
+.Ar instance
+must be a single path component and must not contain a
+.Sq / .
+For example,
+.Fl Fl instance=foo
+will cause the DUID file to be written to
+.Pa @DBDIR@/ Ns Pa foo Ns .duid
+and the PID file to
+.Pa @RUNDIR@/ Ns Pa foo Ns .pid .
+The base directories remain unchanged.
+.It Fl Fl dbdir Ar dir
+Specify the base directory where
+.Nm
+stores its lease and state database.
+This overrides the compiled in default
+.Pa @DBDIR@ .
+Without
+.Fl Fl instance
+the DUID, secret, lease and RDM files are created directly here, otherwise
+they are created here under the file name prefixed with the instance name.
+.It Fl Fl rundir Ar dir
+Specify the base directory where
+.Nm
+stores its runtime files, such as the PID file and control socket.
+This overrides the compiled in default
+.Pa @RUNDIR@ .
+Without
+.Fl Fl instance
+the PID file and control socket are created directly here, otherwise they
+are created here under the file name prefixed with the instance name.
+.It Fl Fl devdir Ar dir
+Specify the directory from which
+.Nm
+loads
+.Pa /dev
+management modules.
+This overrides the compiled in default
+.Pa @LIBDIR@/dhcpcd/dev .
 .El
 .Sh 3RDPARTY LINK MANAGEMENT
 Some interfaces require configuration by 3rd parties, such as PPP or VPN.
@@ -818,6 +867,18 @@ sends to match.
 If using a DUID in place of the ClientID, edit
 .Pa @DBDIR@/duid
 accordingly.
+.Pp
+The file paths shown in this manual, such as
+.Pa @DBDIR@/duid ,
+are the compiled in defaults.
+The effective path used by
+.Nm
+can be changed with the
+.Fl Fl dbdir ,
+.Fl Fl rundir
+and
+.Fl Fl instance
+options described above.
 .Sh FILES
 .Bl -ohang
 .It Pa @SYSCONFDIR@/dhcpcd.conf

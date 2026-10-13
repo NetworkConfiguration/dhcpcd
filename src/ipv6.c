@@ -154,7 +154,8 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	size_t len;
 	uint32_t r;
 
-	ctx->secret_len = dhcp_read_hwaddr_aton(ctx, &ctx->secret, SECRET);
+	ctx->secret_len = dhcp_read_hwaddr_aton(ctx, &ctx->secret,
+	    dhcpcd_secretfile);
 	if (ctx->secret_len != 0)
 		return (ssize_t)ctx->secret_len;
 
@@ -185,7 +186,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 		line[len++] = '\n';
 		line[len] = '\0';
 	}
-	if (dhcp_writefile(ctx, SECRET, S_IRUSR, line, len) == -1) {
+	if (dhcp_writefile(ctx, dhcpcd_secretfile, S_IRUSR, line, len) == -1) {
 		logerr("%s: cannot write secret", __func__);
 		ctx->secret_len = 0;
 		return -1;

@@ -146,12 +146,96 @@ out:
 	return bytes;
 }
 
+/* Return a copy of s with every '%' doubled so it is safe to use as a
+ * literal within a printf-style format string. Returns NULL on failure. */
+char *
+escape_percent(const char *s)
+{
+	const char *p;
+	char *r, *d;
+	size_t extra = 0;
+
+	if (s == NULL)
+		s = "";
+	for (p = s; *p != '\0'; p++)
+		if (*p == '%')
+			extra++;
+	r = malloc(strlen(s) + extra + 1);
+	if (r == NULL)
+		return NULL;
+	for (p = s, d = r; *p != '\0'; p++) {
+		if (*p == '%')
+			*d++ = '%';
+		*d++ = *p;
+	}
+	*d = '\0';
+	return r;
+}
+
+/* Create a directory and any missing parents, like mkdir -p. */
+int
+mkdirs(const char *dir, mode_t mode)
+{
+	char *d, *p;
+	int r = 0;
+
+	if (dir == NULL || dir[0] == '\0') {
+		errno = EINVAL;
+		return -1;
+	}
+	d = strdup(dir);
+	if (d == NULL)
+		return -1;
+	for (p = d + 1; *p != '\0'; p++) {
+		if (*p != '/')
+			continue;
+		*p = '\0';
+		if (mkdir(d, mode) == -1 && errno != EEXIST)
+			r = -1;
+		*p = '/';
+	}
+	if (mkdir(d, mode) == -1 && errno != EEXIST)
+		r = -1;
+	free(d);
+	return r;
+}
+
+/* Ensure the directory part of a file path exists. */
+int
+ensure_dir(const char *file, mode_t mode)
+{
+	char *d, *p;
+	int r;
+
+	if (file == NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+	d = strdup(file);
+	if (d == NULL)
+		return -1;
+	p = strrchr(d, '/');
+	if (p == NULL) {
+		free(d);
+		return 0;
+	}
+	if (p == d)
+		*(p + 1) = '\0';
+	else
+		*p = '\0';
+	r = mkdirs(d, mode);
+	free(d);
+	return r;
+}
+
 ssize_t
 writefile(const char *file, mode_t mode, const void *data, size_t len)
 {
 	int fd;
 	ssize_t bytes;
 
+	if (ensure_dir(file, 0750) == -1)
+		return -1;
 	fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if (fd == -1)
 		return -1;
