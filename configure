@@ -304,6 +304,8 @@ eval DATADIR="$DATADIR"
 echo "#ifndef	SYSCONFDIR" >>$CONFIG_H
 for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 	eval v=\$$x
+	v=${v%/}
+	eval $x=\"\$v\"
 	# Make files look nice for import
 	l=$((10 - ${#x}))
 	unset t
