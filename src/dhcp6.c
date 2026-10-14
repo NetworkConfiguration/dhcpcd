@@ -4516,49 +4516,18 @@ delegated:
 #ifndef SMALL
 static int
 dhcp6_dump_lease_time(FILE *fp, const char *name, struct eloop *eloop,
-    void (*callback)(void *), void *arg, time_t *now, uint32_t lifetime,
-    bool privsep)
+    void (*callback)(void *), void *arg, unsigned long long esecs,
+    unsigned int ensecs, uint32_t lifetime)
 {
 	unsigned int seconds;
-	int has;
-	time_t when;
-	struct tm tm;
-	char buf[32];
-	char *ts;
 
 	if (lifetime == ND6_INFINITE_LIFETIME)
-		return script_envtime(fp, name, "never");
+		return efprintf(fp, "%s=never", name);
 
-	has = eloop_timeout_remaining(eloop, callback, arg, &seconds);
-	if (has == -1) {
-		logerrx("Could not get remaining dhcp6 lease time");
-		return -1;
-	}
-	if (has == 0)
-		return script_envtime(fp, name, "expired");
-
-	when = *now + (time_t)seconds;
-	if (!privsep) {
-		/* if not using privsep, we can take advantage of ctime
-		 * formatting */
-		ts = ctime(&when);
-		if (ts == NULL) {
-			logerrx("Could not convert dhcp6 lease time");
-			return -1;
-		}
-		return script_envtime(fp, name, ts);
-	}
-	/* if using privsep, use gmtime and convert the time to a string in the
-	 * UTC */
-	if (gmtime_r(&when, &tm) == NULL) {
-		logerrx("Could not convert dhcp6 lease time");
-		return -1;
-	}
-	if (strftime(buf, sizeof(buf), "%a %b %e %H:%M:%S %Y UTC", &tm) == 0) {
-		logerrx("Could not format dhcp6 lease time");
-		return -1;
-	}
-	return script_envtime(fp, name, buf);
+	if (eloop_timeout_remaining(eloop, callback, arg, esecs, ensecs,
+		&seconds) == 0)
+		seconds = 0;
+	return efprintf(fp, "%s=%u", name, seconds);
 }
 
 int
@@ -4566,7 +4535,8 @@ dhcp6_dump_lease_times(FILE *fp, const struct interface *ifp)
 {
 	const struct dhcp6_state *state;
 	void *arg;
-	time_t now;
+	unsigned long long esecs;
+	unsigned int ensecs;
 
 	state = D6_CSTATE(ifp);
 	if (state == NULL)
@@ -4575,24 +4545,20 @@ dhcp6_dump_lease_times(FILE *fp, const struct interface *ifp)
 	    state->state != DH6S_REBIND)
 		return 0;
 
-	now = time(NULL);
-	if (now == (time_t)-1) {
-		logerrx("Could not get current time");
+	if (eloop_monotonic_elapsed(ifp->ctx->eloop, &esecs, &ensecs) == -1) {
+		logerr("eloop_monotonic_elapsed");
 		return -1;
 	}
 
 	arg = UNCONST(ifp);
-	if (dhcp6_dump_lease_time(fp, "next_renewal_time", ifp->ctx->eloop,
-		dhcp6_startrenew, arg, &now, state->renew,
-		IN_PRIVSEP(ifp->ctx)) == -1)
+	if (dhcp6_dump_lease_time(fp, "time_to_renew", ifp->ctx->eloop,
+		dhcp6_startrenew, arg, esecs, ensecs, state->renew) == -1)
 		return -1;
-	if (dhcp6_dump_lease_time(fp, "next_rebind_time", ifp->ctx->eloop,
-		dhcp6_startrebind, arg, &now, state->rebind,
-		IN_PRIVSEP(ifp->ctx)) == -1)
+	if (dhcp6_dump_lease_time(fp, "time_to_rebind", ifp->ctx->eloop,
+		dhcp6_startrebind, arg, esecs, ensecs, state->rebind) == -1)
 		return -1;
-	if (dhcp6_dump_lease_time(fp, "next_expire_time", ifp->ctx->eloop,
-		dhcp6_startexpire, arg, &now, state->expire,
-		IN_PRIVSEP(ifp->ctx)) == -1)
+	if (dhcp6_dump_lease_time(fp, "time_to_expire", ifp->ctx->eloop,
+		dhcp6_startexpire, arg, esecs, ensecs, state->expire) == -1)
 		return -1;
 	return 0;
 }
