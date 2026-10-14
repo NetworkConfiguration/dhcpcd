@@ -84,9 +84,9 @@ unsigned long long eloop_timespec_diff(const struct timespec *tsp,
 #ifndef SMALL
 int eloop_monotonic_elapsed(struct eloop *, unsigned long long *,
     unsigned int *);
-#define eloop_timeout_remaining(eloop, cb, ctx, esecs, ensecs, sec) \
-	eloop_q_timeout_remaining((eloop), ELOOP_QUEUE, (cb), (ctx), \
-	    (esecs), (ensecs), (sec))
+#define eloop_timeout_remaining(eloop, cb, ctx, esecs, ensecs, sec)           \
+	eloop_q_timeout_remaining((eloop), ELOOP_QUEUE, (cb), (ctx), (esecs), \
+	    (ensecs), (sec))
 #endif
 int eloop_q_timeout_add_tv(struct eloop *, int, const struct timespec *,
     void (*)(void *), void *);
