@@ -275,17 +275,20 @@ ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path,
 	if (strstr(path, "..") != NULL)
 		goto noperm;
 
-	if (cmd == PS_READFILE) {
+	if (cmd == PS_READFILE || cmd == PS_FILEMTIME) {
 #ifdef EMBEDDED_CONFIG
-		if (strcmp(ctx->cffile, EMBEDDED_CONFIG) == 0)
+		if (strcmp(EMBEDDED_CONFIG, path) == 0)
 			return true;
 #endif
 		if (strcmp(ctx->cffile, path) == 0)
 			return true;
 	}
-	if (strncmp(DBDIR, path, strlen(DBDIR)) == 0)
+	if (strncmp(DBDIR "/", path,
+		sizeof(DBDIR) - (DBDIR[sizeof(DBDIR) - 2] == '/' ? 1 : 0)) == 0)
 		return true;
-	if (strncmp(RUNDIR, path, strlen(RUNDIR)) == 0)
+	if (strncmp(RUNDIR "/", path,
+		sizeof(RUNDIR) - (RUNDIR[sizeof(RUNDIR) - 2] == '/' ? 1 : 0)) ==
+	    0)
 		return true;
 
 #ifdef __linux__
