@@ -4525,7 +4525,8 @@ dhcp6_dump_lease_time(FILE *fp, const char *name, struct eloop *eloop,
 		return efprintf(fp, "%s=never", name);
 
 	if (eloop_timeout_remaining(eloop, callback, arg, esecs, ensecs,
-		&seconds) == 0)
+
+	    &seconds) == 0)
 		seconds = 0;
 	return efprintf(fp, "%s=%u", name, seconds);
 }

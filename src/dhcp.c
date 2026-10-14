@@ -4402,7 +4402,8 @@ dhcp_dump_lease_time(FILE *fp, const char *name, struct eloop *eloop,
 		return efprintf(fp, "%s=never", name);
 
 	if (eloop_timeout_remaining(eloop, callback, arg, esecs, ensecs,
-		&seconds) == 0)
+
+	    &seconds) == 0)
 		seconds = 0;
 	return efprintf(fp, "%s=%u", name, seconds);
 }
@@ -4431,7 +4432,8 @@ dhcp_dump_lease_times(FILE *fp, const struct interface *ifp)
 	lease = &state->lease;
 	arg = UNCONST(ifp);
 	if (dhcp_dump_lease_time(fp, "time_to_renew", ifp->ctx->eloop,
-		dhcp_startrenew, arg, esecs, ensecs, lease->renewaltime) == -1)
+		dhcp_startrenew, arg, esecs, ensecs,
+		lease->renewaltime) == -1)
 		return -1;
 	if (dhcp_dump_lease_time(fp, "time_to_rebind", ifp->ctx->eloop,
 		dhcp_rebind, arg, esecs, ensecs, lease->rebindtime) == -1)
