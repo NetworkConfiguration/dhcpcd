@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #define ELOOP_QUEUE ELOOP_DHCP6
@@ -4511,6 +4512,57 @@ delegated:
 
 	return 1;
 }
+
+#ifndef SMALL
+static int
+dhcp6_dump_lease_time(FILE *fp, const char *name, struct eloop *eloop,
+    void (*callback)(void *), void *arg, unsigned long long esecs,
+    unsigned int ensecs, uint32_t lifetime)
+{
+	unsigned int seconds;
+
+	if (lifetime == ND6_INFINITE_LIFETIME)
+		return efprintf(fp, "%s=never", name);
+
+	if (eloop_timeout_remaining(eloop, callback, arg, esecs, ensecs,
+		&seconds) == 0)
+		seconds = 0;
+	return efprintf(fp, "%s=%u", name, seconds);
+}
+
+int
+dhcp6_dump_lease_times(FILE *fp, const struct interface *ifp)
+{
+	const struct dhcp6_state *state;
+	void *arg;
+	unsigned long long esecs;
+	unsigned int ensecs;
+
+	state = D6_CSTATE(ifp);
+	if (state == NULL)
+		return 0;
+	if (state->state != DH6S_BOUND && state->state != DH6S_RENEW &&
+	    state->state != DH6S_REBIND)
+		return 0;
+
+	if (eloop_monotonic_elapsed(ifp->ctx->eloop, &esecs, &ensecs) == -1) {
+		logerr("eloop_monotonic_elapsed");
+		return -1;
+	}
+
+	arg = UNCONST(ifp);
+	if (dhcp6_dump_lease_time(fp, "time_to_renew", ifp->ctx->eloop,
+		dhcp6_startrenew, arg, esecs, ensecs, state->renew) == -1)
+		return -1;
+	if (dhcp6_dump_lease_time(fp, "time_to_rebind", ifp->ctx->eloop,
+		dhcp6_startrebind, arg, esecs, ensecs, state->rebind) == -1)
+		return -1;
+	if (dhcp6_dump_lease_time(fp, "time_to_expire", ifp->ctx->eloop,
+		dhcp6_startexpire, arg, esecs, ensecs, state->expire) == -1)
+		return -1;
+	return 0;
+}
+#endif
 #endif
 
 #ifndef SMALL
