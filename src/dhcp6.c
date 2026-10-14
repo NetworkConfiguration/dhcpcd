@@ -1633,7 +1633,7 @@ dhcp6_dadcallback(void *arg)
 			completed = false;
 			break;
 		}
-		if (DECLINE_IA(ia))
+		if (DECLINE_IA(ia2))
 			oneduplicated = true;
 	}
 	if (!completed)
