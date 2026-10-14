@@ -158,24 +158,6 @@ efprintf(FILE *fp, const char *fmt, ...)
 	return r;
 }
 
-#ifndef SMALL
-int
-script_envtime(FILE *fp, const char *name, const char *timestr)
-{
-	char buf[32];
-	char *nl;
-
-	if (strlcpy(buf, timestr, sizeof(buf)) >= sizeof(buf)) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	nl = strchr(buf, '\n');
-	if (nl != NULL)
-		*nl = '\0';
-	return efprintf(fp, "%s=%s", name, buf);
-}
-#endif
-
 char **
 script_buftoenv(struct dhcpcd_ctx *ctx, char *buf, size_t len)
 {

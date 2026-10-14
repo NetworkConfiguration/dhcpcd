@@ -32,9 +32,6 @@
 #include "control.h"
 
 __printflike(2, 3) int efprintf(FILE *, const char *, ...);
-#ifndef SMALL
-int script_envtime(FILE *, const char *, const char *);
-#endif
 void if_printoptions(void);
 char **script_buftoenv(struct dhcpcd_ctx *, char *, size_t);
 pid_t script_exec(char *const *, char *const *);
