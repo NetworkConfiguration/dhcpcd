@@ -228,7 +228,7 @@ ipv6_reserved(const struct in6_addr *addr)
 
 	id = be64dec(addr->s6_addr + sizeof(id));
 	if (id == 0) /* RFC4291 */
-		return 1;
+		return true;
 	for (i = 0; i < __arraycount(reslowhigh); i++) {
 		r = &reslowhigh[i];
 		low = be64dec(r->low);
