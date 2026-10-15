@@ -1379,8 +1379,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 				has_address = true;
 
 #ifdef IPV6_MANAGETEMPADDR
-			/* RFC4941 Section 3.3.3 */
+			/* RFC 8981 Section 3.4 */
 			if (ia->flags & IPV6_AF_AUTOCONF &&
+			    !(ia->flags & IPV6_AF_TEMPFAILED) &&
 			    ia->iface->options->options & DHCPCD_SLAACTEMP &&
 			    IA6_CANAUTOCONF(ia)) {
 				if (!new_ia) {

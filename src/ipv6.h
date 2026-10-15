@@ -58,11 +58,11 @@
 #define ND6_INFINITE_LIFETIME ((uint32_t)~0)
 #endif
 
-/* RFC4941 constants */
-#define TEMP_VALID_LIFETIME	604800 /* 1 week */
+/* RFC 8981 constants */
+#define TEMP_VALID_LIFETIME	172800 /* 2 days */
 #define TEMP_PREFERRED_LIFETIME 86400  /* 1 day */
 #define REGEN_ADVANCE		5      /* seconds */
-#define MAX_DESYNC_FACTOR	600    /* 10 minutes */
+#define MAX_DESYNC_FACTOR	(TEMP_PREFERRED_LIFETIME * 4 / 10) /* 0.4 * TEMP_PREFERRED_LIFETIME */
 #define TEMP_IDGEN_RETRIES	3
 
 /* RFC7217 constants */
@@ -208,6 +208,9 @@ struct ipv6_addr {
 #ifdef ALIAS_ADDR
 	char alias[IF_NAMESIZE];
 #endif
+#ifdef IPV6_MANAGETEMPADDR
+	uint32_t desync_factor;
+#endif
 };
 
 #define IPV6_AF_ONLINK	      (1U << 0)
@@ -228,7 +231,8 @@ struct ipv6_addr {
 #define IPV6_AF_ROUTER	      (1U << 15)
 #define IPV6_AF_ADVERTISED    (1U << 16)
 #ifdef IPV6_MANAGETEMPADDR
-#define IPV6_AF_TEMPORARY (1U << 17)
+#define IPV6_AF_TEMPORARY     (1U << 17)
+#define IPV6_AF_TEMPFAILED    (1U << 18)
 #endif
 
 struct ll_callback {
@@ -241,10 +245,6 @@ TAILQ_HEAD(ll_callback_head, ll_callback);
 struct ipv6_state {
 	struct ipv6_addrhead addrs;
 	struct ll_callback_head ll_callbacks;
-
-#ifdef IPV6_MANAGETEMPADDR
-	uint32_t desync_factor;
-#endif
 };
 
 #define IPV6_STATE(ifp) ((struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
