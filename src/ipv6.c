@@ -379,7 +379,7 @@ ipv6_makestableprivate(struct in6_addr *addr, const struct in6_addr *prefix,
 	return r;
 }
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 static int
 ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
     int prefix_len, const struct interface *ifp)
@@ -504,7 +504,7 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 		return -1;
 	}
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 	if (flags & IPV6_AF_TEMPORARY)
 		return ipv6_maketemporaryaddress(addr, prefix, prefix_len, ifp);
 #else
@@ -777,12 +777,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 
 	loglevel = ia->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG;
 	logmessage(loglevel, "%s: adding %saddress %s", ifp->name,
-#ifdef IPV6_AF_TEMPORARY
-	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
-#else
-	    "",
-#endif
-	    ia->saddr);
+	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "", ia->saddr);
 	if (ia->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ia->prefix_vltime == ND6_INFINITE_LIFETIME)
 		logdebugx("%s: pltime infinity, vltime infinity", ifp->name);

@@ -2525,31 +2525,36 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		if (strcmp(arg, "private") == 0 ||
 		    strcmp(arg, "stableprivate") == 0 ||
-		    strcmp(arg, "stable") == 0)
+		    strcmp(arg, "stable") == 0) {
 			ifo->options |= DHCPCD_SLAACPRIVATE;
-		else
+			arg = np;
+		} else {
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
 #ifdef INET6
-		if (strcmp(arg, "token") == 0) {
-			if (np == NULL) {
-				logerrx("slaac token: no token specified");
-				return -1;
+			if (strcmp(arg, "token") == 0) {
+				if (np == NULL) {
+					logerrx(
+					    "slaac token: no token specified");
+					return -1;
+				}
+				arg = np;
+				np = strwhite(np);
+				if (np != NULL) {
+					*np++ = '\0';
+					np = strskipwhite(np);
+				}
+				if (inet_pton(AF_INET6, arg, &ifo->token) !=
+				    1) {
+					logerrx("slaac token: invalid token");
+					return -1;
+				}
+				arg = np;
 			}
-			arg = np;
-			np = strwhite(np);
-			if (np != NULL) {
-				*np++ = '\0';
-				np = strskipwhite(np);
-			}
-			if (inet_pton(AF_INET6, arg, &ifo->token) != 1) {
-				logerrx("slaac token: invalid token");
-				return -1;
-			}
-			arg = np;
-			if (arg == NULL)
-				break;
-		}
 #endif
+		}
+
+		if (arg == NULL)
+			break;
 		if (strcmp(arg, "temp") == 0 || strcmp(arg, "temporary") == 0)
 			ifo->options |= DHCPCD_SLAACTEMP;
 		break;

@@ -231,10 +231,8 @@ struct ipv6_addr {
 #define IPV6_AF_REGEN	      (1U << 14)
 #define IPV6_AF_ROUTER	      (1U << 15)
 #define IPV6_AF_ADVERTISED    (1U << 16)
-#ifdef IPV6_MANAGETEMPADDR
-#define IPV6_AF_TEMPORARY  (1U << 17)
-#define IPV6_AF_TEMPFAILED (1U << 18)
-#endif
+#define IPV6_AF_TEMPORARY     (1U << 17)
+#define IPV6_AF_TEMPFAILED    (1U << 18)
 
 struct ll_callback {
 	TAILQ_ENTRY(ll_callback) next;

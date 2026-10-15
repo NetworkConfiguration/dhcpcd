@@ -1223,7 +1223,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	has_address = false;
 	rap->mtu = 0;
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
 #endif
 	TAILQ_FOREACH(ia, &rap->addrs, next) {
@@ -1730,9 +1730,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 		j = 0;
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
 			if (!(ia->flags & IPV6_AF_AUTOCONF) ||
-#ifdef IPV6_AF_TEMPORARY
 			    ia->flags & IPV6_AF_TEMPORARY ||
-#endif
 			    !(ia->flags & IPV6_AF_ADDED) ||
 			    ia->prefix_vltime == 0)
 				continue;
