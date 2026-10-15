@@ -123,6 +123,18 @@
 
 #ifdef IPV6_MANAGETEMPADDR
 static void ipv6_regentempaddr(void *);
+
+/* RFC 8981 Section 3.8:
+ * 2 + (TEMP_IDGEN_RETRIES * DupAddrDetectTransmits * RetransTimer / 1000) */
+static inline uint32_t
+ipv6_regen_advance(const struct interface *ifp)
+{
+	const struct rs_state *state = RS_CSTATE(ifp);
+
+	if (state != NULL && state->retrans != 0)
+		return 2 + (TEMP_IDGEN_RETRIES * 1 * state->retrans / 1000);
+	return REGEN_ADVANCE;
+}
 #endif
 
 int
@@ -216,7 +228,7 @@ ipv6_reserved(const struct in6_addr *addr)
 
 	id = be64dec(addr->s6_addr + sizeof(id));
 	if (id == 0) /* RFC4291 */
-		return 1;
+		return true;
 	for (i = 0; i < __arraycount(reslowhigh); i++) {
 		r = &reslowhigh[i];
 		low = be64dec(r->low);
@@ -367,7 +379,7 @@ ipv6_makestableprivate(struct in6_addr *addr, const struct in6_addr *prefix,
 	return r;
 }
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 static int
 ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
     int prefix_len, const struct interface *ifp)
@@ -377,12 +389,22 @@ ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
 
 	if (ipv6_mask(&mask, prefix_len) == -1)
 		return -1;
-	*addr = *prefix;
 
 again:
-	addr->s6_addr32[2] |= (arc4random() & ~mask.s6_addr32[2]);
-	addr->s6_addr32[3] |= (arc4random() & ~mask.s6_addr32[3]);
+	*addr = *prefix;
+	addr->s6_addr32[0] = (addr->s6_addr32[0] & mask.s6_addr32[0]) |
+	    (arc4random() & ~mask.s6_addr32[0]);
+	addr->s6_addr32[1] = (addr->s6_addr32[1] & mask.s6_addr32[1]) |
+	    (arc4random() & ~mask.s6_addr32[1]);
+	addr->s6_addr32[2] = (addr->s6_addr32[2] & mask.s6_addr32[2]) |
+	    (arc4random() & ~mask.s6_addr32[2]);
+	addr->s6_addr32[3] = (addr->s6_addr32[3] & mask.s6_addr32[3]) |
+	    (arc4random() & ~mask.s6_addr32[3]);
 
+	/* RFC 8981 Section 3.3.1 Step 3:
+	 * The resulting IID MUST be compared against the reserved IPv6 IIDs
+	 * and against those IIDs already employed in an address of the same
+	 * network interface and the same network prefix. */
 	TAILQ_FOREACH(ifpn, ifp->ctx->ifaces, next) {
 		if (ipv6_iffindaddr(ifpn, addr, 0) != NULL)
 			break;
@@ -482,7 +504,7 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 		return -1;
 	}
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 	if (flags & IPV6_AF_TEMPORARY)
 		return ipv6_maketemporaryaddress(addr, prefix, prefix_len, ifp);
 #else
@@ -755,12 +777,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 
 	loglevel = ia->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG;
 	logmessage(loglevel, "%s: adding %saddress %s", ifp->name,
-#ifdef IPV6_AF_TEMPORARY
-	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
-#else
-	    "",
-#endif
-	    ia->saddr);
+	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "", ia->saddr);
 	if (ia->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ia->prefix_vltime == ND6_INFINITE_LIFETIME)
 		logdebugx("%s: pltime infinity, vltime infinity", ifp->name);
@@ -768,7 +785,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 		logdebugx("%s: pltime infinity, vltime %" PRIu32 " seconds",
 		    ifp->name, ia->prefix_vltime);
 	else if (ia->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logdebugx("%s: pltime %" PRIu32 "seconds, vltime infinity",
+		logdebugx("%s: pltime %" PRIu32 " seconds, vltime infinity",
 		    ifp->name, ia->prefix_pltime);
 	else
 		logdebugx("%s: pltime %" PRIu32 " seconds, vltime %" PRIu32
@@ -784,12 +801,19 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 	}
 
 #ifdef IPV6_MANAGETEMPADDR
-	/* RFC4941 Section 3.4 */
+	/* RFC 8981 Section 3.5 */
 	if (ia->flags & IPV6_AF_TEMPORARY &&
-	    ia->prefix_pltime > REGEN_ADVANCE && ia->prefix_vltime &&
-	    ifp->options->options & DHCPCD_SLAACTEMP)
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ia->prefix_pltime - REGEN_ADVANCE, ipv6_regentempaddr, ia);
+	    ifp->options->options & DHCPCD_SLAACTEMP) {
+		uint32_t regen_advance = ipv6_regen_advance(ifp);
+
+		if (ia->prefix_pltime > regen_advance && ia->prefix_vltime)
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    ia->prefix_pltime - regen_advance,
+			    ipv6_regentempaddr, ia);
+		else
+			eloop_timeout_delete(ifp->ctx->eloop,
+			    ipv6_regentempaddr, ia);
+	}
 #endif
 
 	/* Restore real pltime and vltime */
@@ -1211,7 +1235,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx, int cmd, struct if_head *ifs,
 				ia->prefix_pltime = 0;
 				ia->prefix_vltime = ND6_INFINITE_LIFETIME;
 			}
-			/* This is a minor regression against RFC 4941
+			/* This is a minor regression against RFC 8981
 			 * because the kernel only knows when the
 			 * lifetimes were last updated, not when the
 			 * address was initially created.
@@ -1604,7 +1628,7 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 	else if (ia->flags & IPV6_AF_AUTOCONF) {
 		ia->prefix = *addr;
 		iaf = ipv6nd_iffindprefix(ifp, addr, prefix_len);
-		if (iaf != NULL)
+		if (iaf != NULL && !(ia->flags & IPV6_AF_TEMPORARY))
 			memcpy(&ia->addr, &iaf->addr, sizeof(ia->addr));
 		else {
 			ia->dadcounter = ipv6_makeaddr(&ia->addr, ifp,
@@ -1894,29 +1918,7 @@ ipv6_handleifa_addrs(int cmd, struct ipv6_addrhead *addrs,
 }
 
 #ifdef IPV6_MANAGETEMPADDR
-static void
-ipv6_regen_desync(struct interface *ifp, bool force)
-{
-	struct ipv6_state *state;
-	unsigned int max;
-
-	state = IPV6_STATE(ifp);
-
-	/* RFC4941 Section 5 states that DESYNC_FACTOR must never be
-	 * greater than TEMP_VALID_LIFETIME - REGEN_ADVANCE.
-	 * I believe this is an error and it should be never be greater than
-	 * TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE. */
-	max = TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE;
-	if (state->desync_factor && !force && state->desync_factor < max)
-		return;
-	if (state->desync_factor == 0)
-		state->desync_factor = arc4random_uniform(
-		    MIN(MAX_DESYNC_FACTOR, max));
-	max = TEMP_PREFERRED_LIFETIME - state->desync_factor - REGEN_ADVANCE;
-	eloop_timeout_add_sec(ifp->ctx->eloop, max, ipv6_regentempaddrs, ifp);
-}
-
-/* RFC4941 Section 3.3.7 */
+/* RFC 8981 Section 3.4 Step 7 */
 static void
 ipv6_tempdadcallback(void *arg)
 {
@@ -1926,9 +1928,16 @@ ipv6_tempdadcallback(void *arg)
 		struct ipv6_addr *ia1;
 		struct timespec tv;
 
-		if (++ia->dadcounter == TEMP_IDGEN_RETRIES) {
+		if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
+			struct ipv6_addr *iapfx;
+
 			logerrx("%s: too many duplicate temporary addresses",
 			    ia->iface->name);
+			iapfx = ipv6nd_iffindprefix(ia->iface, &ia->prefix,
+			    ia->prefix_len);
+			if (iapfx != NULL)
+				iapfx->flags |= IPV6_AF_TEMPFAILED;
+			ipv6_deleteaddr(ia);
 			return;
 		}
 		clock_gettime(CLOCK_MONOTONIC, &tv);
@@ -1948,6 +1957,7 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	struct ipv6_state *state;
 	struct interface *ifp = ia0->iface;
 	struct ipv6_addr *ia;
+	uint32_t regen_advance, max_desync;
 
 	ia = ipv6_newaddr(ifp, &ia0->prefix, ia0->prefix_len,
 	    IPV6_AF_AUTOCONF | IPV6_AF_TEMPORARY);
@@ -1957,21 +1967,32 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	ia->dadcallback = ipv6_tempdadcallback;
 	ia->created = ia->acquired = now ? *now : ia0->acquired;
 
-	/* Ensure desync is still valid */
-	ipv6_regen_desync(ifp, false);
+	/* RFC 8981 Section 3.4 Step 4 and Section 3.8:
+	 * DESYNC_FACTOR is computed each time a temporary address is
+	 * generated, and is associated with the corresponding address.
+	 * It MUST be smaller than (TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE). */
+	regen_advance = ipv6_regen_advance(ifp);
+	max_desync = TEMP_PREFERRED_LIFETIME - regen_advance - 1;
+	if (max_desync > MAX_DESYNC_FACTOR)
+		max_desync = MAX_DESYNC_FACTOR;
+	ia->desync_factor = arc4random_uniform(max_desync + 1);
 
-	/* RFC4941 Section 3.3.4 */
-	state = IPV6_STATE(ia->iface);
+	/* RFC 8981 Section 3.4 Step 4 */
 	ia->prefix_pltime = MIN(ia0->prefix_pltime,
-	    TEMP_PREFERRED_LIFETIME - state->desync_factor);
+	    TEMP_PREFERRED_LIFETIME - ia->desync_factor);
 	ia->prefix_vltime = MIN(ia0->prefix_vltime, TEMP_VALID_LIFETIME);
-	if (ia->prefix_pltime <= REGEN_ADVANCE ||
+
+	/* RFC 8981 Section 3.4 Step 5:
+	 * A temporary address is created only if this calculated preferred
+	 * lifetime is greater than REGEN_ADVANCE time units. */
+	if (ia->prefix_pltime <= regen_advance ||
 	    ia->prefix_pltime > ia0->prefix_vltime) {
 		errno = EINVAL;
 		free(ia);
 		return NULL;
 	}
 
+	state = IPV6_STATE(ia->iface);
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
 }
@@ -1981,8 +2002,10 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr *ap, *first;
+	uint32_t regen_advance;
 
 	state = IPV6_STATE(ia->iface);
+	regen_advance = ipv6_regen_advance(ia->iface);
 	first = NULL;
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY && ap->prefix_pltime &&
@@ -1994,7 +2017,7 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 				elapsed = eloop_timespec_diff(&ia->acquired,
 				    &ap->acquired, NULL);
 				if (ap->prefix_pltime <= elapsed ||
-				    ap->prefix_pltime - elapsed < REGEN_ADVANCE)
+				    ap->prefix_pltime - elapsed < regen_advance)
 					continue;
 
 				return ap;
@@ -2007,20 +2030,17 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			elapsed = eloop_timespec_diff(&ia->acquired,
 			    &ap->created, NULL);
 
-			/* RFC4941 Section 3.4
+			/* RFC 8981 Section 3.5
 			 * Deprecated prefix, deprecate the temporary address */
 			if (ia->prefix_pltime == 0) {
 				ap->prefix_pltime = 0;
 				goto valid;
 			}
 
-			/* Ensure desync is still valid */
-			ipv6_regen_desync(ap->iface, false);
-
-			/* RFC4941 Section 3.3.2
+			/* RFC 8981 Section 3.4 Steps 1 & 2
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
-			limit = TEMP_PREFERRED_LIFETIME - state->desync_factor;
+			limit = TEMP_PREFERRED_LIFETIME - ap->desync_factor;
 			if (elapsed >= limit)
 				ap->prefix_pltime = 0;
 			else {
@@ -2106,8 +2126,6 @@ ipv6_regentempaddrs(void *arg)
 	state = IPV6_STATE(ifp);
 	if (state == NULL)
 		return;
-
-	ipv6_regen_desync(ifp, true);
 
 	clock_gettime(CLOCK_MONOTONIC, &tv);
 

@@ -860,7 +860,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	 * would normally as we maybe on a new network. */
 	ipv6nd_startexpire(ifp);
 #ifdef IPV6_MANAGETEMPADDR
-	/* RFC4941 Section 3.5 */
+	/* RFC 8981 Section 3.6 */
 	ipv6_regentempaddrs(ifp);
 #endif
 #endif
