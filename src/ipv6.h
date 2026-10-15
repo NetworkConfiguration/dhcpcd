@@ -62,8 +62,9 @@
 #define TEMP_VALID_LIFETIME	172800 /* 2 days */
 #define TEMP_PREFERRED_LIFETIME 86400  /* 1 day */
 #define REGEN_ADVANCE		5      /* seconds */
-#define MAX_DESYNC_FACTOR	(TEMP_PREFERRED_LIFETIME * 4 / 10) /* 0.4 * TEMP_PREFERRED_LIFETIME */
-#define TEMP_IDGEN_RETRIES	3
+#define MAX_DESYNC_FACTOR \
+	(TEMP_PREFERRED_LIFETIME * 4 / 10) /* 0.4 * TEMP_PREFERRED_LIFETIME */
+#define TEMP_IDGEN_RETRIES 3
 
 /* RFC7217 constants */
 #define IDGEN_RETRIES 3
@@ -231,8 +232,8 @@ struct ipv6_addr {
 #define IPV6_AF_ROUTER	      (1U << 15)
 #define IPV6_AF_ADVERTISED    (1U << 16)
 #ifdef IPV6_MANAGETEMPADDR
-#define IPV6_AF_TEMPORARY     (1U << 17)
-#define IPV6_AF_TEMPFAILED    (1U << 18)
+#define IPV6_AF_TEMPORARY  (1U << 17)
+#define IPV6_AF_TEMPFAILED (1U << 18)
 #endif
 
 struct ll_callback {

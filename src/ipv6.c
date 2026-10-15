@@ -790,7 +790,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 		logdebugx("%s: pltime infinity, vltime %" PRIu32 " seconds",
 		    ifp->name, ia->prefix_vltime);
 	else if (ia->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logdebugx("%s: pltime %" PRIu32 "seconds, vltime infinity",
+		logdebugx("%s: pltime %" PRIu32 " seconds, vltime infinity",
 		    ifp->name, ia->prefix_pltime);
 	else
 		logdebugx("%s: pltime %" PRIu32 " seconds, vltime %" PRIu32
