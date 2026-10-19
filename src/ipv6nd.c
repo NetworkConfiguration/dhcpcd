@@ -58,6 +58,7 @@
 #include "ipv6nd.h"
 #include "logerr.h"
 #include "privsep.h"
+#include "queue.h"
 #include "route.h"
 #include "script.h"
 
@@ -916,6 +917,24 @@ try_script:
 				    rap->iface->name);
 				ipv6nd_scriptrun(rap);
 			}
+		}
+	}
+}
+
+/* Sets the flags for the prefix found on each RA for the interface */
+void
+ipv6nd_prefix_setflags(struct ipv6_addr *ia, unsigned int flags)
+{
+	struct ra *rap;
+	struct ipv6_addr *pfx;
+
+	TAILQ_FOREACH(rap, ia->iface->ctx->ra_routers, next) {
+		if (rap->iface != ia->iface)
+			continue;
+		TAILQ_FOREACH(pfx, &rap->addrs, next) {
+			if (ia->prefix_len == pfx->prefix_len &&
+			    IN6_ARE_ADDR_EQUAL(&ia->prefix, &pfx->prefix))
+				pfx->flags &= flags;
 		}
 	}
 }

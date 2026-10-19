@@ -1922,33 +1922,28 @@ ipv6_handleifa_addrs(int cmd, struct ipv6_addrhead *addrs,
 static void
 ipv6_tempdadcallback(void *arg)
 {
-	struct ipv6_addr *ia = arg;
+	struct ipv6_addr *ia = arg, *ta;
+	struct timespec tv;
 
-	if (ia->addr_flags & IN6_IFF_DUPLICATED) {
-		struct ipv6_addr *ia1;
-		struct timespec tv;
+	if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
+		return;
 
-		if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
-			struct ipv6_addr *iapfx;
-
-			logerrx("%s: too many duplicate temporary addresses",
-			    ia->iface->name);
-			iapfx = ipv6nd_iffindprefix(ia->iface, &ia->prefix,
-			    ia->prefix_len);
-			if (iapfx != NULL)
-				iapfx->flags |= IPV6_AF_TEMPFAILED;
-			ipv6_deleteaddr(ia);
-			return;
-		}
-		clock_gettime(CLOCK_MONOTONIC, &tv);
-		if ((ia1 = ipv6_createtempaddr(ia, &tv)) == NULL)
-			logerr(__func__);
-		else
-			ia1->dadcounter = ia->dadcounter;
+	if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
+		logerrx("%s: %s: too many duplicate temporary addresses",
+		    ia->iface->name, ia->saddr);
+		ipv6nd_prefix_setflags(ia, IPV6_AF_TEMPFAILED);
 		ipv6_deleteaddr(ia);
-		if (ia1)
-			ipv6_addaddr(ia1, &ia1->acquired);
+		return;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC, &tv);
+	if ((ta = ipv6_createtempaddr(ia, &tv)) == NULL)
+		logerr(__func__);
+	else
+		ta->dadcounter = ia->dadcounter;
+	ipv6_deleteaddr(ia);
+	if (ta != NULL)
+		ipv6_addaddr(ta, &ta->acquired);
 }
 
 struct ipv6_addr *
