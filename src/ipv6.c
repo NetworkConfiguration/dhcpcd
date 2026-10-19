@@ -806,7 +806,8 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 	    ifp->options->options & DHCPCD_SLAACTEMP) {
 		uint32_t regen_advance = ipv6_regen_advance(ifp);
 
-		if (ia->prefix_pltime > regen_advance && ia->prefix_vltime)
+		if (!(ia->flags & IPV6_AF_TEMPFAILED) &&
+		    ia->prefix_pltime > regen_advance && ia->prefix_vltime)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    ia->prefix_pltime - regen_advance,
 			    ipv6_regentempaddr, ia);
@@ -1933,6 +1934,7 @@ ipv6_tempdadcallback(void *arg)
 	 * Don't delete it here as it will still be used after the callback.
 	 * Duplicate addresses in other IPv6 protocols are not deleted.
 	 */
+	eloop_timeout_delete(ia->iface->ctx->eloop, ipv6_regentempaddr, ia);
 
 	if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
 		logerrx("%s: %s: too many duplicate temporary addresses",
@@ -2131,7 +2133,8 @@ ipv6_regentempaddrs(void *arg)
 	/* Mark addresses for regen so we don't infinite loop. */
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (ia->flags & IPV6_AF_TEMPORARY &&
-		    ia->flags & IPV6_AF_ADDED && !(ia->flags & IPV6_AF_STALE))
+		    ia->flags & IPV6_AF_ADDED &&
+		    !(ia->flags & (IPV6_AF_STALE | IPV6_AF_TEMPFAILED)))
 			ia->flags |= IPV6_AF_REGEN;
 		else
 			ia->flags &= ~IPV6_AF_REGEN;
