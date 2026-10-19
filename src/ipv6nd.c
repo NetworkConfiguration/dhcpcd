@@ -934,7 +934,7 @@ ipv6nd_prefix_setflags(struct ipv6_addr *ia, unsigned int flags)
 		TAILQ_FOREACH(pfx, &rap->addrs, next) {
 			if (ia->prefix_len == pfx->prefix_len &&
 			    IN6_ARE_ADDR_EQUAL(&ia->prefix, &pfx->prefix))
-				pfx->flags &= flags;
+				pfx->flags |= flags;
 		}
 	}
 }

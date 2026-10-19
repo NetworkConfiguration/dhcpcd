@@ -1928,11 +1928,16 @@ ipv6_tempdadcallback(void *arg)
 	if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
 		return;
 
+	/*
+	 * The address is duplicated.
+	 * Don't delete it here as it will still be used after the callback.
+	 * Duplicate addresses in other IPv6 protocols are not deleted.
+	 */
+
 	if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
 		logerrx("%s: %s: too many duplicate temporary addresses",
 		    ia->iface->name, ia->saddr);
 		ipv6nd_prefix_setflags(ia, IPV6_AF_TEMPFAILED);
-		ipv6_deleteaddr(ia);
 		return;
 	}
 
@@ -1941,7 +1946,6 @@ ipv6_tempdadcallback(void *arg)
 		logerr(__func__);
 	else
 		ta->dadcounter = ia->dadcounter;
-	ipv6_deleteaddr(ia);
 	if (ta != NULL)
 		ipv6_addaddr(ta, &ta->acquired);
 }
