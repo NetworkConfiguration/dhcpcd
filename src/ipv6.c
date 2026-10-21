@@ -401,6 +401,17 @@ ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
 	struct in6_addr mask;
 	struct interface *ifpn;
 
+	/*
+	 * For a /120 prefix whose first seven IID bytes are
+	 * 02:00:5e:ff:fe:00:00, every possible last byte falls within the
+	 * reserved range in ipv6_reserved.
+	 * So just reject 120 or greater - realistically this will just be 64.
+	 */
+	if (prefix_len >= 120) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (ipv6_mask(&mask, prefix_len) == -1)
 		return -1;
 
@@ -1262,15 +1273,18 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx, int cmd, struct if_head *ifs,
 			 * restart. */
 			ia->acquired = ia->created;
 			ia->addr_flags = addrflags;
+#ifdef IPV6_MANAGETEMPADDR
+			/* Only set desync factor for new addresses */
+			if (ia->addr_flags & IN6_IFF_TEMPORARY)
+				ipv6_set_desync_factor(ia);
+#endif
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
 		ia->dstaddr = dstaddr ? *dstaddr : in6addr_any;
 		ia->flags &= ~IPV6_AF_STALE;
 #ifdef IPV6_MANAGETEMPADDR
-		if (ia->addr_flags & IN6_IFF_TEMPORARY) {
+		if (ia->addr_flags & IN6_IFF_TEMPORARY)
 			ia->flags |= IPV6_AF_TEMPORARY;
-			ipv6_set_desync_factor(ia);
-		}
 #endif
 
 #ifdef IPV6_POLLADDRFLAG
