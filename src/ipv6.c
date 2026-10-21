@@ -132,7 +132,8 @@ ipv6_regen_advance(const struct interface *ifp)
 	const struct rs_state *state = RS_CSTATE(ifp);
 
 	if (state != NULL && state->retrans != 0)
-		return 2 + (TEMP_IDGEN_RETRIES * 1 * state->retrans / 1000);
+		return 2 + (TEMP_IDGEN_RETRIES * DUP_ADDR_DETECT_TRANSMITS *
+		    state->retrans / 1000);
 	return REGEN_ADVANCE;
 }
 #endif
@@ -1974,7 +1975,8 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	 * It MUST be smaller than (TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE). */
 	regen_advance = ipv6_regen_advance(ifp);
 	max_desync = TEMP_PREFERRED_LIFETIME - regen_advance - 1;
-	if (max_desync > MAX_DESYNC_FACTOR)
+	if (regen_advance >= TEMP_PREFERRED_LIFETIME - 1 ||
+	    max_desync > MAX_DESYNC_FACTOR)
 		max_desync = MAX_DESYNC_FACTOR;
 	ia->desync_factor = arc4random_uniform(max_desync + 1);
 

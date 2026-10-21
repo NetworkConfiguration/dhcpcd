@@ -70,6 +70,9 @@
 #define IDGEN_RETRIES 3
 #define IDGEN_DELAY   1 /* second */
 
+/* RFC 4862 */
+#define DUP_ADDR_DETECT_TRANSMITS 1
+
 /* Interface identifier length. Prefix + this == 128 for autoconf */
 #define ipv6_ifidlen(ifp) 64
 #define IA6_CANAUTOCONF(ia) \
