@@ -132,8 +132,9 @@ ipv6_regen_advance(const struct interface *ifp)
 	const struct rs_state *state = RS_CSTATE(ifp);
 
 	if (state != NULL && state->retrans != 0)
-		return 2 + (TEMP_IDGEN_RETRIES * DUP_ADDR_DETECT_TRANSMITS *
-		    state->retrans / 1000);
+		return 2 +
+		    ((uint64_t)TEMP_IDGEN_RETRIES * DUP_ADDR_DETECT_TRANSMITS *
+			state->retrans / 1000);
 	return REGEN_ADVANCE;
 }
 #endif

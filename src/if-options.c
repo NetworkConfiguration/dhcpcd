@@ -2531,7 +2531,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		} else {
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
 #ifdef INET6
-			if (strcmp(arg, "token") == 0) {
+			if (strcmp(arg, "hwaddr") == 0) {
+				arg = np;
+			} else if (strcmp(arg, "token") == 0) {
 				if (np == NULL) {
 					logerrx(
 					    "slaac token: no token specified");
