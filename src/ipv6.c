@@ -126,7 +126,7 @@ static void ipv6_regentempaddr(void *);
 
 /* RFC 8981 Section 3.8:
  * 2 + (TEMP_IDGEN_RETRIES * DupAddrDetectTransmits * RetransTimer / 1000) */
-static inline uint32_t
+static uint32_t
 ipv6_regen_advance(const struct interface *ifp)
 {
 	const struct rs_state *state = RS_CSTATE(ifp);
@@ -136,6 +136,18 @@ ipv6_regen_advance(const struct interface *ifp)
 		    ((uint64_t)TEMP_IDGEN_RETRIES * DUP_ADDR_DETECT_TRANSMITS *
 			state->retrans / 1000);
 	return REGEN_ADVANCE;
+}
+
+static void
+ipv6_set_desync_factor(struct ipv6_addr *ia)
+{
+	uint32_t regen_advance = ipv6_regen_advance(ia->iface);
+	uint32_t max_desync = TEMP_PREFERRED_LIFETIME - regen_advance - 1;
+
+	if (regen_advance >= TEMP_PREFERRED_LIFETIME - 1 ||
+	    max_desync > MAX_DESYNC_FACTOR)
+		max_desync = MAX_DESYNC_FACTOR;
+	ia->desync_factor = arc4random_uniform(max_desync + 1);
 }
 #endif
 
@@ -1255,8 +1267,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx, int cmd, struct if_head *ifs,
 		ia->dstaddr = dstaddr ? *dstaddr : in6addr_any;
 		ia->flags &= ~IPV6_AF_STALE;
 #ifdef IPV6_MANAGETEMPADDR
-		if (ia->addr_flags & IN6_IFF_TEMPORARY)
+		if (ia->addr_flags & IN6_IFF_TEMPORARY) {
 			ia->flags |= IPV6_AF_TEMPORARY;
+			ipv6_set_desync_factor(ia);
+		}
 #endif
 
 #ifdef IPV6_POLLADDRFLAG
@@ -1960,7 +1974,7 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	struct ipv6_state *state;
 	struct interface *ifp = ia0->iface;
 	struct ipv6_addr *ia;
-	uint32_t regen_advance, max_desync;
+	uint32_t regen_advance;
 
 	ia = ipv6_newaddr(ifp, &ia0->prefix, ia0->prefix_len,
 	    IPV6_AF_AUTOCONF | IPV6_AF_TEMPORARY);
@@ -1970,16 +1984,8 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	ia->dadcallback = ipv6_tempdadcallback;
 	ia->created = ia->acquired = now ? *now : ia0->acquired;
 
-	/* RFC 8981 Section 3.4 Step 4 and Section 3.8:
-	 * DESYNC_FACTOR is computed each time a temporary address is
-	 * generated, and is associated with the corresponding address.
-	 * It MUST be smaller than (TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE). */
 	regen_advance = ipv6_regen_advance(ifp);
-	max_desync = TEMP_PREFERRED_LIFETIME - regen_advance - 1;
-	if (regen_advance >= TEMP_PREFERRED_LIFETIME - 1 ||
-	    max_desync > MAX_DESYNC_FACTOR)
-		max_desync = MAX_DESYNC_FACTOR;
-	ia->desync_factor = arc4random_uniform(max_desync + 1);
+	ipv6_set_desync_factor(ia);
 
 	/* RFC 8981 Section 3.4 Step 4 */
 	ia->prefix_pltime = MIN(ia0->prefix_pltime,
