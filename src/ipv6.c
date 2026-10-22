@@ -400,6 +400,7 @@ ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
 {
 	struct in6_addr mask;
 	struct interface *ifpn;
+	unsigned int attempts = 0;
 
 	/*
 	 * For a /120 prefix whose first seven IID bytes are
@@ -416,6 +417,10 @@ ipv6_maketemporaryaddress(struct in6_addr *addr, const struct in6_addr *prefix,
 		return -1;
 
 again:
+	if (++attempts > TEMP_IDGEN_RETRIES) {
+		errno = EADDRNOTAVAIL;
+		return -1;
+	}
 	*addr = *prefix;
 	addr->s6_addr32[0] = (addr->s6_addr32[0] & mask.s6_addr32[0]) |
 	    (arc4random() & ~mask.s6_addr32[0]);
