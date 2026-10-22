@@ -1976,6 +1976,7 @@ ipv6_tempdadcallback(void *arg)
 	if (++ia->dadcounter >= TEMP_IDGEN_RETRIES) {
 		logerrx("%s: %s: too many duplicate temporary addresses",
 		    ia->iface->name, ia->saddr);
+		ia->flags |= IPV6_AF_TEMPFAILED;
 		ipv6nd_prefix_setflags(ia, IPV6_AF_TEMPFAILED);
 		return;
 	}
@@ -2166,7 +2167,8 @@ ipv6_regentempaddrs(void *arg)
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (ia->flags & IPV6_AF_TEMPORARY &&
 		    ia->flags & IPV6_AF_ADDED &&
-		    !(ia->flags & (IPV6_AF_STALE | IPV6_AF_TEMPFAILED)))
+		    !(ia->flags & (IPV6_AF_STALE | IPV6_AF_TEMPFAILED)) &&
+		    !(ia->addr_flags & IN6_IFF_DUPLICATED))
 			ia->flags |= IPV6_AF_REGEN;
 		else
 			ia->flags &= ~IPV6_AF_REGEN;
