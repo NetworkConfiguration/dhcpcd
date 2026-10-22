@@ -921,6 +921,27 @@ try_script:
 	}
 }
 
+static struct ipv6_addr *
+ipv6nd_prefix_findflags(struct interface *ifp, struct in6_addr *prefix,
+    uint8_t prefix_len, unsigned int flags)
+{
+	struct ra *rap;
+	struct ipv6_addr *pfx;
+
+	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+		if (rap->iface != ifp)
+			continue;
+		TAILQ_FOREACH(pfx, &rap->addrs, next) {
+			if (prefix_len == pfx->prefix_len &&
+			    IN6_ARE_ADDR_EQUAL(prefix, &pfx->prefix) &&
+			    pfx->flags & flags)
+				return pfx;
+		}
+	}
+
+	return NULL;
+}
+
 /* Sets the flags for the prefix found on each RA for the interface */
 void
 ipv6nd_prefix_setflags(struct ipv6_addr *ia, unsigned int flags)
@@ -1312,6 +1333,20 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			ia = ipv6nd_rapfindprefix(rap, &pi_prefix,
 			    pi.nd_opt_pi_prefix_len);
 			if (ia == NULL) {
+				/* RFC 8981 Section 3.4 says that after
+				 * TEMP_IDGEN_RETRIES DAD failures, the host
+				 * SHOULD NOT generate a temporary address for
+				 * that prefix during the host's attachment to
+				 * the interface.
+				 *
+				 * Try and find the same prefix from another
+				 * router that has failed.
+				 */
+				if (ipv6nd_prefix_findflags(ifp, &pi_prefix,
+					pi.nd_opt_pi_prefix_len,
+					IPV6_AF_TEMPFAILED) != NULL)
+					flags |= IPV6_AF_TEMPFAILED;
+
 				ia = ipv6_newaddr(rap->iface, &pi_prefix,
 				    pi.nd_opt_pi_prefix_len, flags);
 				if (ia == NULL)
