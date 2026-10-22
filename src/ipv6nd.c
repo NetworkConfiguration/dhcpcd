@@ -929,7 +929,9 @@ ipv6nd_prefix_findflags(struct interface *ifp, struct in6_addr *prefix,
 	struct ipv6_addr *pfx;
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface != ifp)
+		/* willexpire will be set when the link comes up and we want to
+		 * exclude them */
+		if (rap->iface != ifp || rap->willexpire)
 			continue;
 		TAILQ_FOREACH(pfx, &rap->addrs, next) {
 			if (prefix_len == pfx->prefix_len &&
