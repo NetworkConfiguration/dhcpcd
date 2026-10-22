@@ -144,8 +144,9 @@ ipv6_set_desync_factor(struct ipv6_addr *ia)
 	uint32_t regen_advance = ipv6_regen_advance(ia->iface);
 	uint32_t max_desync = TEMP_PREFERRED_LIFETIME - regen_advance - 1;
 
-	if (regen_advance >= TEMP_PREFERRED_LIFETIME - 1 ||
-	    max_desync > MAX_DESYNC_FACTOR)
+	if (regen_advance >= TEMP_PREFERRED_LIFETIME - 1)
+		max_desync = 0;
+	else if (max_desync > MAX_DESYNC_FACTOR)
 		max_desync = MAX_DESYNC_FACTOR;
 	ia->desync_factor = arc4random_uniform(max_desync + 1);
 }

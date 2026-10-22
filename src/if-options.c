@@ -2518,6 +2518,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case O_SLAAC:
 		ARG_REQUIRED;
+		ifo->options &= ~DHCPCD_SLAACTEMP;
 		np = strwhite(arg);
 		if (np != NULL) {
 			*np++ = '\0';
