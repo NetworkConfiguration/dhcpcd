@@ -1886,6 +1886,9 @@ ip6_dadcount(__unused struct interface *ifp)
 {
 #ifdef IPV6CTL_DAD_COUNT
 	return get_inet6_sysctl(IPV6CTL_DAD_COUNT);
+#else
+	errno = ENOSYS;
+	return -1;
 #endif
 }
 
