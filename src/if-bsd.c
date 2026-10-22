@@ -1733,7 +1733,8 @@ if_machinearch(char *str, size_t len)
 }
 
 #ifdef INET6
-#if (defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV))
+#if ((defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)) || \
+    defined(IPV6CTL_DAD_COUNT))
 #define get_inet6_sysctl(code)	    inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
 static int
@@ -1877,6 +1878,14 @@ if_disable_rtadv(void)
 			if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1)
 				logerr("IPV6CTL_ACCEPT_RTADV");
 	}
+#endif
+}
+
+int
+ip6_dadcount(__unused struct interface *ifp)
+{
+#ifdef IPV6CTL_DAD_COUNT
+	return get_inet6_sysctl(IPV6CTL_DAD_COUNT);
 #endif
 }
 

@@ -127,14 +127,18 @@ static void ipv6_regentempaddr(void *);
 /* RFC 8981 Section 3.8:
  * 2 + (TEMP_IDGEN_RETRIES * DupAddrDetectTransmits * RetransTimer / 1000) */
 static uint32_t
-ipv6_regen_advance(const struct interface *ifp)
+ipv6_regen_advance(struct interface *ifp)
 {
 	const struct rs_state *state = RS_CSTATE(ifp);
+	int dad_count = ip6_dadcount(ifp);
+
+	if (dad_count == -1)
+		dad_count = DUP_ADDR_DETECT_TRANSMITS;
 
 	if (state != NULL && state->retrans != 0)
-		return 2 +
-		    ((uint64_t)TEMP_IDGEN_RETRIES * DUP_ADDR_DETECT_TRANSMITS *
-			state->retrans / 1000);
+		return (uint32_t)(2 +
+		    ((uint64_t)TEMP_IDGEN_RETRIES * (unsigned int)dad_count *
+			state->retrans / 1000));
 	return REGEN_ADVANCE;
 }
 

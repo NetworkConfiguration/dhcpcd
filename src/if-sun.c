@@ -1716,4 +1716,11 @@ void
 if_setup_inet6(__unused const struct interface *ifp)
 {
 }
+
+int
+ip6_dadcount(__unused struct inteface *ifp)
+{
+	errno = ENOSYS;
+	return -1;
+}
 #endif
