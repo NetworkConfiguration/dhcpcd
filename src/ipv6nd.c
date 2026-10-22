@@ -58,6 +58,7 @@
 #include "ipv6nd.h"
 #include "logerr.h"
 #include "privsep.h"
+#include "queue.h"
 #include "route.h"
 #include "script.h"
 
@@ -921,6 +922,47 @@ try_script:
 }
 
 static struct ipv6_addr *
+ipv6nd_prefix_findflags(struct interface *ifp, struct in6_addr *prefix,
+    uint8_t prefix_len, unsigned int flags)
+{
+	struct ra *rap;
+	struct ipv6_addr *pfx;
+
+	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+		/* willexpire will be set when the link comes up and we want to
+		 * exclude them */
+		if (rap->iface != ifp || rap->willexpire)
+			continue;
+		TAILQ_FOREACH(pfx, &rap->addrs, next) {
+			if (prefix_len == pfx->prefix_len &&
+			    IN6_ARE_ADDR_EQUAL(prefix, &pfx->prefix) &&
+			    pfx->flags & flags)
+				return pfx;
+		}
+	}
+
+	return NULL;
+}
+
+/* Sets the flags for the prefix found on each RA for the interface */
+void
+ipv6nd_prefix_setflags(struct ipv6_addr *ia, unsigned int flags)
+{
+	struct ra *rap;
+	struct ipv6_addr *pfx;
+
+	TAILQ_FOREACH(rap, ia->iface->ctx->ra_routers, next) {
+		if (rap->iface != ia->iface)
+			continue;
+		TAILQ_FOREACH(pfx, &rap->addrs, next) {
+			if (ia->prefix_len == pfx->prefix_len &&
+			    IN6_ARE_ADDR_EQUAL(&ia->prefix, &pfx->prefix))
+				pfx->flags |= flags;
+		}
+	}
+}
+
+static struct ipv6_addr *
 ipv6nd_findmarkstale(struct ra *rap, struct ipv6_addr *ia, bool mark)
 {
 	struct dhcpcd_ctx *ctx = ia->iface->ctx;
@@ -1223,7 +1265,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 	has_address = false;
 	rap->mtu = 0;
 
-#ifdef IPV6_AF_TEMPORARY
+#ifdef IPV6_MANAGETEMPADDR
 	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
 #endif
 	TAILQ_FOREACH(ia, &rap->addrs, next) {
@@ -1293,6 +1335,20 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			ia = ipv6nd_rapfindprefix(rap, &pi_prefix,
 			    pi.nd_opt_pi_prefix_len);
 			if (ia == NULL) {
+				/* RFC 8981 Section 3.4 says that after
+				 * TEMP_IDGEN_RETRIES DAD failures, the host
+				 * SHOULD NOT generate a temporary address for
+				 * that prefix during the host's attachment to
+				 * the interface.
+				 *
+				 * Try and find the same prefix from another
+				 * router that has failed.
+				 */
+				if (ipv6nd_prefix_findflags(ifp, &pi_prefix,
+					pi.nd_opt_pi_prefix_len,
+					IPV6_AF_TEMPFAILED) != NULL)
+					flags |= IPV6_AF_TEMPFAILED;
+
 				ia = ipv6_newaddr(rap->iface, &pi_prefix,
 				    pi.nd_opt_pi_prefix_len, flags);
 				if (ia == NULL)
@@ -1379,8 +1435,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 				has_address = true;
 
 #ifdef IPV6_MANAGETEMPADDR
-			/* RFC4941 Section 3.3.3 */
+			/* RFC 8981 Section 3.4 */
 			if (ia->flags & IPV6_AF_AUTOCONF &&
+			    !(ia->flags & IPV6_AF_TEMPFAILED) &&
 			    ia->iface->options->options & DHCPCD_SLAACTEMP &&
 			    IA6_CANAUTOCONF(ia)) {
 				if (!new_ia) {
@@ -1729,9 +1786,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 		j = 0;
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
 			if (!(ia->flags & IPV6_AF_AUTOCONF) ||
-#ifdef IPV6_AF_TEMPORARY
 			    ia->flags & IPV6_AF_TEMPORARY ||
-#endif
 			    !(ia->flags & IPV6_AF_ADDED) ||
 			    ia->prefix_vltime == 0)
 				continue;

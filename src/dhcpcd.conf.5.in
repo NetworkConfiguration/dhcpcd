@@ -733,7 +733,7 @@ The default is 180 seconds.
 .It Ic ssid Ar ssid
 Subsequent options are only parsed for this wireless
 .Ar ssid .
-.It Ic slaac Ic hwaddr | Ic private | Ic token Ar token Op Ic temp | Ic temporary
+.It Xo Ic slaac Ic hwaddr | Ic private | Ic token Ar token Xc Oo Ic temp | Ic temporary Oc
 Selects the interface identifier used for SLAAC generated IPv6 addresses.
 If
 .Ic private
@@ -743,7 +743,7 @@ If
 is used then the token is combined with the prefix to make the final address.
 The
 .Ic temporary
-directive will create a temporary address for the prefix as well.
+directive will create a RFC 8981 temporary address for the prefix.
 .It Ic static Ar value
 Configures a static
 .Ar value .
