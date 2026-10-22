@@ -1961,7 +1961,8 @@ ipv6_tempdadcallback(void *arg)
 	struct ipv6_addr *ia = arg, *ta;
 	struct timespec tv;
 
-	if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
+	if (!(ia->addr_flags & IN6_IFF_DUPLICATED) ||
+	    ia->flags & IPV6_AF_TEMPFAILED)
 		return;
 
 	/*
@@ -2117,7 +2118,8 @@ ipv6_addtempaddrs(struct interface *ifp, struct timespec *now)
 	state = IPV6_STATE(ifp);
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (ia->flags & IPV6_AF_TEMPORARY &&
-		    !(ia->flags & IPV6_AF_STALE))
+		    !(ia->flags & IPV6_AF_STALE) &&
+		    !(ia->addr_flags & IN6_IFF_DUPLICATED))
 			ipv6_addaddr(ia, now);
 	}
 }
