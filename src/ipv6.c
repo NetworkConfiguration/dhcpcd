@@ -2040,6 +2040,7 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 	first = NULL;
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY && ap->prefix_pltime &&
+		    !(ap->addr_flags & IN6_IFF_DUPLICATED) &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix)) {
 			unsigned long long elapsed;
 			uint32_t limit, rmtime;
