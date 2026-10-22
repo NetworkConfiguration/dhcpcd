@@ -286,6 +286,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_accept
 	SECCOMP_ALLOW(__NR_accept),
 #endif
+#ifdef __NR_accept4
+	SECCOMP_ALLOW(__NR_accept4),
+#endif
 #ifdef __NR_brk
 	SECCOMP_ALLOW(__NR_brk),
 #endif
