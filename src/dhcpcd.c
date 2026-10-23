@@ -2432,11 +2432,10 @@ main(int argc, char **argv, char **envp)
 			/* if manager exited quickly, don't wait */
 			if (pidfile_read(ctx.pidfile) == -1)
 				goto exit_success;
-			/* arm the pidfile and timeout loops to wait for it to exit */
 			eloop_timeout_add_msec(ctx.eloop, 100,
 				dhcpcd_pidfile_timeout, &ctx);
 			eloop_timeout_add_sec(ctx.eloop, 50,
-			    dhcpcd_exit_timeout, &ctx);
+				dhcpcd_exit_timeout, &ctx);
 			goto run_loop;
 		}
 	}
