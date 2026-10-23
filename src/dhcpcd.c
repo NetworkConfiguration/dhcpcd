@@ -2429,7 +2429,7 @@ main(int argc, char **argv, char **envp)
 				goto exit_success;
 			/* Spin until it exits */
 			loginfox("waiting for pid %d to exit", (int)pid);
-			/* if manager exited really fast due to no interfaces, don't bother waiting */
+			/* if manager exited quickly, don't wait */
 			if (pidfile_read(ctx.pidfile) == -1)
 				goto exit_success;
 			/* arm the pidfile and timeout loops to wait for it to exit */
