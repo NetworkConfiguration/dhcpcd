@@ -2429,7 +2429,12 @@ main(int argc, char **argv, char **envp)
 				goto exit_success;
 			/* Spin until it exits */
 			loginfox("waiting for pid %d to exit", (int)pid);
-			dhcpcd_pidfile_timeout(&ctx);
+			/* if manager exited really fast due to no interfaces, don't bother waiting */
+			if (pidfile_read(ctx.pidfile) == -1)
+				goto exit_success;
+			/* arm the pidfile and timeout loops to wait for it to exit */
+			eloop_timeout_add_msec(ctx.eloop, 100,
+				dhcpcd_pidfile_timeout, &ctx);
 			eloop_timeout_add_sec(ctx.eloop, 50,
 			    dhcpcd_exit_timeout, &ctx);
 			goto run_loop;
