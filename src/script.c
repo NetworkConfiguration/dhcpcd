@@ -325,7 +325,21 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 			protocol = PROTO_DHCP;
 #endif
 	}
+#ifdef INET
+	else if (strcmp(reason, "DISC_NO_OFFER") == 0 ||
+	    strcmp(reason, "REQ_NO_RESP") == 0 ||
+	    strcmp(reason, "RENEW_NO_RESP") == 0)
+		protocol = PROTO_DHCP;
+#endif
 #ifdef INET6
+#ifdef DHCP6
+	else if (strcmp(reason, "SOLICIT_NO_ADVERT") == 0 ||
+	    strcmp(reason, "REQ6_NO_REPLY") == 0 ||
+	    strcmp(reason, "RENEW6_NO_RESP") == 0)
+		protocol = PROTO_DHCP6;
+#endif
+	else if (strcmp(reason, "RS_TIMEOUT_NO_RA") == 0)
+		protocol = PROTO_RA;
 	else if (strcmp(reason, "STATIC6") == 0)
 		protocol = PROTO_STATIC6;
 #ifdef DHCP6
@@ -440,7 +454,14 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		if_down = ifo->options & DHCPCD_RELEASE ? true_str : false_str;
 	} else if (strcmp(reason, "TEST") == 0 ||
 	    strcmp(reason, "PREINIT") == 0 || strcmp(reason, "CARRIER") == 0 ||
-	    strcmp(reason, "STOP") == 0 || strcmp(reason, "UNKNOWN") == 0) {
+	    strcmp(reason, "STOP") == 0 || strcmp(reason, "UNKNOWN") == 0 ||
+	    strcmp(reason, "DISC_NO_OFFER") == 0 ||
+	    strcmp(reason, "REQ_NO_RESP") == 0 ||
+	    strcmp(reason, "RENEW_NO_RESP") == 0 ||
+	    strcmp(reason, "SOLICIT_NO_ADVERT") == 0 ||
+	    strcmp(reason, "REQ6_NO_REPLY") == 0 ||
+	    strcmp(reason, "RENEW6_NO_RESP") == 0 ||
+	    strcmp(reason, "RS_TIMEOUT_NO_RA") == 0) {
 		if_up = false_str;
 		if_down = false_str;
 	} else if (strcmp(reason, "NOCARRIER") == 0) {
