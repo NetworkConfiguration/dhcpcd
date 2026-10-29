@@ -4262,7 +4262,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		 * dhcp6_finishrelease(), so the lease must still be unlinked.
 		 */
 		if (drop &&
-		    ((options & DHCPCD_RELEASE) || state->state == DH6S_RELEASED) &&
+		    ((options & DHCPCD_RELEASE) ||
+		    state->state == DH6S_RELEASED) &&
 		    state->state != DH6S_DELEGATED) {
 			if (if_is_link_up(ifp) &&
 			    state->state != DH6S_RELEASED &&
