@@ -1265,12 +1265,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	if (hwaddr != NULL && hwaddr->rta_len != RTA_LENGTH(hwl))
 		hwa = NULL;
 
-	/* Update hardware address if valid (even if interface is up);
-	 * if interface is down, update even if we don't have a valid
-	 * hardware address. */
-	if ((hwa != NULL && if_valid_hwaddr(hwa, hwl)) ||
-	    !(ifi->ifi_flags & IFF_UP))
-		dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
+	dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
 
 	dhcpcd_handlecarrier(ifp, if_carrier_from_flags(ifi->ifi_flags),
 	    ifi->ifi_flags);
