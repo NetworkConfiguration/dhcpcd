@@ -1169,6 +1169,8 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	struct rtattr *rta, *hwaddr, *mtu;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
+	void *hwa;
+	uint8_t hwl;
 
 	r = link_route(ctx, ifp, nlm);
 	if (r != 0)
@@ -1258,15 +1260,12 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	if (mtu != NULL)
 		ifp->mtu = (int)*(unsigned int *)RTA_DATA(mtu);
 
-	/* Re-read hardware address and friends */
-	if (!(ifi->ifi_flags & IFF_UP)) {
-		void *hwa = hwaddr != NULL ? RTA_DATA(hwaddr) : NULL;
-		uint8_t hwl = l2addr_len(ifi->ifi_type);
+	hwa = hwaddr != NULL ? RTA_DATA(hwaddr) : NULL;
+	hwl = l2addr_len(ifi->ifi_type);
+	if (hwaddr != NULL && hwaddr->rta_len != RTA_LENGTH(hwl))
+		hwa = NULL;
 
-		if (hwaddr != NULL && hwaddr->rta_len != RTA_LENGTH(hwl))
-			hwa = NULL;
-		dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
-	}
+	dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
 
 	dhcpcd_handlecarrier(ifp, if_carrier_from_flags(ifi->ifi_flags),
 	    ifi->ifi_flags);
