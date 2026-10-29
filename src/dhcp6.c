@@ -4263,7 +4263,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		 */
 		if (drop &&
 		    ((options & DHCPCD_RELEASE) ||
-		    state->state == DH6S_RELEASED) &&
+			state->state == DH6S_RELEASED) &&
 		    state->state != DH6S_DELEGATED) {
 			if (if_is_link_up(ifp) &&
 			    state->state != DH6S_RELEASED &&
