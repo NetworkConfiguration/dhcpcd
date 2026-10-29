@@ -4256,7 +4256,14 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			return;
 		}
 
-		if (drop && options & DHCPCD_RELEASE &&
+		/*
+		 * Per-interface --release requires ifp-options before the
+		 * RELEASE6 reply, DH6S_RELEASED is only entered from
+		 * dhcp6_finishrelease(), so the lease must still be unlinked.
+		 */
+		if (drop &&
+		    ((options & DHCPCD_RELEASE) ||
+			state->state == DH6S_RELEASED) &&
 		    state->state != DH6S_DELEGATED) {
 			if (if_is_link_up(ifp) &&
 			    state->state != DH6S_RELEASED &&
