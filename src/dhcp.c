@@ -57,6 +57,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #define ELOOP_QUEUE ELOOP_DHCP
@@ -4390,6 +4391,57 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 }
 
 #ifndef SMALL
+static int
+dhcp_dump_lease_time(FILE *fp, const char *name, struct eloop *eloop,
+    void (*callback)(void *), void *arg, unsigned long long esecs,
+    unsigned int ensecs, uint32_t lifetime)
+{
+	unsigned int seconds;
+
+	if (lifetime == DHCP_INFINITE_LIFETIME)
+		return efprintf(fp, "%s=never", name);
+
+	if (eloop_timeout_remaining(eloop, callback, arg, esecs, ensecs,
+		&seconds) == 0)
+		seconds = 0;
+	return efprintf(fp, "%s=%u", name, seconds);
+}
+
+int
+dhcp_dump_lease_times(FILE *fp, const struct interface *ifp)
+{
+	const struct dhcp_state *state;
+	const struct dhcp_lease *lease;
+	void *arg;
+	unsigned long long esecs;
+	unsigned int ensecs;
+
+	state = D_CSTATE(ifp);
+	if (state == NULL)
+		return 0;
+	if (state->state != DHS_BOUND && state->state != DHS_RENEW &&
+	    state->state != DHS_REBIND)
+		return 0;
+
+	if (eloop_monotonic_elapsed(ifp->ctx->eloop, &esecs, &ensecs) == -1) {
+		logerr("eloop_monotonic_elapsed");
+		return -1;
+	}
+
+	lease = &state->lease;
+	arg = UNCONST(ifp);
+	if (dhcp_dump_lease_time(fp, "time_to_renew", ifp->ctx->eloop,
+		dhcp_startrenew, arg, esecs, ensecs, lease->renewaltime) == -1)
+		return -1;
+	if (dhcp_dump_lease_time(fp, "time_to_rebind", ifp->ctx->eloop,
+		dhcp_rebind, arg, esecs, ensecs, lease->rebindtime) == -1)
+		return -1;
+	if (dhcp_dump_lease_time(fp, "time_to_expire", ifp->ctx->eloop,
+		dhcp_expire, arg, esecs, ensecs, lease->leasetime) == -1)
+		return -1;
+	return 0;
+}
+
 int
 dhcp_dump(struct interface *ifp)
 {

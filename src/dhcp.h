@@ -263,6 +263,9 @@ uint16_t dhcp_get_mtu(const struct interface *);
 int dhcp_get_routes(rb_tree_t *, struct interface *);
 ssize_t dhcp_env(FILE *, const char *, const struct interface *,
     const struct bootp *, size_t);
+#ifndef SMALL
+int dhcp_dump_lease_times(FILE *, const struct interface *);
+#endif
 
 struct ipv4_addr *dhcp_handleifa(int, struct ipv4_addr *, pid_t pid);
 void dhcp_drop(struct interface *, const char *);
