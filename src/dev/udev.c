@@ -80,6 +80,7 @@ udev_handle_device(void *ctx)
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
 
+	errno = 0;
 	device = udev_monitor_receive_device(monitor);
 	if (device == NULL) {
 		/* EAGAIN is normal when no matching device is queued. */
