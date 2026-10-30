@@ -83,8 +83,9 @@ udev_handle_device(void *ctx)
 	device = udev_monitor_receive_device(monitor);
 	if (device == NULL) {
 		/* EAGAIN is normal when no matching device is queued. */
-		if (errno != EAGAIN)
-			logerrx("libudev: received NULL device");
+		if (errno == EAGAIN)
+			return 0;
+		logerrx("libudev: received NULL device");
 		return -1;
 	}
 
