@@ -3517,11 +3517,12 @@ packet_udp_data(void *packet, size_t plen, uint16_t *dlen, struct in_addr *from)
 	uint16_t ip_hlen, ip_len, ip_left;
 	struct udphdr udp;
 
-	if (plen < sizeof(*ip) || ip->ip_v != IPVERSION)
+	if (plen < sizeof(*ip) || ip->ip_v != IPVERSION) {
+		from->s_addr = INADDR_ANY;
 		return NULL;
+	}
 
-	if (from != NULL)
-		from->s_addr = ip->ip_src.s_addr;
+	from->s_addr = ip->ip_src.s_addr;
 
 	if (ip->ip_p != IPPROTO_UDP)
 		return NULL;
