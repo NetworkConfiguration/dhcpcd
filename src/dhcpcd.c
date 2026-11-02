@@ -339,30 +339,30 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 	 * We need to do something with stdout/stderr to avoid SIGPIPE.
 	 */
 #ifdef PRIVSEP
-	/*
-	 * Thanks to RLIMIT_NOFILE, we cannot use dup2 as below.
-	 * To me, that's bonkers but it is what it is.
-	 * So we fclose our streams instead.
-	 * Because we *only* emit to stderr using out logger and not fprintf
-	 * or syslog, this *should* be a safe operation.
-	 * Hopefully no libraries dhcpcd uses emit to these streams.
-	 * As we are the privsep manager process we won't fork any children
-	 * ourselves so nothing *should* use fd's 0, 1 and 2.
-	 */
-	if (fclose(stdout) == EOF)
-		logwarn("%s: fclose(stdout)", __func__);
-	if (fclose(stderr) == EOF)
-		logwarn("%s: fclose(stderr)", __func__);
-	/* May as well close stdin while we are here.
-	 * In for a penny, in for a pound. */
-	if (fclose(stdin) == EOF)
-		logwarn("%s: fclose(stdin)", __func__);
-#else
-	if (dup2(STDIN_FILENO, STDOUT_FILENO) == -1)
-		logwarn("%s: dup2 %d", __func__, STDOUT_FILENO);
-	if (dup2(STDIN_FILENO, STDERR_FILENO) == -1)
-		logwarn("%s: dup2 %d", __func__, STDERR_FILENO);
+	if (!(ctx->options & DHCPCD_PRIVSEPROOT)) {
+		/*
+		 * Thanks to RLIMIT_NOFILE, we cannot use dup2 as below.
+		 * To me, that's bonkers but it is what it is.
+		 * We keep the streams intact and hope they do the right
+		 * thing if something (like a library dhcpcd uses)
+		 * wants to write to them.
+		 */
+		if (close(STDOUT_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDOUT_FILENO);
+		if (close(STDERR_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDERR_FILENO);
+		/* May as well close stdin while we are here.
+		 * In for a penny, in for a pound. */
+		if (close(STDIN_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDIN_FILENO);
+	} else
 #endif
+	{
+		if (dup2(STDIN_FILENO, STDOUT_FILENO) == -1)
+			logwarn("%s: dup2 %d", __func__, STDOUT_FILENO);
+		if (dup2(STDIN_FILENO, STDERR_FILENO) == -1)
+			logwarn("%s: dup2 %d", __func__, STDERR_FILENO);
+	}
 
 	ctx->options |= DHCPCD_DAEMONISED;
 }
