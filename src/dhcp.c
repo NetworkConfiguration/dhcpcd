@@ -3620,7 +3620,6 @@ static void
 dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
     struct in_addr *from)
 {
-
 	if (len < offsetof(struct bootp, vend)) {
 		logerrx("%s: truncated packet (%zu) from %s", ifp->name, len,
 		    inet_ntoa(*from));
