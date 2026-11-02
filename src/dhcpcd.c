@@ -2894,6 +2894,9 @@ exit1:
 #ifdef HAVE_OPEN_MEMSTREAM
 	if (ctx.script_fp)
 		(void)fclose(ctx.script_fp);
+#elif defined(PRIVSEP)
+/* RLIMIT_NOFILE 0 means this won't work */
+#error PRIVSEP requires open_memstream(3)
 #endif
 	free(ctx.script_buf);
 	free(ctx.script_env);
