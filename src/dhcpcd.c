@@ -339,7 +339,7 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 	 * We need to do something with stdout/stderr to avoid SIGPIPE.
 	 */
 #ifdef PRIVSEP
-	if (!(ctx->options & DHCPCD_PRIVSEPROOT)) {
+	if (IN_PRIVSEP(ctx) && !(ctx->options & DHCPCD_PRIVSEPROOT)) {
 		/*
 		 * Thanks to RLIMIT_NOFILE, we cannot use dup2 as below.
 		 * To me, that's bonkers but it is what it is.
