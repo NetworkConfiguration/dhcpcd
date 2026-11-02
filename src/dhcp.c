@@ -3625,6 +3625,12 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 {
 	size_t v;
 
+	if (len < offsetof(struct bootp, vend)) {
+		logerrx("%s: truncated packet (%zu) from %s", ifp->name, len,
+		    inet_ntoa(*from));
+		return;
+	}
+
 	/* Unlikely, but appeases sanitizers. */
 	if (len > FRAMELEN_MAX) {
 		logerrx("%s: packet exceeded frame length (%zu) from %s",
@@ -3759,14 +3765,16 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		return;
 	}
 
-	if (iov->iov_len < offsetof(struct bootp, vend)) {
-		logerrx("%s: truncated packet (%zu) from %s", ifp->name,
-		    iov->iov_len, inet_ntoa(from->sin_addr));
-		return;
-	}
-
 	state = D_CSTATE(ifp);
 	if (state == NULL) {
+		/* Unlike dhcp_handlebootp, dhcp_redirect_dhcp does not
+		 * check the length. Do so here. */
+		if (iov->iov_len < offsetof(struct bootp, vend)) {
+			logerrx("%s: truncated packet (%zu) from %s", ifp->name,
+			    iov->iov_len, inet_ntoa(from->sin_addr));
+			return;
+		}
+
 		/* Try re-directing it to another interface. */
 		dhcp_redirect_dhcp(ifp, (struct bootp *)iov->iov_base,
 		    iov->iov_len, &from->sin_addr);
