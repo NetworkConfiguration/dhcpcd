@@ -3511,8 +3511,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 }
 
 static void *
-packet_udp_data(void *packet, size_t plen, uint16_t *dlen,
-    struct in_addr *from)
+packet_udp_data(void *packet, size_t plen, uint16_t *dlen, struct in_addr *from)
 {
 	struct ip *ip = packet;
 	uint16_t ip_hlen, ip_len, ip_left;
