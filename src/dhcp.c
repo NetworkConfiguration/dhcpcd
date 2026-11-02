@@ -3123,6 +3123,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		bootp->vend[v++] = '\0';
 		bootp_len++;
 	}
+	dp.bootp_len = bootp_len;
 
 	/* Don't do anything if the user hasn't configured it. */
 	if (ifp->active != IF_ACTIVE_USER ||
