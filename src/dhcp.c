@@ -3511,23 +3511,28 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 }
 
 static void *
-packet_udp_data(void *packet, size_t plen, uint16_t *dlen)
+packet_udp_data(void *packet, size_t plen, uint16_t *dlen,
+    struct in_addr *from)
 {
 	struct ip *ip = packet;
 	uint16_t ip_hlen, ip_len, ip_left;
 	struct udphdr udp;
 
-	if (plen < sizeof(*ip))
+	if (plen < sizeof(*ip) || ip->ip_v != IPVERSION)
 		return NULL;
 
-	if (ip->ip_v != IPVERSION || ip->ip_p != IPPROTO_UDP)
+	if (from != NULL)
+		from->s_addr = ip->ip_src.s_addr;
+
+	if (ip->ip_p != IPPROTO_UDP)
 		return NULL;
+
 	ip_len = ntohs(ip->ip_len);
 	if (ip_len < sizeof(*ip) || ip_len > plen)
 		return NULL;
 
 	ip_hlen = ip->ip_hl * 4;
-	if (ip_hlen < sizeof(*ip))
+	if (ip_hlen < sizeof(*ip) || ip_hlen > ip_len)
 		return NULL;
 
 	ip_left = (uint16_t)(ip_len - ip_hlen);
@@ -3558,7 +3563,7 @@ struct ip_pseudo {
 
 /* Lengths have already been checked. */
 static bool
-checksums_valid(const void *packet, struct in_addr *from, unsigned int flags)
+checksums_valid(const void *packet, unsigned int flags)
 {
 	const struct ip *ip = packet;
 	size_t ip_hlen;
@@ -3569,9 +3574,6 @@ checksums_valid(const void *packet, struct in_addr *from, unsigned int flags)
 	/* We create a buffer to copy ip_pseudo into and send that to
 	 * in_cksum() to avoid memory issues. */
 	uint8_t ip_pseudo_buf[sizeof(struct ip_pseudo)];
-
-	if (from != NULL)
-		from->s_addr = ip->ip_src.s_addr;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
 	/* RFC 1071 states that the check of the checksum is equal to 0. */
@@ -3682,14 +3684,14 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
 
 	/* Get the payload and length from the packet.
 	 * Double checks the BPF filter. */
-	bootp = packet_udp_data(data, len, &bootp_len);
+	bootp = packet_udp_data(data, len, &bootp_len, &from);
 	if (bootp == NULL) {
 		logerrx("%s: IP/UDP validation failure from %s", ifp->name,
 		    inet_ntoa(from));
 		return;
 	}
 
-	if (!checksums_valid(data, &from, bpf_flags)) {
+	if (!checksums_valid(data, bpf_flags)) {
 		logerrx("%s: checksum failure from %s", ifp->name,
 		    inet_ntoa(from));
 		return;
