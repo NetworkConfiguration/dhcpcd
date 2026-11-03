@@ -192,7 +192,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			errno = EPERM;
 			return NULL;
 		}
-		if ((uint64_t)(replay - state->replay) <= 0) {
+		if ((int64_t)(replay - state->replay) <= 0) {
 			/* Replay attack detected */
 			errno = EPERM;
 			return NULL;
