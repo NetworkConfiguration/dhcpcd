@@ -34,6 +34,7 @@
 #warning in master mode.
 #endif
 
+#include <errno.h>
 #include <libudev.h>
 #include <string.h>
 
@@ -79,8 +80,12 @@ udev_handle_device(void *ctx)
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
 
+	errno = 0;
 	device = udev_monitor_receive_device(monitor);
 	if (device == NULL) {
+		/* EAGAIN is normal when no matching device is queued. */
+		if (errno == EAGAIN)
+			return 0;
 		logerrx("libudev: received NULL device");
 		return -1;
 	}
