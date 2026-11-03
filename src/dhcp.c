@@ -3087,6 +3087,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	uint8_t type;
 	struct in_addr addr;
 	unsigned int i;
+	size_t v;
 	char *msg;
 	bool bootp_copied;
 	uint32_t v6only_time = 0;
@@ -3114,6 +3115,15 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #define IS_STATE_ACTIVE(s)                                    \
 	((s) - state != DHS_NONE && (s)->state != DHS_INIT && \
 	    (s)->state != DHS_BOUND)
+
+	/* To make our IS_DHCP macro easy, ensure the vendor
+	 * area has at least 4 octets. */
+	v = bootp_len - offsetof(struct bootp, vend);
+	while (v < 4) {
+		bootp->vend[v++] = '\0';
+		bootp_len++;
+	}
+	dp.bootp_len = bootp_len;
 
 	/* Don't do anything if the user hasn't configured it. */
 	if (ifp->active != IF_ACTIVE_USER ||
@@ -3611,8 +3621,6 @@ static void
 dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
     struct in_addr *from)
 {
-	size_t v;
-
 	if (len < offsetof(struct bootp, vend)) {
 		logerrx("%s: truncated packet (%zu) from %s", ifp->name, len,
 		    inet_ntoa(*from));
@@ -3624,14 +3632,6 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 		logerrx("%s: packet exceeded frame length (%zu) from %s",
 		    ifp->name, len, inet_ntoa(*from));
 		return;
-	}
-
-	/* To make our IS_DHCP macro easy, ensure the vendor
-	 * area has at least 4 octets. */
-	v = len - offsetof(struct bootp, vend);
-	while (v < 4) {
-		bootp->vend[v++] = '\0';
-		len++;
 	}
 
 	dhcp_handledhcp(ifp, bootp, len, from);
