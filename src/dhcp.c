@@ -3511,54 +3511,45 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 }
 
 static void *
-get_udp_data(void *packet, size_t *len)
-{
-	const struct ip *ip = packet;
-	size_t ip_hl = (size_t)ip->ip_hl * 4;
-	char *p = packet;
-
-	p += ip_hl + sizeof(struct udphdr);
-	*len = (size_t)ntohs(ip->ip_len) - sizeof(struct udphdr) - ip_hl;
-	return p;
-}
-
-static bool
-is_packet_udp_bootp(void *packet, size_t plen)
+packet_udp_data(void *packet, size_t plen, uint16_t *dlen, struct in_addr *from)
 {
 	struct ip *ip = packet;
-	size_t ip_hlen;
+	uint16_t ip_hlen, ip_len, ip_left;
 	struct udphdr udp;
 
-	if (plen < sizeof(*ip))
-		return false;
+	if (plen < sizeof(*ip) || ip->ip_v != IPVERSION) {
+		from->s_addr = INADDR_ANY;
+		return NULL;
+	}
 
-	if (ip->ip_v != IPVERSION || ip->ip_p != IPPROTO_UDP)
-		return false;
+	from->s_addr = ip->ip_src.s_addr;
 
-	/* Sanity. */
-	if (ntohs(ip->ip_len) > plen)
-		return false;
+	if (ip->ip_p != IPPROTO_UDP)
+		return NULL;
 
-	ip_hlen = (size_t)ip->ip_hl * 4;
-	if (ip_hlen < sizeof(*ip))
-		return false;
+	ip_len = ntohs(ip->ip_len);
+	if (ip_len < sizeof(*ip) || ip_len > plen)
+		return NULL;
 
-	/* Check we have a UDP header and BOOTP. */
-	if (ip_hlen + sizeof(udp) + offsetof(struct bootp, vend) > plen)
-		return false;
+	ip_hlen = ip->ip_hl * 4;
+	if (ip_hlen < sizeof(*ip) || ip_hlen > ip_len)
+		return NULL;
 
-	/* Sanity. */
+	ip_left = (uint16_t)(ip_len - ip_hlen);
+	if (ip_left < sizeof(udp))
+		return NULL;
 	memcpy(&udp, (char *)ip + ip_hlen, sizeof(udp));
-	if (ntohs(udp.uh_ulen) < sizeof(udp))
-		return false;
-	if (ip_hlen + ntohs(udp.uh_ulen) > plen)
-		return false;
+	*dlen = ntohs(udp.uh_ulen);
+	if (*dlen < sizeof(udp) || *dlen > ip_left)
+		return NULL;
 
 	/* Check it's to the right port. */
 	if (udp.uh_dport != htons(BOOTPC))
-		return false;
+		return NULL;
 
-	return true;
+	/* Trim the UDP header from the UDP payload length */
+	*dlen -= (uint16_t)sizeof(udp);
+	return ((char *)packet) + ip_hlen + sizeof(udp);
 }
 
 /* IPv4 pseudo header used for computing TCP and UDP checksums. */
@@ -3572,7 +3563,7 @@ struct ip_pseudo {
 
 /* Lengths have already been checked. */
 static bool
-checksums_valid(const void *packet, struct in_addr *from, unsigned int flags)
+checksums_valid(const void *packet, unsigned int flags)
 {
 	const struct ip *ip = packet;
 	size_t ip_hlen;
@@ -3583,9 +3574,6 @@ checksums_valid(const void *packet, struct in_addr *from, unsigned int flags)
 	/* We create a buffer to copy ip_pseudo into and send that to
 	 * in_cksum() to avoid memory issues. */
 	uint8_t ip_pseudo_buf[sizeof(struct ip_pseudo)];
-
-	if (from != NULL)
-		from->s_addr = ip->ip_src.s_addr;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
 	/* RFC 1071 states that the check of the checksum is equal to 0. */
@@ -3654,8 +3642,8 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
     unsigned int bpf_flags)
 {
 	struct bootp *bootp;
+	uint16_t bootp_len;
 	struct in_addr from;
-	size_t udp_len;
 	size_t fl = bpf_frame_header_len(ifp);
 #ifdef PRIVSEP
 	const struct dhcp_state *state = D_CSTATE(ifp);
@@ -3694,29 +3682,22 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
 		memmove(data, data + fl, len);
 	}
 
-	/* Validate filter. */
-	if (!is_packet_udp_bootp(data, len)) {
-#ifdef BPF_DEBUG
-		logerrx("%s: DHCP BPF validation failure", ifp->name);
-#endif
+	/* Get the payload and length from the packet.
+	 * Double checks the BPF filter. */
+	bootp = packet_udp_data(data, len, &bootp_len, &from);
+	if (bootp == NULL) {
+		logerrx("%s: IP/UDP validation failure from %s", ifp->name,
+		    inet_ntoa(from));
 		return;
 	}
 
-	if (!checksums_valid(data, &from, bpf_flags)) {
+	if (!checksums_valid(data, bpf_flags)) {
 		logerrx("%s: checksum failure from %s", ifp->name,
 		    inet_ntoa(from));
 		return;
 	}
 
-	/*
-	 * DHCP has a variable option area rather than a fixed vendor area.
-	 * Because DHCP uses the BOOTP protocol it should still send BOOTP
-	 * sized packets to be RFC compliant.
-	 * However some servers send a truncated vendor area.
-	 * dhcpcd can work fine without the vendor area being sent.
-	 */
-	bootp = get_udp_data(data, &udp_len);
-	dhcp_handlebootp(ifp, bootp, udp_len, &from);
+	dhcp_handlebootp(ifp, bootp, bootp_len, &from);
 }
 
 static void
