@@ -363,9 +363,12 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 	return 1;
 
 send_error:
-	if (control_queuef(fd, &errno, sizeof(errno), 0) == -1)
+	if (control_queuef(fd, &errno, sizeof(errno), 0) == -1) {
 		logerr("%s: control_queuef", __func__);
-	return -1;
+		return -1;
+	}
+	/* We sent the error back to the fd */
+	return 1;
 }
 
 struct fd_list *
