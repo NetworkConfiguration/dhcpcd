@@ -324,15 +324,15 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 			}
 			e = memchr(p, '\0', len);
 			if (e == NULL) {
-				errno = EINVAL;
 				logerrx("%s: no terminator", __func__);
-				return -1;
+				errno = EINVAL;
+				goto send_error;
 			}
 			if ((size_t)argc + 1 >=
 			    sizeof(argvp) / sizeof(argvp[0])) {
-				errno = ENOBUFS;
 				logerrx("%s: no arg buffer", __func__);
-				return -1;
+				errno = ENOBUFS;
+				goto send_error;
 			}
 			*ap++ = p;
 			argc++;
@@ -352,6 +352,7 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 		*ap = NULL;
 		if (dhcpcd_handleargs(fd->ctx, fd, argc, argvp) == -1) {
 			logerr("%s: dhcpcd_handleargs", __func__);
+			/* dhcpcd_handleargs sends any error to the fd */
 			if (errno != EINTR && errno != EAGAIN && errno != EPERM)
 				return -1;
 		}
@@ -359,6 +360,14 @@ control_recvmsg(struct fd_list *fd, struct msghdr *msg, size_t len)
 			fd->flags |= FD_COMMAND;
 	}
 
+	return 1;
+
+send_error:
+	if (control_queuef(fd, &errno, sizeof(errno), 0) == -1) {
+		logerr("%s: control_queuef", __func__);
+		return -1;
+	}
+	/* We sent the error back to the fd */
 	return 1;
 }
 
