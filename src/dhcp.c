@@ -1944,7 +1944,15 @@ send_inform(void *arg)
 static void
 send_discover(void *arg)
 {
-	send_message((struct interface *)arg, DHCP_DISCOVER, send_discover);
+	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
+	/* First call: interval==0 (set to 4 inside send_message).
+	 * Retransmits: interval already 4/8/... - mirror ISC's dhclient. */
+	int retransmit = state->interval != 0;
+
+	send_message(ifp, DHCP_DISCOVER, send_discover);
+	if (retransmit)
+		script_runreason(ifp, "DISC_NO_OFFER");
 }
 
 static void
@@ -2005,6 +2013,7 @@ dhcp_requestfailed(void *arg)
 	state->offer = NULL;
 	state->offer_len = 0;
 	state->interval = 0;
+	script_runreason(ifp, "REQ_NO_RESP");
 	dhcp_discover(ifp);
 }
 
@@ -2096,6 +2105,7 @@ dhcp_rebind(void *arg)
 	struct dhcp_lease *lease = &state->lease;
 
 	logwarnx("%s: failed to renew DHCP, rebinding", ifp->name);
+	script_runreason(ifp, "RENEW_NO_RESP");
 	logdebugx("%s: expire in %" PRIu32 " seconds", ifp->name,
 	    lease->leasetime - lease->rebindtime);
 	state->state = DHS_REBIND;
