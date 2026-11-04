@@ -51,8 +51,7 @@
 #endif
 
 #ifdef __sun
-#define htonll
-#define ntohll
+#include <sys/byteorder.h>
 #endif
 
 #ifndef htonll
@@ -269,11 +268,9 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 				errno = EINVAL;
 				return NULL;
 			}
-			if (state->reconf == NULL)
-				errno = ENOENT;
 			/* Free the old token so we log acceptance */
-			if (state->token) {
-				free(state->token);
+			if (state->token != NULL) {
+				free_token(state->token);
 				state->token = NULL;
 			}
 			/* Nothing to validate, just accepting the key */
@@ -314,7 +311,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 		if (time(&now) == -1)
 			return NULL;
 		if (t->expire < now) {
-			errno = EFAULT;
+			errno = EPERM;
 			return NULL;
 		}
 	}
@@ -380,7 +377,7 @@ gottoken:
 	}
 
 	free(mm);
-	if (!consttime_memequal(d, &hmac_code, dlen)) {
+	if (!consttime_memequal(d, hmac_code, dlen)) {
 		errno = EPERM;
 		return NULL;
 	}
@@ -457,7 +454,7 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 #ifdef LOCK_EX
 		flocked = flock(fileno(fp), LOCK_EX);
 #endif
-		if (fscanf(fp, "0x%016" PRIu64, rdm) != 1) {
+		if (fscanf(fp, "0x%016" PRIx64, rdm) != 1) {
 			(void)fclose(fp);
 			return -1;
 		}
@@ -465,7 +462,7 @@ auth_get_rdm_monotonic(uint64_t *rdm)
 
 	(*rdm)++;
 	if (fseek(fp, 0, SEEK_SET) == -1 || ftruncate(fileno(fp), 0) == -1 ||
-	    fprintf(fp, "0x%016" PRIu64 "\n", *rdm) != 19 || fflush(fp) == EOF)
+	    fprintf(fp, "0x%016" PRIx64 "\n", *rdm) != 19 || fflush(fp) == EOF)
 		err = -1;
 	else
 		err = 0;
@@ -493,6 +490,10 @@ get_next_rdm_monotonic_clock(struct auth *auth)
 	secs = (uint64_t)ts.tv_sec + NTP_EPOCH;
 	frac = ((double)ts.tv_nsec / 1e9 * NTP_SCALE_FRAC);
 	rdm = (secs << 32) | (uint64_t)frac;
+	if (rdm <= auth->last_replay)
+		rdm = ++auth->last_replay;
+	else
+		auth->last_replay = rdm;
 	return rdm;
 }
 
@@ -710,6 +711,11 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 		memcpy(data, &secretid, sizeof(secretid));
 		data += sizeof(secretid);
 		dlen -= sizeof(secretid);
+	}
+
+	if (dlen < sizeof(hmac_code)) {
+		errno = ENOBUFS;
+		return -1;
 	}
 
 	/* Zero what's left, the MAC */
