@@ -127,9 +127,10 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			return -1;
 		fd->peer_id = (unsigned int)psm->ps_flags;
 		err = control_recvmsg(fd, msg, psm->ps_datalen);
-		if (err == -1 || err == 0)
-			control_free(fd);
-		break;
+		/* This is the manager, don't hangup the control proxy.
+		 * Any error should also have been written back to the fd.
+		 * Just return the result and be done. */
+		return err;
 	default:
 		errno = ENOTSUP;
 		return -1;
