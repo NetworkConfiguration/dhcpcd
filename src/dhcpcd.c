@@ -2436,7 +2436,8 @@ main(int argc, char **argv, char **envp)
 				eloop_timeout_add_msec(ctx.eloop, 100,
 				    dhcpcd_pidfile_timeout, &ctx);
 			} else
-				dhcpcd_pidfile_timeout(&ctx);
+				eloop_timeout_add_msec(ctx.eloop, 0,
+				    dhcpcd_pidfile_timeout, &ctx);
 			eloop_timeout_add_sec(ctx.eloop, 50,
 			    dhcpcd_exit_timeout, &ctx);
 			goto run_loop;
