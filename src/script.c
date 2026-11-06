@@ -470,6 +470,18 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		if_up = false_str;
 		if_down = true_str;
 	}
+#ifdef INET
+	if (strcmp(reason, "NAK") == 0) {
+		struct dhcp_state *dstate = D_STATE(ifp);
+
+		if (dstate != NULL && dstate->message != NULL) {
+			if (efprintf(fp, "message=%s", dstate->message) == -1)
+				goto eexit;
+			free(dstate->message);
+			dstate->message = NULL;
+		}
+	}
+#endif
 	if (efprintf(fp, "if_up=%s", if_up) == -1)
 		goto eexit;
 	if (efprintf(fp, "if_down=%s", if_down) == -1)
