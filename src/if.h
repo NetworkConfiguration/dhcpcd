@@ -267,7 +267,7 @@ int if_addrflags(const struct interface *, const struct in_addr *,
 #ifdef INET6
 void if_disable_rtadv(void);
 void if_setup_inet6(const struct interface *);
-int ip6_forwarding(const char *ifname);
+int ip6_dadcount(struct interface *);
 
 struct ra;
 struct ipv6_addr;
