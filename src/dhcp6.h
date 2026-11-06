@@ -245,6 +245,9 @@ void dhcp6_reboot(struct interface *);
 void dhcp6_renew(struct interface *);
 ssize_t dhcp6_env(FILE *, const char *, const struct interface *,
     const struct dhcp6_message *, size_t);
+#ifndef SMALL
+int dhcp6_dump_lease_times(FILE *, const struct interface *);
+#endif
 void dhcp6_free(struct interface *);
 void dhcp6_handleifa(int, struct ipv6_addr *, pid_t);
 bool dhcp6_dadcompleted(const struct interface *);

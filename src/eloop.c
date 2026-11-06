@@ -606,6 +606,47 @@ eloop_q_timeout_delete(struct eloop *eloop, int queue, void (*callback)(void *),
 	return n;
 }
 
+#ifndef SMALL
+int
+eloop_monotonic_elapsed(struct eloop *eloop, unsigned long long *secs,
+    unsigned int *nsecs)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
+		return -1;
+	*secs = eloop_timespec_diff(&now, &eloop->now, nsecs);
+	return 0;
+}
+
+int
+eloop_q_timeout_remaining(struct eloop *eloop, int queue,
+    void (*callback)(void *), void *arg, unsigned long long secs,
+    unsigned int nsecs, unsigned int *seconds)
+{
+	struct eloop_timeout *t;
+	unsigned int left;
+
+	TAILQ_FOREACH(t, &eloop->timeouts, next) {
+		if ((queue == 0 || t->queue == queue) &&
+		    t->callback == callback && t->arg == arg) {
+			if (seconds == NULL)
+				return 1;
+			if (secs > t->seconds)
+				left = 0;
+			else {
+				left = t->seconds - (unsigned int)secs;
+				if (nsecs > t->nseconds && left > 0)
+					left--;
+			}
+			*seconds = left;
+			return 1;
+		}
+	}
+	return 0;
+}
+#endif
+
 void
 eloop_exit(struct eloop *eloop, int code)
 {
