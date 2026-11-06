@@ -337,13 +337,32 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 
 	/*
 	 * We need to do something with stdout/stderr to avoid SIGPIPE.
-	 * We know that stdin is already mapped to /dev/null.
-	 * TODO: Capture script output and log it to the logfile and/or syslog.
 	 */
-	if (dup2(STDIN_FILENO, STDOUT_FILENO) == -1)
-		logwarn("%s: dup2 %d", __func__, STDOUT_FILENO);
-	if (dup2(STDIN_FILENO, STDERR_FILENO) == -1)
-		logwarn("%s: dup2 %d", __func__, STDERR_FILENO);
+#ifdef PRIVSEP
+	if (IN_PRIVSEP(ctx) && !(ctx->options & DHCPCD_PRIVSEPROOT)) {
+		/*
+		 * Thanks to RLIMIT_NOFILE, we cannot use dup2 as below.
+		 * To me, that's bonkers but it is what it is.
+		 * We keep the streams intact and hope they do the right
+		 * thing if something (like a library dhcpcd uses)
+		 * wants to write to them.
+		 */
+		if (close(STDOUT_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDOUT_FILENO);
+		if (close(STDERR_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDERR_FILENO);
+		/* May as well close stdin while we are here.
+		 * In for a penny, in for a pound. */
+		if (close(STDIN_FILENO) == -1)
+			logwarn("%s: close %d", __func__, STDIN_FILENO);
+	} else
+#endif
+	{
+		if (dup2(STDIN_FILENO, STDOUT_FILENO) == -1)
+			logwarn("%s: dup2 %d", __func__, STDOUT_FILENO);
+		if (dup2(STDIN_FILENO, STDERR_FILENO) == -1)
+			logwarn("%s: dup2 %d", __func__, STDERR_FILENO);
+	}
 
 	ctx->options |= DHCPCD_DAEMONISED;
 }
@@ -2875,6 +2894,9 @@ exit1:
 #ifdef HAVE_OPEN_MEMSTREAM
 	if (ctx.script_fp)
 		(void)fclose(ctx.script_fp);
+#elif defined(PRIVSEP)
+/* RLIMIT_NOFILE 0 means this won't work */
+#error PRIVSEP requires open_memstream(3)
 #endif
 	free(ctx.script_buf);
 	free(ctx.script_env);
