@@ -672,7 +672,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	int e, i, t;
 	long l;
 	unsigned long u;
-	char *p = NULL, *bp, *fp, *np;
+	char *p = NULL, *bp, *fp, *np, *dp;
 	ssize_t s;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
@@ -2200,9 +2200,22 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		return -1;
 #else
 		fp = strwhite(arg);
-		if (fp)
-			*fp++ = '\0';
-		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		dp = NULL;
+		/* Command line options are parsed globally and then replayed
+		 * per-interface using the same argv, so do not split optarg
+		 * in-place. Later passes still need the data after the EN. */
+		if (fp) {
+			dl = (size_t)(fp - arg);
+			dp = malloc(dl + 1);
+			if (!dp) {
+				logerr(__func__);
+				return -1;
+			}
+			memcpy(dp, arg, dl);
+			dp[dl] = '\0';
+		}
+		u = (uint32_t)strtou(dp ? dp : arg, NULL, 0, 0, UINT32_MAX, &e);
+		free(dp);
 		if (e) {
 			logerrx("invalid code: %s", arg);
 			return -1;
