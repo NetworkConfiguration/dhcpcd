@@ -192,6 +192,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #endif
 
 int ps_bufalloc(struct dhcpcd_ctx *, size_t);
+int ps_bufshrink(struct dhcpcd_ctx *);
 int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);

@@ -80,6 +80,9 @@ static const char dhcpcd_copyright[] = "Copyright (c) 2006-2025 Roy Marples";
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
+#if defined(HAVE_MALLOC_TRIM) || defined(HAVE_MALLOPT)
+#include <malloc.h>
+#endif
 
 #ifdef USE_SIGNALS
 const int dhcpcd_signals[] = {
@@ -322,6 +325,36 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 }
 
 #ifndef THERE_IS_NO_FORK
+#ifdef HAVE_MALLOC_TRIM
+/* Interval in seconds between periodic heap trim calls while idle. */
+#define DHCPCD_TRIM_INTERVAL	60
+
+/*
+ * dhcpcd_trim_cb - periodically return unused heap pages to the OS.
+ *
+ * After the DHCP negotiation peak (packet parsing, script execution,
+ * option buffers) glibc retains free pages in the heap arena.
+ * Calling malloc_trim(0) forces the allocator to release those pages
+ * back to the kernel, reducing RSS in the long-running idle state.
+ */
+static void
+dhcpcd_trim_cb(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+
+#ifdef PRIVSEP
+	ps_bufshrink(ctx);
+#endif
+	malloc_trim(0);
+	logdebugx("malloc_trim: returned free heap pages to OS");
+
+	/* Re-arm only while still running as a daemon. */
+	if (ctx->options & DHCPCD_DAEMONISED)
+		eloop_timeout_add_sec(ctx->eloop, DHCPCD_TRIM_INTERVAL,
+		    dhcpcd_trim_cb, ctx);
+}
+#endif /* HAVE_MALLOC_TRIM */
+
 void
 dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 {
@@ -365,6 +398,35 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 	}
 
 	ctx->options |= DHCPCD_DAEMONISED;
+
+	/*
+	 * Clean up temporary buffers held from startup / negotiation peak:
+	 * 1. io_buf (used for reading configs / sysfs)
+	 * 2. script_buf and script_env (hooks environment)
+	 * 3. ps_buf (privsep IPC buffer, shrink to baseline BUFSIZ)
+	 */
+	free(ctx->io_buf);
+	ctx->io_buf = NULL;
+	ctx->io_buflen = 0;
+	script_free(ctx);
+#ifdef PRIVSEP
+	ps_bufshrink(ctx);
+#endif
+
+#ifdef HAVE_MALLOC_TRIM
+	/*
+	 * Return peak-phase heap allocations to the OS now that we have
+	 * finished startup/negotiation and are transitioning to idle.
+	 * This is the single most effective point: all temporary buffers
+	 * (script_buf, ps_buf, option parsing) have already been freed.
+	 */
+	malloc_trim(0);
+	logdebugx("malloc_trim: post-daemonise trim complete");
+
+	/* Schedule periodic trim to handle renewals and re-negotiations. */
+	eloop_timeout_add_sec(ctx->eloop, DHCPCD_TRIM_INTERVAL,
+	    dhcpcd_trim_cb, ctx);
+#endif /* HAVE_MALLOC_TRIM */
 }
 #endif
 
@@ -2160,6 +2222,24 @@ main(int argc, char **argv, char **envp)
 	memset(&ctx, 0, sizeof(ctx));
 	closefrom(STDERR_FILENO + 1);
 
+#ifdef HAVE_MALLOPT
+	/*
+	 * Tune glibc malloc for a single-threaded long-running daemon.
+	 *
+	 * M_ARENA_MAX=1: glibc creates up to 8*nCPU malloc arenas by default
+	 * to reduce lock contention in multi-threaded programs.  dhcpcd is
+	 * single-threaded (event-loop), so extra arenas just waste anonymous
+	 * memory.  One arena is sufficient and reduces RSS noticeably.
+	 *
+	 * M_TRIM_THRESHOLD=32768: lower the threshold at which the allocator
+	 * releases free top-of-heap memory to the OS (default 128 KB).
+	 * With a smaller threshold, free pages are returned to the kernel
+	 * sooner after allocation bursts, lowering idle RSS.
+	 */
+	mallopt(M_ARENA_MAX, 1);
+	mallopt(M_TRIM_THRESHOLD, 32768);
+#endif /* HAVE_MALLOPT */
+
 	ifo = NULL;
 	ctx.cffile = CONFIG;
 	ctx.script = UNCONST(dhcpcd_default_script);
@@ -2336,6 +2416,12 @@ main(int argc, char **argv, char **envp)
 		goto exit_success;
 	}
 	ctx.options |= ifo->options;
+	/* Free temporary config reading buffer (embedded config + config file)
+	 * before starting daemon or privsep forks to avoid inheriting bloated
+	 * buffers across child processes. */
+	free(ctx.io_buf);
+	ctx.io_buf = NULL;
+	ctx.io_buflen = 0;
 
 	if (i == 1 || i == 3) {
 		if (i == 1)

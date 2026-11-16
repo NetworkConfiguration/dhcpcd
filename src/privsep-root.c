@@ -57,6 +57,10 @@
 #include "sa.h"
 #include "script.h"
 
+#ifdef HAVE_MALLOC_TRIM
+#include <malloc.h>
+#endif
+
 __CTASSERT(sizeof(ioctl_request_t) <= sizeof(unsigned long));
 
 struct psr_error {
@@ -257,6 +261,18 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 			break;
 		}
 	}
+
+	/*
+	 * Free the script environment pointers and trim heap in the
+	 * privileged root process to drop peak RSS back to idle.
+	 */
+	free(ctx->script_env);
+	ctx->script_env = NULL;
+	ctx->script_envlen = 0;
+#ifdef HAVE_MALLOC_TRIM
+	malloc_trim(0);
+#endif
+
 	return status;
 }
 

@@ -178,6 +178,20 @@ eloop_event_setup_fds(struct eloop *eloop)
 			return -1;
 		eloop->fds = pfd;
 		eloop->nfds = eloop->nevents;
+	} else if (eloop->nevents > 0 &&
+	           eloop->nevents < eloop->nfds / 2) {
+		/*
+		 * Shrink the fd array when utilisation drops below 50%.
+		 * This can happen after interfaces are removed or after
+		 * BPF/privsep sockets are closed post-configuration.
+		 * Failure is non-fatal: we keep the oversized buffer.
+		 */
+		pfd = eloop_realloca(eloop->fds, eloop->nevents, sizeof(*pfd));
+		if (pfd != NULL) {
+			eloop->fds = pfd;
+			eloop->nfds = eloop->nevents;
+		}
+		pfd = eloop->fds;
 	} else
 		pfd = eloop->fds;
 #endif
