@@ -1258,7 +1258,6 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		logdebugx("reading standard input");
 	else
 		logdebugx("%s: reading lease: %s", ifp->name, state->leasefile);
-	*bootp = NULL;
 	sbytes = dhcp_readfile(ifp->ctx, state->leasefile, (void **)bootp,
 	    NULL);
 	if (sbytes == -1) {
