@@ -785,10 +785,9 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	 * global context if we are stopping or not.
 	 * This allows an active interface to stop even if dhcpcd is not.
 	 */
-	if (ifp->options != NULL) {
-		if (ifp->options->options & DHCPCD_STOPPING)
-			return;
-	} else if (ifp->ctx->options & DHCPCD_EXITING)
+	if (ifp->options == NULL ||
+	    ifp->options->options & DHCPCD_STOPPING ||
+	    ifp->ctx->options & DHCPCD_EXITING)
 		return;
 
 	if (!if_is_link_up(ifp)) {
