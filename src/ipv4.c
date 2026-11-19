@@ -544,13 +544,12 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 			struct dhcp_state *dstate;
 
 			dstate = D_STATE(ap->iface);
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			free(ap);
-
 			if (dstate && dstate->addr == ap) {
 				dstate->added = 0;
 				dstate->addr = NULL;
 			}
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			free(ap);
 			break;
 		}
 	}
