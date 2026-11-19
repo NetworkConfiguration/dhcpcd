@@ -671,7 +671,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 {
 	int e, i, t;
 	long l;
-	unsigned long u;
+	uint32_t u;
 	char *p = NULL, *bp, *fp, *np;
 	ssize_t s;
 	struct in_addr addr, addr2;
@@ -1043,7 +1043,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 
 		for (sl = 0, vsio = *vsiop; sl < *vsio_lenp; sl++, vsio++) {
-			if (vsio->en == (uint32_t)u)
+			if (vsio->en == u)
 				break;
 		}
 		if (sl == *vsio_lenp) {
@@ -1056,7 +1056,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			*vsiop = vsio;
 			vsio = &(*vsiop)[(*vsio_lenp)++];
-			vsio->en = (uint32_t)u;
+			vsio->en = u;
 			vsio->so = NULL;
 			vsio->so_len = 0;
 		}
@@ -2165,7 +2165,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ndop->encopts_len = 0;
 		} else
 			free_dhcp_opt_embenc(ndop);
-		ndop->option = (uint32_t)u; /* could have been 0 */
+		ndop->option = u; /* could have been 0 */
 		ndop->type = t;
 		ndop->len = (size_t)l;
 		ndop->var = np;
@@ -2208,7 +2208,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		for (vivco = ifo->vivco; vivco != vivco_endp; vivco++) {
-			if (vivco->en == (uint32_t)u) {
+			if (vivco->en == u) {
 				logerrx(
 				    "vendor class option for enterprise number %u already defined",
 				    vivco->en);
@@ -2246,7 +2246,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		ifo->vivco = vivco;
 		vivco = &ifo->vivco[ifo->vivco_len++];
-		vivco->en = (uint32_t)u;
+		vivco->en = u;
 		vivco->len = dl;
 		vivco->data = (uint8_t *)np;
 		break;
