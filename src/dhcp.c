@@ -1446,7 +1446,7 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
 		dhcp_envoption(ifp->ctx, fenv, prefix, ifp->name, opt,
 		    dhcp_getoption, p, pl);
 
-		if (opt->option != DHO_VIVSO || pl <= (int)sizeof(uint32_t))
+		if (opt->option != DHO_VIVSO || pl <= sizeof(uint32_t))
 			continue;
 		memcpy(&en, p, sizeof(en));
 		en = ntohl(en);
