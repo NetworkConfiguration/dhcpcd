@@ -815,6 +815,8 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 	if (iaf == NULL) {
 		struct ipv6_state *state = ipv6_getstate(ifp);
 
+		if (state == NULL)
+			return -1;
 		if ((iaf = malloc(sizeof(*iaf))) == NULL) {
 			logerr(__func__);
 			return 0; /* Well, we did add the address */
@@ -1396,6 +1398,8 @@ ipv6_addlinklocalcallback(struct interface *ifp, void (*callback)(void *),
 	struct ll_callback *cb;
 
 	state = ipv6_getstate(ifp);
+	if (state == NULL)
+		return -1;
 	TAILQ_FOREACH(cb, &state->ll_callbacks, next) {
 		if (cb->callback == callback && cb->arg == arg)
 			return 0;
