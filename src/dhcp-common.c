@@ -443,8 +443,6 @@ encode_rfc1035(const char *src, uint8_t *dst)
 	len = 1;
 	has_dot = 0;
 	for (; *src; src++) {
-		if (*src == '\0')
-			break;
 		if (*src == '.') {
 			/* Skip the trailing . */
 			if (src[1] == '\0')
@@ -489,7 +487,6 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 	o_len = 0;
 	start = out;
 	start_len = len;
-	q = p;
 	e = p + pl;
 	while (q < e) {
 		r = NULL;
@@ -1208,7 +1205,7 @@ dhcp_readfile(struct dhcpcd_ctx *ctx, const char *file, void **data,
 	}
 
 #ifdef PRIVSEP
-	if (file != NULL && ctx->options & DHCPCD_PRIVSEP &&
+	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
 		return ps_root_readfile(ctx, file, data, len);
 #else
