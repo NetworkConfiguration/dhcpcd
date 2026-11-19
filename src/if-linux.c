@@ -774,7 +774,8 @@ recv_again:
 		}
 		if (cb == NULL)
 			continue;
-		if (nlm->nlmsg_seq != (uint32_t)ctx->seq && fd != ctx->link_fd)
+		if (ctx != NULL &&
+		    nlm->nlmsg_seq != (uint32_t)ctx->seq && fd != ctx->link_fd)
 			logwarnx("%s: received sequence %u, expecting %d",
 			    __func__, nlm->nlmsg_seq, ctx->seq);
 		else
