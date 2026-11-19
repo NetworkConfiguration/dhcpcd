@@ -2436,8 +2436,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	int i, e, error;
 	size_t j;
 	uint16_t nl;
-	uint8_t iaid[4];
-	char buf[sizeof(iaid) * 3];
+	char buf[sizeof(ia.iaid) * 3];
 	struct ipv6_addr *ap;
 	struct if_ia *ifia;
 
@@ -2516,7 +2515,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 			if (ia.t2 > 0 && ia.t1 > ia.t2) {
 				logwarnx("%s: IAID %s T1(%d) > T2(%d) from %s",
 				    ifp->name,
-				    hwaddr_ntoa(iaid, sizeof(iaid), buf,
+				    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid), buf,
 					sizeof(buf)),
 				    ia.t1, ia.t2, sfrom);
 				continue;
