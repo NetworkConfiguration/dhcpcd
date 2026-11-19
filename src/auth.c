@@ -753,5 +753,5 @@ dhcp_auth_encode(struct dhcpcd_ctx *ctx, struct auth *auth,
 	}
 
 	/* Done! */
-	return (int)(dlen - sizeof(hmac_code)); /* should be zero */
+	return (ssize_t)(dlen - sizeof(hmac_code)); /* should be zero */
 }
