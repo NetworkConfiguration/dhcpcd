@@ -111,9 +111,9 @@ TAILQ_HEAD(ipv4_addrhead, ipv4_addr);
 #define IPV4_AF_NEW	      (1U << 1)
 
 #define IPV4_ADDR_EQ(a1, a2)  ((a1) && (a1)->addr.s_addr == (a2)->addr.s_addr)
-#define IPV4_MASK1_EQ(a1, a2) ((a1) && (a1)->mask.s_addr == (a2)->mask.s_addr)
+#define IPV4_MASK1_EQ(a1, a2) ((a1)->mask.s_addr == (a2)->mask.s_addr)
 #define IPV4_MASK_EQ(a1, a2)  (IPV4_ADDR_EQ(a1, a2) && IPV4_MASK1_EQ(a1, a2))
-#define IPV4_BRD1_EQ(a1, a2)  ((a1) && (a1)->brd.s_addr == (a2)->brd.s_addr)
+#define IPV4_BRD1_EQ(a1, a2)  ((a1)->brd.s_addr == (a2)->brd.s_addr)
 #define IPV4_BRD_EQ(a1, a2)   (IPV4_MASK_EQ(a1, a2) && IPV4_BRD1_EQ(a1, a2))
 
 struct ipv4_state {

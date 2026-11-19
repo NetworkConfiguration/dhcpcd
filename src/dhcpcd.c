@@ -1348,7 +1348,7 @@ dhcpcd_handlehwaddr(struct interface *ifp, uint16_t hwtype, const void *hwaddr,
 		    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
 	}
 	ifp->hwlen = hwlen;
-	if (hwaddr != NULL)
+	if (hwlen != 0)
 		memcpy(ifp->hwaddr, hwaddr, hwlen);
 }
 
