@@ -63,6 +63,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -1327,9 +1328,9 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
-	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
-	if ((unsigned int)ctx->seq > UINT32_MAX)
+	if (ctx->seq >= INT_MAX)
 		ctx->seq = 0;
+	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP && if_netlinkpriv(protocol, hdr))
