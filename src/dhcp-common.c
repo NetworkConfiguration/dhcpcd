@@ -194,12 +194,12 @@ dhcp_vendor(char *str, size_t len)
 	p = str;
 	l = snprintf(p, len, "%s-%s:%s-%s:%s", PACKAGE, VERSION, utn.sysname,
 	    utn.release, utn.machine);
-	if (l == -1 || (size_t)(l + 1) > len)
+	if (l == -1 || (size_t)l >= len)
 		return -1;
 	p += l;
 	len -= (size_t)l;
 	l = if_machinearch(p + 1, len - 1);
-	if (l == -1 || (size_t)(l + 1) > len)
+	if (l == -1 || (size_t)l >= len)
 		return -1;
 	if (l != 0) {
 		*p = ':';
