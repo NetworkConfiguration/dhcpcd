@@ -2361,7 +2361,10 @@ main(int argc, char **argv, char **envp)
 			ifname = *ctx.ifv;
 			if (ifname == NULL || strlen(ifname) > IF_NAMESIZE) {
 				errno = ifname == NULL ? EINVAL : E2BIG;
-				logerr("%s: ", ifname);
+				if (ifname != NULL)
+					logerr("%s", ifname);
+				else
+					logerr("interface name");
 				goto exit_failure;
 			}
 			/* Allow a dhcpcd interface per address family */
