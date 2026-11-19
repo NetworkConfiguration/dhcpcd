@@ -635,7 +635,6 @@ set_default_allow(struct if_options *ifo, struct dho_policy_group *pg)
 		struct dho_policy *p = &pg->dhop_allow;
 
 		if (dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
-		    dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
 		    dho_policy_add(p, DHO_CSR) == -1 ||
 		    dho_policy_add(p, DHO_ROUTER) == -1 ||
 		    dho_policy_add(p, DHO_DNSSERVER) == -1 ||
