@@ -498,7 +498,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		return 0;
 	}
 
-	if (psm->ps_cmd & PS_STOP && psp == NULL)
+	if (psm->ps_cmd & PS_STOP)
 		return 0;
 
 	switch (cmd) {
@@ -928,8 +928,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		ctx->ps_data_fd = datafd[1];
 		close(datafd[0]);
 		return 0;
-	} else if (pid == -1)
-		return -1;
+	}
 
 	logsetfd(logfd[0]);
 	close(logfd[1]);
