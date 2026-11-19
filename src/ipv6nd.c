@@ -1796,12 +1796,10 @@ ipv6nd_expirera(void *arg)
 			ltime = lifetime_left(rap->lifetime, &rap->acquired,
 			    &now);
 			if (ltime == 0 || rap->doexpire) {
-				if (!rap->expired) {
-					logwarnx("%s: %s: router expired",
-					    ifp->name, rap->sfrom);
-					rap->lifetime = 0;
-					expired = true;
-				}
+				logwarnx("%s: %s: router expired",
+				    ifp->name, rap->sfrom);
+				rap->lifetime = 0;
+				expired = true;
 			} else {
 				valid = true;
 				if (next == 0 || ltime < next)
