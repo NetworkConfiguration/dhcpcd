@@ -294,11 +294,11 @@ static const struct bpf_insn bpf_arp_filter[] = {
 
 /* One address is two checks of two statements. */
 #define BPF_NADDRS	  1
-#define BPF_ARP_ADDRS_LEN 5 + ((BPF_NADDRS * 2) * 2)
+#define BPF_ARP_ADDRS_LEN (5 + ((BPF_NADDRS * 2) * 2))
 
-#define BPF_ARP_LEN                                                   \
-	BPF_ARP_ETHER_LEN + BPF_ARP_FILTER_LEN + BPF_CMP_HWADDR_LEN + \
-	    BPF_ARP_ADDRS_LEN
+#define BPF_ARP_LEN                                                     \
+	(BPF_ARP_ETHER_LEN + BPF_ARP_FILTER_LEN + BPF_CMP_HWADDR_LEN + \
+	    BPF_ARP_ADDRS_LEN)
 
 static int
 bpf_arp_rw(const struct bpf *bpf, const struct in_addr *ia, bool recv)
@@ -447,9 +447,9 @@ static const struct bpf_insn bpf_bootp_write[] = {
 #define BPF_BOOTP_CHADDR_LEN ((BOOTP_CHADDR_LEN / 4) * 3)
 #define BPF_BOOTP_XID_LEN    4 /* BOUND check is 4 instructions */
 
-#define BPF_BOOTP_LEN                                                   \
-	BPF_BOOTP_ETHER_LEN + BPF_BOOTP_BASE_LEN + BPF_BOOTP_READ_LEN + \
-	    BPF_BOOTP_XID_LEN + BPF_BOOTP_CHADDR_LEN + 4
+#define BPF_BOOTP_LEN                                                     \
+	(BPF_BOOTP_ETHER_LEN + BPF_BOOTP_BASE_LEN + BPF_BOOTP_READ_LEN + \
+	    BPF_BOOTP_XID_LEN + BPF_BOOTP_CHADDR_LEN + 4)
 
 static int
 bpf_bootp_rw(const struct bpf *bpf, bool read)
