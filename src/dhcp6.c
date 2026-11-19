@@ -633,7 +633,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		int bits;
 
 		sla_max = ia->sla_max;
-		if (sla_max == 0 && (sla == NULL || !sla->sla_set)) {
+		if (sla_max == 0 && !sla->sla_set) {
 			const struct interface *ifi;
 
 			TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
@@ -1462,7 +1462,7 @@ sent:
 			state->RT = RT;
 		if (state->MRC == 0 || state->RTC <= state->MRC)
 			eloop_timeout_add_msec(ctx->eloop, RT, callback, ifp);
-		else if (state->MRC != 0 && state->MRCcallback)
+		else if (state->MRCcallback)
 			eloop_timeout_add_msec(ctx->eloop, RT,
 			    state->MRCcallback, ifp);
 		else
