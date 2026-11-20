@@ -2395,6 +2395,12 @@ dhcp_bind(struct interface *ifp)
 		state->offer = NULL;
 		state->offer_len = 0;
 	}
+	/* Free temporary opt_buffer if split options were reassembled */
+	if (ctx->opt_buffer != NULL) {
+		free(ctx->opt_buffer);
+		ctx->opt_buffer = NULL;
+		ctx->opt_buffer_len = 0;
+	}
 	get_lease(ifp, lease, state->new, state->new_len);
 	if (ifo->options & DHCPCD_STATIC) {
 		loginfox("%s: using static address %s/%d", ifp->name,

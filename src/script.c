@@ -56,6 +56,10 @@
 #include "privsep.h"
 #include "script.h"
 
+#ifdef HAVE_MALLOC_TRIM
+#include <malloc.h>
+#endif
+
 #define DEFAULT_PATH "/usr/bin:/usr/sbin:/bin:/sbin"
 
 static const char *const if_params[] = { "interface", "ifxname", "protocol",
@@ -814,5 +818,31 @@ send_listeners:
 			status = 1;
 	}
 
+	/*
+	 * Free script environment buffers and memstream immediately after
+	 * running the hooks to avoid retaining peak allocation in idle state.
+	 */
+	script_free(ctx);
+#ifdef HAVE_MALLOC_TRIM
+	malloc_trim(0);
+#endif
+
 	return status;
+}
+
+void
+script_free(struct dhcpcd_ctx *ctx)
+{
+#ifdef HAVE_OPEN_MEMSTREAM
+	if (ctx->script_fp != NULL) {
+		fclose(ctx->script_fp);
+		ctx->script_fp = NULL;
+	}
+#endif
+	free(ctx->script_buf);
+	ctx->script_buf = NULL;
+	ctx->script_buflen = 0;
+	free(ctx->script_env);
+	ctx->script_env = NULL;
+	ctx->script_envlen = 0;
 }

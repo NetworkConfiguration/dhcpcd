@@ -1338,6 +1338,48 @@ fi
 # Set this for eloop
 echo "#define	HAVE_REALLOCARRAY" >>$CONFIG_H
 
+if [ -z "$MALLOC_TRIM" ]; then
+	printf "Testing for malloc_trim ... "
+	cat <<EOF >_malloc_trim.c
+#include <malloc.h>
+int main(void) {
+	malloc_trim(0);
+	return 0;
+}
+EOF
+	if $XCC _malloc_trim.c -o _malloc_trim 2>&3; then
+		MALLOC_TRIM=yes
+	else
+		MALLOC_TRIM=no
+	fi
+	echo "$MALLOC_TRIM"
+	rm -rf _malloc_trim.* _malloc_trim
+fi
+if [ "$MALLOC_TRIM" = yes ]; then
+	echo "#define HAVE_MALLOC_TRIM" >>$CONFIG_H
+fi
+
+if [ -z "$MALLOPT" ]; then
+	printf "Testing for mallopt ... "
+	cat <<EOF >_mallopt.c
+#include <malloc.h>
+int main(void) {
+	mallopt(M_ARENA_MAX, 1);
+	return 0;
+}
+EOF
+	if $XCC _mallopt.c -o _mallopt 2>&3; then
+		MALLOPT=yes
+	else
+		MALLOPT=no
+	fi
+	echo "$MALLOPT"
+	rm -rf _mallopt.* _mallopt
+fi
+if [ "$MALLOPT" = yes ]; then
+	echo "#define HAVE_MALLOPT" >>$CONFIG_H
+fi
+
 if [ -z "$BE64ENC" ]; then
 	printf "Testing for be64enc ... "
 	cat <<EOF >_be64enc.c

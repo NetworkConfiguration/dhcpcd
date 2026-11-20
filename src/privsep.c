@@ -82,6 +82,9 @@
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
+#ifdef HAVE_MALLOC_TRIM
+#include <malloc.h>
+#endif
 
 /* CMSG_ALIGN is a Linux extension */
 #ifndef CMSG_ALIGN
@@ -430,6 +433,15 @@ ps_startprocess(struct ps_process *psp,
 	if (flags & PSF_DROPPRIVS)
 		ps_dropprivs(ctx);
 
+#ifdef HAVE_MALLOC_TRIM
+	/*
+	 * After the child process completes its initialisation (callback)
+	 * and drops privileges, release any heap memory accumulated during
+	 * startup back to the OS before entering the event loop.
+	 */
+	malloc_trim(0);
+#endif
+
 	psp->psp_started = true;
 	return 0;
 
@@ -504,6 +516,23 @@ ps_bufalloc(struct dhcpcd_ctx *ctx, size_t len)
 
 	ctx->ps_buf = nbuf;
 	ctx->ps_buflen = len;
+	return 0;
+}
+
+int
+ps_bufshrink(struct dhcpcd_ctx *ctx)
+{
+	void *nbuf;
+
+	if (ctx->ps_buflen <= BUFSIZ)
+		return 0;
+
+	nbuf = realloc(ctx->ps_buf, BUFSIZ);
+	if (nbuf == NULL)
+		return -1;
+
+	ctx->ps_buf = nbuf;
+	ctx->ps_buflen = BUFSIZ;
 	return 0;
 }
 
