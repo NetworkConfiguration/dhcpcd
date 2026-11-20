@@ -85,7 +85,7 @@ struct nd_opt_ri { /* Route Information option RFC4191 */
 	struct in6_addr nd_opt_ri_prefix;
 };
 __CTASSERT(sizeof(struct nd_opt_ri) == 24);
-#define OPT_RI_FLAG_PREFERENCE(flags) ((flags & 0x18) >> 3)
+#define OPT_RI_FLAG_PREFERENCE(flags) (((flags) & 0x18) >> 3)
 #endif
 
 #ifndef ND_OPT_RDNSS
@@ -113,7 +113,7 @@ __CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 #endif
 
 /* Impossible options, so we can easily add extras */
-#define _ND_OPT_PREFIX_ADDR 255 + 1
+#define _ND_OPT_PREFIX_ADDR (255 + 1)
 
 /* Minimal IPv6 MTU */
 #ifndef IPV6_MMTU
@@ -132,10 +132,10 @@ __CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 	5 /* Remember 5 expired routers to avoid \
 	     logspam. */
 
-#define MIN_RANDOM_FACTOR   500			     /* millisecs */
-#define MAX_RANDOM_FACTOR   1500		     /* millisecs */
-#define MIN_RANDOM_FACTOR_U MIN_RANDOM_FACTOR * 1000 /* usecs */
-#define MAX_RANDOM_FACTOR_U MAX_RANDOM_FACTOR * 1000 /* usecs */
+#define MIN_RANDOM_FACTOR   500			       /* millisecs */
+#define MAX_RANDOM_FACTOR   1500		       /* millisecs */
+#define MIN_RANDOM_FACTOR_U (MIN_RANDOM_FACTOR * 1000) /* usecs */
+#define MAX_RANDOM_FACTOR_U (MAX_RANDOM_FACTOR * 1000) /* usecs */
 
 #if BYTE_ORDER == BIG_ENDIAN
 #define IPV6_ADDR_INT32_ONE 1
@@ -1796,12 +1796,10 @@ ipv6nd_expirera(void *arg)
 			ltime = lifetime_left(rap->lifetime, &rap->acquired,
 			    &now);
 			if (ltime == 0 || rap->doexpire) {
-				if (!rap->expired) {
-					logwarnx("%s: %s: router expired",
-					    ifp->name, rap->sfrom);
-					rap->lifetime = 0;
-					expired = true;
-				}
+				logwarnx("%s: %s: router expired",
+				    ifp->name, rap->sfrom);
+				rap->lifetime = 0;
+				expired = true;
 			} else {
 				valid = true;
 				if (next == 0 || ltime < next)

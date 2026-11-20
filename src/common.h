@@ -158,7 +158,7 @@
 #define __restrict
 #elif __STDC_VERSION__ >= 199901L
 #define __restrict restrict
-#elif !(2 < __GNUC__ || (2 == __GNU_C && 95 <= __GNUC_VERSION__))
+#elif !(2 < __GNUC__ || (2 == __GNUC__ && 95 <= __GNUC_MINOR__))
 #define __restrict
 #endif
 #endif

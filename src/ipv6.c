@@ -165,13 +165,11 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	 * RFC7217 section 5.1 states the key SHOULD be at least 128 bits.
 	 * To attempt and future proof ourselves, we'll generate a key of
 	 * 512 bits (64 bytes). */
-	if (ctx->secret_len < 64) {
-		if ((ctx->secret = malloc(64)) == NULL) {
-			logerr(__func__);
-			return -1;
-		}
-		ctx->secret_len = 64;
+	if ((ctx->secret = malloc(64)) == NULL) {
+		logerr(__func__);
+		return -1;
 	}
+	ctx->secret_len = 64;
 	p = ctx->secret;
 	for (len = 0; len < 512 / NBBY; len += sizeof(r)) {
 		r = arc4random();
@@ -817,6 +815,8 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 	if (iaf == NULL) {
 		struct ipv6_state *state = ipv6_getstate(ifp);
 
+		if (state == NULL)
+			return -1;
 		if ((iaf = malloc(sizeof(*iaf))) == NULL) {
 			logerr(__func__);
 			return 0; /* Well, we did add the address */
@@ -1398,6 +1398,8 @@ ipv6_addlinklocalcallback(struct interface *ifp, void (*callback)(void *),
 	struct ll_callback *cb;
 
 	state = ipv6_getstate(ifp);
+	if (state == NULL)
+		return -1;
 	TAILQ_FOREACH(cb, &state->ll_callbacks, next) {
 		if (cb->callback == callback && cb->arg == arg)
 			return 0;
@@ -2229,7 +2231,7 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 #ifndef __linux__
 		sa_in6_init(rt->rt_gateway, &in6addr_loopback);
 #endif
-	} else if (!(addr->flags & IPV6_AF_ONLINK))
+	} else if (rap != NULL && !(addr->flags & IPV6_AF_ONLINK))
 		sa_in6_init(rt->rt_gateway, &rap->from);
 	else
 		rt->rt_gateway->sa_family = AF_UNSPEC;

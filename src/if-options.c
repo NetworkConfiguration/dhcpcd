@@ -635,7 +635,6 @@ set_default_allow(struct if_options *ifo, struct dho_policy_group *pg)
 		struct dho_policy *p = &pg->dhop_allow;
 
 		if (dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
-		    dho_policy_add(p, DHO_SUBNETMASK) == -1 ||
 		    dho_policy_add(p, DHO_CSR) == -1 ||
 		    dho_policy_add(p, DHO_ROUTER) == -1 ||
 		    dho_policy_add(p, DHO_DNSSERVER) == -1 ||
@@ -1911,14 +1910,17 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			dop = &ifo->vivso_override;
 			dop_len = &ifo->vivso_override_len;
 		}
-		*edop = *ldop = NULL;
+		if (edop != NULL)
+			*edop = NULL;
+		if (ldop != NULL)
+			*ldop = NULL;
 		/* FALLTHROUGH */
 	case O_EMBED:
 		if (dop == NULL) {
-			if (*edop) {
+			if (edop != NULL && *edop != NULL) {
 				dop = &(*edop)->embopts;
 				dop_len = &(*edop)->embopts_len;
-			} else if (*ldop) {
+			} else if (ldop != NULL && *ldop != NULL) {
 				dop = &(*ldop)->embopts;
 				dop_len = &(*ldop)->embopts_len;
 			} else {
@@ -1931,7 +1933,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case O_ENCAP:
 		ARG_REQUIRED;
 		if (dop == NULL) {
-			if (*ldop == NULL) {
+			if (ldop == NULL || *ldop == NULL) {
 				logerrx("encap must be after a define");
 				return -1;
 			}
@@ -2186,10 +2188,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		case O_DEFINEND:
 		case O_DEFINE6:
 		case O_VENDOPT:
-			*ldop = ndop;
+			if (ldop != NULL)
+				*ldop = ndop;
 			break;
 		case O_ENCAP:
-			*edop = ndop;
+			if (edop != NULL)
+				*edop = ndop;
 			break;
 		}
 		break;
@@ -2272,7 +2276,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (arg == NULL) {
 			ifo->auth.options |= DHCPCD_AUTH_SEND;
 			if (ifo->auth.protocol == AUTH_PROTO_TOKEN)
-				ifo->auth.protocol = AUTH_ALG_NONE;
+				ifo->auth.algorithm = AUTH_ALG_NONE;
 			else
 				ifo->auth.algorithm = AUTH_ALG_HMAC_MD5;
 			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
@@ -3049,10 +3053,12 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 {
 	int oi, opt, r;
 	unsigned long long wait_opts;
+	struct dhcp_opt *ldop, *edop;
 
 	if (argc == 0)
 		return 1;
 
+	ldop = edop = NULL;
 	optind = 0;
 	r = 1;
 	/* Don't apply the command line wait options to each interface,
@@ -3063,7 +3069,7 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	    (opt = getopt_long(argc, argv,
 		 ctx->options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
 		 cf_options, &oi)) != -1) {
-		r = parse_option(ctx, ifname, ifo, opt, optarg, NULL, NULL);
+		r = parse_option(ctx, ifname, ifo, opt, optarg, &ldop, &edop);
 		if (r != 1)
 			break;
 	}

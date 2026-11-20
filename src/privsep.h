@@ -92,7 +92,7 @@
 #define PS_START     0x4000
 #define PS_STOP	     0x8000
 
-#define PSP_NAMESIZE 16 + INET_MAX_ADDRSTRLEN
+#define PSP_NAMESIZE (16 + INET_MAX_ADDRSTRLEN)
 
 /* Handy macro to work out if in the privsep engine or not. */
 #define IN_PRIVSEP(ctx) ((ctx)->options & DHCPCD_PRIVSEP)

@@ -785,10 +785,9 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	 * global context if we are stopping or not.
 	 * This allows an active interface to stop even if dhcpcd is not.
 	 */
-	if (ifp->options != NULL) {
-		if (ifp->options->options & DHCPCD_STOPPING)
-			return;
-	} else if (ifp->ctx->options & DHCPCD_EXITING)
+	if (ifp->options == NULL ||
+	    ifp->options->options & DHCPCD_STOPPING ||
+	    ifp->ctx->options & DHCPCD_EXITING)
 		return;
 
 	if (!if_is_link_up(ifp)) {
@@ -1348,7 +1347,7 @@ dhcpcd_handlehwaddr(struct interface *ifp, uint16_t hwtype, const void *hwaddr,
 		    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
 	}
 	ifp->hwlen = hwlen;
-	if (hwaddr != NULL)
+	if (hwlen != 0)
 		memcpy(ifp->hwaddr, hwaddr, hwlen);
 }
 
@@ -2361,7 +2360,10 @@ main(int argc, char **argv, char **envp)
 			ifname = *ctx.ifv;
 			if (ifname == NULL || strlen(ifname) > IF_NAMESIZE) {
 				errno = ifname == NULL ? EINVAL : E2BIG;
-				logerr("%s: ", ifname);
+				if (ifname != NULL)
+					logerr("%s", ifname);
+				else
+					logerr("interface name");
 				goto exit_failure;
 			}
 			/* Allow a dhcpcd interface per address family */

@@ -91,7 +91,7 @@ typedef unsigned long ioctl_request_t;
 #define FRAMEHDRLEN_MAX 14 /* only ethernet support */
 #define FRAMELEN_MAX	(FRAMEHDRLEN_MAX + 9216)
 
-#define UDPLEN_MAX	64 * 1024
+#define UDPLEN_MAX	(64 * 1024)
 
 /* Work out if we have a private address or not
  * 10/8
@@ -99,10 +99,10 @@ typedef unsigned long ioctl_request_t;
  * 192.168/16
  */
 #ifndef IN_PRIVATE
-#define IN_PRIVATE(addr)                           \
-	(((addr & IN_CLASSA_NET) == 0x0a000000) || \
-	    ((addr & 0xfff00000) == 0xac100000) || \
-	    ((addr & IN_CLASSB_NET) == 0xc0a80000))
+#define IN_PRIVATE(addr)                             \
+	((((addr) & IN_CLASSA_NET) == 0x0a000000) || \
+	    (((addr) & 0xfff00000) == 0xac100000) || \
+	    (((addr) & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
 #ifndef CLLADDR

@@ -231,7 +231,7 @@ void
 arp_packet(struct interface *ifp, uint8_t *data, size_t len,
     unsigned int bpf_flags)
 {
-	size_t fl = bpf_frame_header_len(ifp), falen;
+	size_t fl = bpf_frame_header_len(ifp), falen = 0;
 	struct arphdr ar;
 	struct arp_msg arm;
 	const struct iarp_state *state;

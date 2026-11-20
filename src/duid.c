@@ -152,7 +152,7 @@ duid_make(void *d, const struct interface *ifp, uint16_t type)
 	return (size_t)(p - (uint8_t *)d);
 }
 
-#define DUID_STRLEN DUID_LEN * 3
+#define DUID_STRLEN (DUID_LEN * 3)
 static size_t
 duid_get(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 {

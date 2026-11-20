@@ -84,7 +84,7 @@ inet_cidrtoaddr(int cidr, struct in_addr *addr)
 {
 	int ocets;
 
-	if (cidr < 1 || cidr > 32) {
+	if (cidr < 0 || cidr > 32) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -94,7 +94,7 @@ inet_cidrtoaddr(int cidr, struct in_addr *addr)
 	if (ocets > 0) {
 		memset(&addr->s_addr, 255, (size_t)ocets - 1);
 		memset((unsigned char *)&addr->s_addr + (ocets - 1),
-		    (256 - (1 << (32 - cidr) % NBBY)), 1);
+		    (256 - (1 << ((32 - cidr) % NBBY))), 1);
 	}
 
 	return 0;
@@ -544,13 +544,12 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 			struct dhcp_state *dstate;
 
 			dstate = D_STATE(ap->iface);
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			free(ap);
-
 			if (dstate && dstate->addr == ap) {
 				dstate->added = 0;
 				dstate->addr = NULL;
 			}
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			free(ap);
 			break;
 		}
 	}

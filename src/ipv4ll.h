@@ -34,7 +34,7 @@
 #define LINKLOCAL_BCAST (LINKLOCAL_ADDR | ~LINKLOCAL_MASK)
 
 #ifndef IN_LINKLOCAL
-#define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
+#define IN_LINKLOCAL(addr) (((addr) & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
 #ifdef IPV4LL

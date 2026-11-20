@@ -1258,7 +1258,6 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		logdebugx("reading standard input");
 	else
 		logdebugx("%s: reading lease: %s", ifp->name, state->leasefile);
-	*bootp = NULL;
 	sbytes = dhcp_readfile(ifp->ctx, state->leasefile, (void **)bootp,
 	    NULL);
 	if (sbytes == -1) {
@@ -3161,9 +3160,6 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		return;
 	}
 
-	if (!ifp->active)
-		return;
-
 	i = whitelisted_ip(ifp->options, from->s_addr);
 	switch (i) {
 	case WHTLST_NOMATCH:
@@ -4006,6 +4002,10 @@ dhcp_init(struct interface *ifp)
 			    ifp->ctx->duid_len);
 		} else {
 		make_clientid:
+			if (ifp->hwlen >= UINT8_MAX) {
+				errno = ENOBUFS;
+				goto eexit;
+			}
 			len = (uint8_t)(ifp->hwlen + 1);
 			state->clientid = malloc((size_t)len + 1);
 			if (state->clientid == NULL)
@@ -4043,7 +4043,6 @@ dhcp_start1(void *arg)
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state;
 	uint32_t l;
-	int nolease;
 
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
@@ -4102,9 +4101,7 @@ dhcp_start1(void *arg)
 		return;
 	}
 
-	/* We don't want to read the old lease if we NAK an old test */
-	nolease = state->offer && ifp->ctx->options & DHCPCD_TEST;
-	if (!nolease && ifo->options & DHCPCD_DHCP) {
+	if (ifo->options & DHCPCD_DHCP) {
 		state->offer_len = read_lease(ifp, &state->offer);
 		/* Check the saved lease matches the type we want */
 		if (state->offer) {

@@ -141,6 +141,7 @@ ssize_t
 ipv4ll_env(FILE *fp, const char *prefix, const struct interface *ifp)
 {
 	const struct ipv4ll_state *state;
+	const char *pfx = prefix == NULL ? "" : prefix;
 	const char *pf = prefix == NULL ? "" : "_";
 	struct in_addr netnum;
 
@@ -149,20 +150,20 @@ ipv4ll_env(FILE *fp, const char *prefix, const struct interface *ifp)
 		return 0;
 
 	/* Emulate a DHCP environment */
-	if (efprintf(fp, "%s%sip_address=%s", prefix, pf,
+	if (efprintf(fp, "%s%sip_address=%s", pfx, pf,
 		inet_ntoa(state->addr->addr)) == -1)
 		return -1;
-	if (efprintf(fp, "%s%ssubnet_mask=%s", prefix, pf,
+	if (efprintf(fp, "%s%ssubnet_mask=%s", pfx, pf,
 		inet_ntoa(state->addr->mask)) == -1)
 		return -1;
-	if (efprintf(fp, "%s%ssubnet_cidr=%d", prefix, pf,
+	if (efprintf(fp, "%s%ssubnet_cidr=%d", pfx, pf,
 		inet_ntocidr(state->addr->mask)) == -1)
 		return -1;
-	if (efprintf(fp, "%s%sbroadcast_address=%s", prefix, pf,
+	if (efprintf(fp, "%s%sbroadcast_address=%s", pfx, pf,
 		inet_ntoa(state->addr->brd)) == -1)
 		return -1;
 	netnum.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
-	if (efprintf(fp, "%s%snetwork_number=%s", prefix, pf,
+	if (efprintf(fp, "%s%snetwork_number=%s", pfx, pf,
 		inet_ntoa(netnum)) == -1)
 		return -1;
 	return 5;

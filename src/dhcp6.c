@@ -633,7 +633,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		int bits;
 
 		sla_max = ia->sla_max;
-		if (sla_max == 0 && (sla == NULL || !sla->sla_set)) {
+		if (sla_max == 0 && !sla->sla_set) {
 			const struct interface *ifi;
 
 			TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
@@ -1462,7 +1462,7 @@ sent:
 			state->RT = RT;
 		if (state->MRC == 0 || state->RTC <= state->MRC)
 			eloop_timeout_add_msec(ctx->eloop, RT, callback, ifp);
-		else if (state->MRC != 0 && state->MRCcallback)
+		else if (state->MRCcallback)
 			eloop_timeout_add_msec(ctx->eloop, RT,
 			    state->MRCcallback, ifp);
 		else
@@ -2436,8 +2436,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	int i, e, error;
 	size_t j;
 	uint16_t nl;
-	uint8_t iaid[4];
-	char buf[sizeof(iaid) * 3];
+	char buf[sizeof(ia.iaid) * 3];
 	struct ipv6_addr *ap;
 	struct if_ia *ifia;
 
@@ -2516,7 +2515,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 			if (ia.t2 > 0 && ia.t1 > ia.t2) {
 				logwarnx("%s: IAID %s T1(%d) > T2(%d) from %s",
 				    ifp->name,
-				    hwaddr_ntoa(iaid, sizeof(iaid), buf,
+				    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid), buf,
 					sizeof(buf)),
 				    ia.t1, ia.t2, sfrom);
 				continue;
