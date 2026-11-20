@@ -33,6 +33,7 @@
 
 #include <net/if.h>
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "config.h"
@@ -109,7 +110,7 @@ TAILQ_HEAD(if_head, interface);
 #define ALIGNBYTES (sizeof(int) - 1)
 #endif
 #ifndef ALIGN
-#define ALIGN(p) (((unsigned int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
+#define ALIGN(p) (((uintptr_t)(p) + ALIGNBYTES) & ~(uintptr_t)ALIGNBYTES)
 #endif
 #ifndef CMSG_SPACE
 #define CMSG_SPACE(len) (ALIGN(sizeof(struct cmsghdr)) + ALIGN(len))
