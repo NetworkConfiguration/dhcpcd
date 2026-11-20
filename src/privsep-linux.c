@@ -43,8 +43,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h> /* For TCGETS */
 #include <unistd.h>
+
+/* termbits defines termios and termios2, termios defines only termios */
+#ifdef TCGETS2
+#include <asm/termbits.h> /* For termios2 of TCGETS2 */
+#else
+#include <termios.h>	/* For TCGETS */
+#endif
 
 #include "common.h"
 #include "if.h"
@@ -368,6 +374,10 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFVLAN),
 	/* printf over serial terminal requires this */
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS),
+	/* glibc >= 2.42 uses TCGETS2 instead of TCGETS */
+#ifdef TCGETS2
+	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS2),
+#endif
 	/* dumping leases on musl requires this */
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TIOCGWINSZ),
 /* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
