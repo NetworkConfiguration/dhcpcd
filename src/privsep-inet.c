@@ -101,12 +101,12 @@ ps_inet_canstart(const struct dhcpcd_ctx *ctx)
 		return true;
 #endif
 #if defined(INET6) && !defined(__sun)
-	if (ctx->options & DHCPCD_IPV6)
+	if (ctx->options6 & DHCPCD_IPV6)
 		return true;
 #endif
 #ifdef DHCP6
-	if ((ctx->options & (DHCPCD_IPV6 | DHCPCD_MANAGER)) ==
-	    (DHCPCD_IPV6 | DHCPCD_MANAGER))
+	if ((ctx->options6 & DHCPCD_IPV6) &&
+	    (ctx->options & DHCPCD_MANAGER) == DHCPCD_MANAGER)
 		return true;
 #endif
 
@@ -126,7 +126,7 @@ ps_inet_startcb(struct ps_process *psp)
 		setproctitle("[network proxy] %s%s%s",
 		    ctx->ifc != 0 ? ctx->ifv[0] : "",
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
-		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
+		    ctx->options6 & DHCPCD_IPV6 ? " [ip6]" : "");
 #endif
 
 	/* This end is the main engine, so it's useless for us. */
@@ -158,7 +158,7 @@ ps_inet_startcb(struct ps_process *psp)
 	}
 #endif
 #if defined(INET6) && !defined(__sun)
-	if (ctx->options & DHCPCD_IPV6) {
+	if (ctx->options6 & DHCPCD_IPV6) {
 		ctx->nd_fd = ipv6nd_open(true);
 		if (ctx->nd_fd == -1)
 			logerr("%s: ipv6nd_open", __func__);
@@ -179,8 +179,8 @@ ps_inet_startcb(struct ps_process *psp)
 	}
 #endif
 #ifdef DHCP6
-	if ((ctx->options & (DHCPCD_IPV6 | DHCPCD_MANAGER)) ==
-	    (DHCPCD_IPV6 | DHCPCD_MANAGER)) {
+	if ((ctx->options6 & DHCPCD_IPV6) &&
+	    (ctx->options & DHCPCD_MANAGER) == DHCPCD_MANAGER) {
 		ctx->dhcp6_rfd = dhcp6_openudp(0, NULL);
 		if (ctx->dhcp6_rfd == -1)
 			logerr("%s: dhcp6_open", __func__);

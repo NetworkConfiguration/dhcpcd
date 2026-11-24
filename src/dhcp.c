@@ -2178,8 +2178,12 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
 		state->reason = "EXPIRE";
 		script_runreason(ifp, state->reason);
-#define NOT_ONLY_SELF (DHCPCD_MANAGER | DHCPCD_IPV6RS | DHCPCD_DHCP6)
-		if (!(ctx->options & NOT_ONLY_SELF))
+#ifdef INET6
+		if ((ctx->options & DHCPCD_MANAGER) == 0 &&
+		    (ctx->options6 & (DHCPCD_IPV6RS | DHCPCD_DHCP6)) == 0)
+#else
+		if (!(ctx->options & DHCPCD_MANAGER))
+#endif
 			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
 		return deleted;
 	}

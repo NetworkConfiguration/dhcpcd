@@ -1780,7 +1780,7 @@ dhcp6_startinform(void *arg)
 static bool
 dhcp6_startdiscoinform(struct interface *ifp)
 {
-	unsigned long long opts = ifp->options->options;
+	unsigned long long opts = ifp->options->options6;
 
 	if (opts & DHCPCD_IA_FORCED || ipv6nd_hasradhcp(ifp, true))
 		dhcp6_startdiscover(ifp);
@@ -4012,7 +4012,7 @@ dhcp6_activateinterfaces(struct interface *ifp)
 			if (!ifd->active) {
 				loginfox("%s: activating for delegation",
 				    sla->ifname);
-				dhcpcd_activateinterface(ifd,
+				dhcpcd_activateinterface(ifd, 0,
 				    DHCPCD_IPV6 | DHCPCD_DHCP6);
 			}
 		}
@@ -4126,12 +4126,12 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			 * pl/vl time of the RA changing. */
 			if (state->state == DH6S_INIT ||
 			    (state->state == DH6S_DISCOVER &&
-				!(ifp->options->options & DHCPCD_IA_FORCED) &&
+				!(ifp->options->options6 & DHCPCD_IA_FORCED) &&
 				!ipv6nd_hasradhcp(ifp, true)))
 				dhcp6_startinform(ifp);
 			break;
 		case DH6S_REQUEST:
-			if (ifp->options->options & DHCPCD_DHCP6 &&
+			if (ifp->options->options6 & DHCPCD_DHCP6 &&
 			    (state->state == DH6S_INIT ||
 				state->state == DH6S_INFORM ||
 				state->state == DH6S_INFORMED ||
@@ -4173,7 +4173,7 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		}
 	}
 
-	if (!(ifp->options->options & DHCPCD_DHCP6))
+	if (!(ifp->options->options6 & DHCPCD_DHCP6))
 		return 0;
 
 	ifp->if_data[IF_DATA_DHCP6] = calloc(1, sizeof(*state));
@@ -4370,7 +4370,7 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 	if (cmd == RTM_NEWADDR && !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
 	    ifp->active == IF_ACTIVE_USER &&
 	    !(ifp->ctx->options & DHCPCD_MANAGER) &&
-	    ifp->options->options & DHCPCD_DHCP6) {
+	    ifp->options->options6 & DHCPCD_DHCP6) {
 #ifdef PRIVSEP
 		if (IN_PRIVSEP_SE(ifp->ctx)) {
 			if (ps_inet_opendhcp6(ia) == -1)

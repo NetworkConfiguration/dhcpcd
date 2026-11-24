@@ -62,6 +62,9 @@
 #define CLEAR_CONFIG_BLOCK(ifo) ((ifo)->options &= ~DHCPCD_FORKED)
 
 static unsigned long long default_options;
+#ifdef INET6
+static unsigned long long default_options6;
+#endif
 
 const struct option cf_options[] = { { "background", no_argument, NULL, 'b' },
 	{ "script", required_argument, NULL, 'c' },
@@ -898,9 +901,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
 		ifo->options &= ~DHCPCD_STATIC;
 		break;
+#ifdef INET6
 	case O_INFORM6:
-		ifo->options |= DHCPCD_INFORM6;
+		ifo->options6 |= DHCPCD_INFORM6;
 		break;
+#endif
 	case 't':
 		ARG_REQUIRED;
 		ifo->timeout = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX,
@@ -1160,8 +1165,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		while (p != NULL && p[0] != '\0') {
 			if (p[0] == '4' || p[1] == '4')
 				ifo->options |= DHCPCD_WAITIP4;
+#ifdef INET6
 			if (p[0] == '6' || p[1] == '6')
-				ifo->options |= DHCPCD_WAITIP6;
+				ifo->options6 |= DHCPCD_WAITIP6;
+#endif
 			p = strskipwhite(++p);
 		}
 		break;
@@ -1502,8 +1509,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case '4':
 #ifdef INET
-		ifo->options &= ~DHCPCD_IPV6;
 		ifo->options |= DHCPCD_IPV4;
+#ifdef INET6
+		ifo->options6 &= ~DHCPCD_IPV6;
+#endif
 		break;
 #else
 		logerrx("INET has been compiled out");
@@ -1512,7 +1521,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case '6':
 #ifdef INET6
 		ifo->options &= ~DHCPCD_IPV4;
-		ifo->options |= DHCPCD_IPV6;
+		ifo->options6 |= DHCPCD_IPV6;
 		break;
 #else
 		logerrx("INET6 has been compiled out");
@@ -1524,12 +1533,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case O_NOIPV4:
 		ifo->options &= ~DHCPCD_IPV4;
 		break;
+#ifdef INET6
 	case O_IPV6:
-		ifo->options |= DHCPCD_IPV6;
+		ifo->options6 |= DHCPCD_IPV6;
 		break;
 	case O_NOIPV6:
-		ifo->options &= ~DHCPCD_IPV6;
+		ifo->options6 &= ~DHCPCD_IPV6;
 		break;
+#endif
 	case O_ALLOW:
 		ARG_REQUIRED;
 		if (ctx->options & DHCPCD_PRINT_PIDFILE)
@@ -1627,23 +1638,27 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerrx("invalid IAID %s", arg);
 			return -1;
 		}
-		ifo->options |= DHCPCD_IAID;
+#ifdef INET6
+		ifo->options6 |= DHCPCD_IAID;
+#endif
 		break;
+#ifdef INET6
 	case O_IPV6RS:
-		ifo->options |= DHCPCD_IPV6RS;
+		ifo->options6 |= DHCPCD_IPV6RS;
 		break;
 	case O_NOIPV6RS:
-		ifo->options &= ~DHCPCD_IPV6RS;
+		ifo->options6 &= ~DHCPCD_IPV6RS;
 		break;
 	case O_IPV6RA_FORK:
-		ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
+		ifo->options6 &= ~DHCPCD_IPV6RA_REQRDNSS;
 		break;
 	case O_IPV6RA_AUTOCONF:
-		ifo->options |= DHCPCD_IPV6RA_AUTOCONF;
+		ifo->options6 |= DHCPCD_IPV6RA_AUTOCONF;
 		break;
 	case O_IPV6RA_NOAUTOCONF:
-		ifo->options &= ~DHCPCD_IPV6RA_AUTOCONF;
+		ifo->options6 &= ~DHCPCD_IPV6RA_AUTOCONF;
 		break;
+#endif
 	case O_NOALIAS:
 		ifo->options |= DHCPCD_NOALIAS;
 		break;
@@ -1676,7 +1691,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				"interface block");
 			return -1;
 		}
-		ifo->options |= DHCPCD_IA_FORCED;
+		ifo->options6 |= DHCPCD_IA_FORCED;
 		fp = strwhite(arg);
 		if (fp) {
 			*fp++ = '\0';
@@ -2432,12 +2447,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case O_NODHCP:
 		ifo->options &= ~DHCPCD_DHCP;
 		break;
+#ifdef INET6
 	case O_DHCP6:
-		ifo->options |= DHCPCD_DHCP6 | DHCPCD_IPV6;
+		ifo->options6 |= DHCPCD_DHCP6 | DHCPCD_IPV6;
 		break;
 	case O_NODHCP6:
-		ifo->options &= ~DHCPCD_DHCP6;
+		ifo->options6 &= ~DHCPCD_DHCP6;
 		break;
+#endif
 	case O_CONTROLGRP:
 	case O_READGRP:
 		ARG_REQUIRED;
@@ -2523,12 +2540,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			*np++ = '\0';
 			np = strskipwhite(np);
 		}
+#ifdef INET6
 		if (strcmp(arg, "private") == 0 ||
 		    strcmp(arg, "stableprivate") == 0 ||
 		    strcmp(arg, "stable") == 0)
-			ifo->options |= DHCPCD_SLAACPRIVATE;
+			ifo->options6 |= DHCPCD_SLAACPRIVATE;
 		else
-			ifo->options &= ~DHCPCD_SLAACPRIVATE;
+			ifo->options6 &= ~DHCPCD_SLAACPRIVATE;
+#endif
 #ifdef INET6
 		if (strcmp(arg, "token") == 0) {
 			if (np == NULL) {
@@ -2547,9 +2566,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 		}
 #endif
+#ifdef INET6
 		if (np != NULL &&
 		    (strcmp(np, "temp") == 0 || strcmp(np, "temporary") == 0))
-			ifo->options |= DHCPCD_SLAACTEMP;
+			ifo->options6 |= DHCPCD_SLAACTEMP;
+#endif
 		break;
 	case O_BOOTP:
 		ifo->options |= DHCPCD_BOOTP;
@@ -2713,13 +2734,15 @@ finish_config(struct if_options *ifo)
 	if (!(ifo->options & DHCPCD_IPV4))
 		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL | DHCPCD_WAITIP4);
 
-	if (!(ifo->options & DHCPCD_IPV6))
-		ifo->options &= ~(
+#ifdef INET6
+	if (!(ifo->options6 & DHCPCD_IPV6))
+		ifo->options6 &= ~(
 		    DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
-	if (!(ifo->options & DHCPCD_IPV6RS))
-		ifo->options &= ~(
+	if (!(ifo->options6 & DHCPCD_IPV6RS))
+		ifo->options6 &= ~(
 		    DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
+#endif
 
 #ifdef INET
 	/* The exponential backoff cutoff must not be lower than the
@@ -2769,8 +2792,10 @@ default_config(struct dhcpcd_ctx *ctx)
 		ifo->options |= DHCPCD_CONFIGURE;
 	if (ctx->options & DHCPCD_PERSISTENT)
 		ifo->options |= DHCPCD_PERSISTENT;
-	if (ctx->options & DHCPCD_SLAACPRIVATE)
-		ifo->options |= DHCPCD_SLAACPRIVATE;
+#ifdef INET6
+	if (ctx->options6 & DHCPCD_SLAACPRIVATE)
+		ifo->options6 |= DHCPCD_SLAACPRIVATE;
+#endif
 
 	return ifo;
 }
@@ -2808,7 +2833,7 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 		skip = xsocket(PF_INET6, SOCK_DGRAM, 0);
 		if (skip != -1) {
 			close(skip);
-			default_options |= DHCPCD_IPV6 | DHCPCD_IPV6RS |
+			default_options6 |= DHCPCD_IPV6 | DHCPCD_IPV6RS |
 			    DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS |
 			    DHCPCD_DHCP6;
 		}
@@ -2818,6 +2843,9 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 #endif
 	}
 	ifo->options |= default_options;
+#ifdef INET6
+	ifo->options6 |= default_options6;
+#endif
 
 	CLEAR_CONFIG_BLOCK(ifo);
 
@@ -2966,6 +2994,9 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 			had_block = 1;
 			new_block = 0;
 			ifo->options &= ~DHCPCD_WAITOPTS;
+#ifdef INET6
+			ifo->options6 &= ~DHCPCD_WAITOPTS6;
+#endif
 			SET_CONFIG_BLOCK(ifo);
 		}
 
@@ -3036,8 +3067,12 @@ read_config(struct dhcpcd_ctx *ctx, const char *ifname, const char *ssid,
 		return NULL;
 	}
 
-	if (!had_block)
+	if (!had_block) {
 		ifo->options &= ~DHCPCD_WAITOPTS;
+#ifdef INET6
+		ifo->options6 &= ~DHCPCD_WAITOPTS6;
+#endif
+	}
 	CLEAR_CONFIG_BLOCK(ifo);
 	finish_config(ifo);
 	return ifo;
@@ -3048,7 +3083,10 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
     int argc, char **argv)
 {
 	int oi, opt, r;
-	unsigned long long wait_opts;
+	unsigned long long wait_opts = 0;
+#ifdef INET6
+	unsigned long long wait_opts6 = 0;
+#endif
 
 	if (argc == 0)
 		return 1;
@@ -3057,8 +3095,12 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	r = 1;
 	/* Don't apply the command line wait options to each interface,
 	 * only use the dhcpcd.conf entry for that. */
-	if (ifname != NULL)
+	if (ifname != NULL) {
 		wait_opts = ifo->options & DHCPCD_WAITOPTS;
+#ifdef INET6
+		wait_opts6 = ifo->options6 & DHCPCD_WAITOPTS6;
+#endif
+	}
 	while (
 	    (opt = getopt_long(argc, argv,
 		 ctx->options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
@@ -3070,6 +3112,10 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	if (ifname != NULL) {
 		ifo->options &= ~DHCPCD_WAITOPTS;
 		ifo->options |= wait_opts;
+#ifdef INET6
+		ifo->options6 &= ~DHCPCD_WAITOPTS6;
+		ifo->options6 |= wait_opts6;
+#endif
 	}
 
 	finish_config(ifo);

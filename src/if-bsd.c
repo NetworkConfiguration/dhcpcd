@@ -1847,7 +1847,7 @@ if_set_ifxflags(const struct interface *ifp)
 #else
 #define BSD_AUTOCONF DHCPCD_IPV6RA_AUTOCONF
 #endif
-	if (ifp->options->options & BSD_AUTOCONF)
+	if (ifp->options->options6 & BSD_AUTOCONF)
 		flags &= ~IFXF_AUTOCONF6;
 	if (ifr.ifr_flags == flags)
 		return 0;
@@ -1918,10 +1918,10 @@ if_setup_inet6(const struct interface *ifp)
 	 * If we need to, we should have another option actively disable it.
 	 */
 #ifdef ND6_IFF_ACCEPT_RTADV
-	if (ifp->options->options & DHCPCD_IPV6RS)
+	if (ifp->options->options6 & DHCPCD_IPV6RS)
 		flags &= ~ND6_IFF_ACCEPT_RTADV;
 #ifdef ND6_IFF_OVERRIDE_RTADV
-	if (ifp->options->options & DHCPCD_IPV6RS)
+	if (ifp->options->options6 & DHCPCD_IPV6RS)
 		flags |= ND6_IFF_OVERRIDE_RTADV;
 #endif
 #endif
@@ -1951,7 +1951,7 @@ if_setup_inet6(const struct interface *ifp)
 	/* Flush the kernel knowledge of advertised routers
 	 * and prefixes so the kernel does not expire prefixes
 	 * and default routes we are trying to own. */
-	if (ifp->options->options & DHCPCD_IPV6RS) {
+	if (ifp->options->options6 & DHCPCD_IPV6RS) {
 		struct in6_ifreq ifr;
 
 		memset(&ifr, 0, sizeof(ifr));

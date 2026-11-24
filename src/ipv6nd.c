@@ -785,7 +785,7 @@ ipv6nd_scriptrun(struct ra *rap)
 	}
 
 	/* If we don't require RDNSS then set hasdns = 1 so we fork */
-	if (!(rap->iface->options->options & DHCPCD_IPV6RA_REQRDNSS))
+	if (!(rap->iface->options->options6 & DHCPCD_IPV6RA_REQRDNSS))
 		hasdns = 1;
 	else {
 		hasdns = rap->hasdns;
@@ -854,7 +854,7 @@ ipv6nd_dadcallback(void *arg)
 		 * Because ap->dadcounter is always increamented,
 		 * a different address is generated. */
 		/* XXX Cache DAD counter per prefix/id/ssid? */
-		if (ifp->options->options & DHCPCD_SLAACPRIVATE &&
+		if (ifp->options->options6 & DHCPCD_SLAACPRIVATE &&
 		    IA6_CANAUTOCONF(ia)) {
 			unsigned int delay;
 
@@ -1058,7 +1058,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 		return;
 	}
 
-	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
+	if (!(ifp->options->options6 & DHCPCD_IPV6RS)) {
 #ifdef DEBUG_RS
 		logerrx("%s: unexpected RA from %s", ifp->name, sfrom);
 #endif
@@ -1284,7 +1284,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK)
 				flags |= IPV6_AF_ONLINK;
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO &&
-			    rap->iface->options->options &
+			    rap->iface->options->options6 &
 				DHCPCD_IPV6RA_AUTOCONF)
 				flags |= IPV6_AF_AUTOCONF;
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)
@@ -1381,7 +1381,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, const struct sockaddr_in6 *from,
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
 			if (ia->flags & IPV6_AF_AUTOCONF &&
-			    ia->iface->options->options & DHCPCD_SLAACTEMP &&
+			    ia->iface->options->options6 & DHCPCD_SLAACTEMP &&
 			    IA6_CANAUTOCONF(ia)) {
 				if (!new_ia) {
 					if (ipv6_settemptime(ia, 1) == NULL)
@@ -1536,7 +1536,7 @@ run:
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, rap); /* reachable timer */
 
 handle_flag:
-	if (!(ifp->options->options & DHCPCD_DHCP6))
+	if (!(ifp->options->options6 & DHCPCD_DHCP6))
 		goto nodhcp6;
 /* Only log a DHCPv6 start error if compiled in or debugging is enabled. */
 #ifdef DHCP6
@@ -2001,7 +2001,7 @@ ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 	/* Don't do anything if the user hasn't configured it. */
 	if (ifp->active != IF_ACTIVE_USER ||
 	    ifp->options->options & DHCPCD_STOPPING ||
-	    !(ifp->options->options & DHCPCD_IPV6))
+	    !(ifp->options->options6 & DHCPCD_IPV6))
 		return;
 
 	icp = (struct icmp6_hdr *)msg->msg_iov[0].iov_base;

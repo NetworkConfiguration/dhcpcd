@@ -2208,7 +2208,7 @@ if_setup_inet6(const struct interface *ifp)
 
 	/* If not doing autoconf, don't disable the kernel from doing it.
 	 * If we need to, we should have another option actively disable it. */
-	if (!(ifp->options->options & DHCPCD_IPV6RS))
+	if (!(ifp->options->options6 & DHCPCD_IPV6RS))
 		return;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);

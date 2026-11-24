@@ -93,36 +93,36 @@
 #define DHCPCD_BACKGROUND	  (1ULL << 22)
 #define DHCPCD_VENDORRAW	  (1ULL << 23)
 // unused				(1ULL << 24)
-#define DHCPCD_WAITIP			(1ULL << 25)
-#define DHCPCD_SLAACPRIVATE		(1ULL << 26)
-#define DHCPCD_CSR_WARNED		(1ULL << 27)
-#define DHCPCD_XID_HWADDR		(1ULL << 28)
-#define DHCPCD_BROADCAST		(1ULL << 29)
-#define DHCPCD_DUMPLEASE		(1ULL << 30)
-#define DHCPCD_IPV6RS			(1ULL << 31)
-#define DHCPCD_IPV6RA_REQRDNSS		(1ULL << 32)
-#define DHCPCD_PRIVSEP			(1ULL << 33)
-#define DHCPCD_CONFIGURE		(1ULL << 34)
-#define DHCPCD_IPV4			(1ULL << 35)
-#define DHCPCD_FORKED			(1ULL << 36)
-#define DHCPCD_IPV6			(1ULL << 37)
-#define DHCPCD_STARTED			(1ULL << 38)
-#define DHCPCD_NOALIAS			(1ULL << 39)
-#define DHCPCD_IA_FORCED		(1ULL << 40)
-#define DHCPCD_STOPPING			(1ULL << 41)
-#define DHCPCD_LAUNCHER			(1ULL << 42)
-#define DHCPCD_HOSTNAME_SHORT		(1ULL << 43)
-#define DHCPCD_EXITING			(1ULL << 44)
-#define DHCPCD_WAITIP4			(1ULL << 45)
-#define DHCPCD_WAITIP6			(1ULL << 46)
-#define DHCPCD_DEV			(1ULL << 47)
-#define DHCPCD_IAID			(1ULL << 48)
-#define DHCPCD_DHCP			(1ULL << 49)
-#define DHCPCD_DHCP6			(1ULL << 50)
-#define DHCPCD_IF_UP			(1ULL << 51)
-#define DHCPCD_INFORM6			(1ULL << 52)
-#define DHCPCD_WANTDHCP			(1ULL << 53)
-#define DHCPCD_IPV6RA_AUTOCONF		(1ULL << 54)
+#define DHCPCD_WAITIP (1ULL << 25)
+// unused				(1ULL << 26) /* was SLAACPRIVATE */
+#define DHCPCD_CSR_WARNED (1ULL << 27)
+#define DHCPCD_XID_HWADDR (1ULL << 28)
+#define DHCPCD_BROADCAST  (1ULL << 29)
+#define DHCPCD_DUMPLEASE  (1ULL << 30)
+// unused				(1ULL << 31) /* was IPV6RS */
+// unused				(1ULL << 32) /* was IPV6RA_REQRDNSS */
+#define DHCPCD_PRIVSEP	 (1ULL << 33)
+#define DHCPCD_CONFIGURE (1ULL << 34)
+#define DHCPCD_IPV4	 (1ULL << 35)
+#define DHCPCD_FORKED	 (1ULL << 36)
+// unused				(1ULL << 37) /* was IPV6 */
+#define DHCPCD_STARTED (1ULL << 38)
+#define DHCPCD_NOALIAS (1ULL << 39)
+// unused				(1ULL << 40) /* was IA_FORCED */
+#define DHCPCD_STOPPING	      (1ULL << 41)
+#define DHCPCD_LAUNCHER	      (1ULL << 42)
+#define DHCPCD_HOSTNAME_SHORT (1ULL << 43)
+#define DHCPCD_EXITING	      (1ULL << 44)
+#define DHCPCD_WAITIP4	      (1ULL << 45)
+// unused				(1ULL << 46) /* was WAITIP6 */
+#define DHCPCD_DEV (1ULL << 47)
+// unused				(1ULL << 48) /* was IAID */
+#define DHCPCD_DHCP (1ULL << 49)
+// unused				(1ULL << 50) /* was DHCP6 */
+#define DHCPCD_IF_UP (1ULL << 51)
+// unused				(1ULL << 52) /* was INFORM6 */
+#define DHCPCD_WANTDHCP (1ULL << 53)
+// unused				(1ULL << 54) /* was IPV6RA_AUTOCONF */
 #define DHCPCD_ROUTER_HOST_ROUTE_WARNED (1ULL << 55)
 #define DHCPCD_LASTLEASE_EXTEND		(1ULL << 56)
 #define DHCPCD_BOOTP			(1ULL << 57)
@@ -130,14 +130,30 @@
 #define DHCPCD_PRINT_PIDFILE		(1ULL << 59)
 #define DHCPCD_ONESHOT			(1ULL << 60)
 #define DHCPCD_INACTIVE			(1ULL << 61)
-#define DHCPCD_SLAACTEMP		(1ULL << 62)
-#define DHCPCD_PRIVSEPROOT		(1ULL << 63)
+// unused				(1ULL << 62) /* was SLAACTEMP */
+#define DHCPCD_PRIVSEPROOT (1ULL << 63)
 
-#define DHCPCD_NODROP			(DHCPCD_EXITING | DHCPCD_PERSISTENT)
+#ifdef INET6
+#define DHCPCD_IPV6	       (1ULL << 0)
+#define DHCPCD_SLAACPRIVATE    (1ULL << 1)
+#define DHCPCD_IPV6RS	       (1ULL << 2)
+#define DHCPCD_IPV6RA_REQRDNSS (1ULL << 3)
+#define DHCPCD_IA_FORCED       (1ULL << 4)
+#define DHCPCD_WAITIP6	       (1ULL << 5)
+#define DHCPCD_IAID	       (1ULL << 6)
+#define DHCPCD_DHCP6	       (1ULL << 7)
+#define DHCPCD_INFORM6	       (1ULL << 8)
+#define DHCPCD_IPV6RA_AUTOCONF (1ULL << 9)
+#define DHCPCD_SLAACTEMP       (1ULL << 10)
 
-#define DHCPCD_WAITOPTS			(DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)
+#define DHCPCD_WAITOPTS6       (DHCPCD_WAITIP6)
+#endif
 
-#define DHCPCD_WARNINGS			(DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED)
+#define DHCPCD_NODROP	(DHCPCD_EXITING | DHCPCD_PERSISTENT)
+
+#define DHCPCD_WAITOPTS (DHCPCD_WAITIP | DHCPCD_WAITIP4)
+
+#define DHCPCD_WARNINGS (DHCPCD_CSR_WARNED | DHCPCD_ROUTER_HOST_ROUTE_WARNED)
 
 /* These options only make sense in the config file, so don't use any
    valid short options for them */
@@ -277,6 +293,9 @@ struct if_options {
 	uint32_t backoff_cutoff;
 	uint32_t backoff_jitter;
 	unsigned long long options;
+#ifdef INET6
+	unsigned long long options6;
+#endif
 	bool randomise_hwaddr;
 
 #ifdef INET
