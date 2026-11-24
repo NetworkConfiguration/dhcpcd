@@ -1071,7 +1071,11 @@ dhcpcd_startinterface(void *arg)
 		return;
 	}
 
+#ifdef INET6
 	if (((ifo->options & DHCPCD_DUID) || (ifo->options6 & DHCPCD_IPV6)) &&
+#else
+	if ((ifo->options & DHCPCD_DUID) &&
+#endif
 	    !(ifo->options & DHCPCD_ANONYMOUS)) {
 		char buf[sizeof(ifo->iaid) * 3];
 #ifdef INET6
@@ -2892,7 +2896,11 @@ start_manager:
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MANAGER ? "[manager]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
+#ifdef INET6
 	    ctx.options6 & DHCPCD_IPV6 ? " [ip6]" : "");
+#else
+	    "");
+#endif
 #endif
 
 	if (if_opensockets(&ctx) == -1) {
