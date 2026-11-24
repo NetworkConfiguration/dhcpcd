@@ -131,6 +131,7 @@ struct ipv6_addr *ipv6nd_iffindprefix(struct interface *,
     const struct in6_addr *, uint8_t);
 ssize_t ipv6nd_free(struct interface *);
 void ipv6nd_expirera(void *arg);
+void ipv6nd_prefix_setflags(struct ipv6_addr *, unsigned int);
 bool ipv6nd_hasralifetime(const struct interface *, bool);
 #define ipv6nd_hasra(i) ipv6nd_hasralifetime((i), false)
 bool ipv6nd_hasradhcp(const struct interface *, bool);

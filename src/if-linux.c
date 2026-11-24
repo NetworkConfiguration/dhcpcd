@@ -2267,4 +2267,15 @@ if_applyra(const struct ra *rap)
 	return error;
 }
 
+int
+ip6_dadcount(struct interface *ifp)
+{
+	char path[256];
+	const char *ifname = ifp->name;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+
+	snprintf(path, sizeof(path), "%s/%s/dad_transmits", p_conf, ifname);
+	return check_proc_int(ctx, path);
+}
+
 #endif /* INET6 */
