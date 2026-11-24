@@ -686,9 +686,14 @@ ps_root_startcb(struct ps_process *psp)
 	if (ctx->options & DHCPCD_MANAGER)
 		setproctitle("[privileged proxy]");
 	else
+#ifdef INET6
 		setproctitle("[privileged proxy] %s%s%s", ctx->ifv[0],
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
-		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
+		    ctx->options6 & DHCPCD_IPV6 ? " [ip6]" : "");
+#else
+		setproctitle("[privileged proxy] %s%s", ctx->ifv[0],
+		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "");
+#endif
 #endif
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
@@ -719,7 +724,7 @@ ps_root_startcb(struct ps_process *psp)
 	}
 #endif
 #if defined(INET6) && !defined(__sun)
-	if (ctx->options & DHCPCD_IPV6) {
+	if (ctx->options6 & DHCPCD_IPV6) {
 		int buflen = 1;
 
 		ctx->nd_fd = ipv6nd_open(false);
@@ -731,7 +736,7 @@ ps_root_startcb(struct ps_process *psp)
 	}
 #endif
 #ifdef DHCP6
-	if (ctx->options & DHCPCD_IPV6) {
+	if (ctx->options6 & DHCPCD_IPV6) {
 		int buflen = 1;
 
 		ctx->dhcp6_wfd = dhcp6_openraw();

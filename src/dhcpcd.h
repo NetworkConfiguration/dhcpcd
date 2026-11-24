@@ -124,6 +124,9 @@ struct dhcpcd_ctx {
 	int fork_fd; /* FD for the fork init signal pipe */
 	const char *cffile;
 	unsigned long long options;
+#ifdef INET6
+	unsigned long long options6;
+#endif
 	char *logfile;
 	int argc;
 	char **argv;
@@ -278,6 +281,11 @@ void dhcpcd_dropped(struct interface *);
 int dhcpcd_selectprofile(struct interface *, const char *);
 
 void dhcpcd_startinterface(void *);
+#ifdef INET6
+void dhcpcd_activateinterface(struct interface *, unsigned long long,
+    unsigned long long);
+#else
 void dhcpcd_activateinterface(struct interface *, unsigned long long);
+#endif
 
 #endif

@@ -489,7 +489,7 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 	UNUSED(flags);
 #endif
 
-	if (ifo->options & DHCPCD_SLAACPRIVATE) {
+	if (ifo->options6 & DHCPCD_SLAACPRIVATE) {
 		dad = 0;
 		if (ipv6_makestableprivate(addr, prefix, prefix_len, ifp,
 			&dad) == -1)
@@ -787,7 +787,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, struct timespec *now)
 	/* RFC4941 Section 3.4 */
 	if (ia->flags & IPV6_AF_TEMPORARY &&
 	    ia->prefix_pltime > REGEN_ADVANCE && ia->prefix_vltime &&
-	    ifp->options->options & DHCPCD_SLAACTEMP)
+	    ifp->options->options6 & DHCPCD_SLAACTEMP)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ia->prefix_pltime - REGEN_ADVANCE, ipv6_regentempaddr, ia);
 #endif
@@ -1282,8 +1282,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx, int cmd, struct if_head *ifs,
 	 * global address on the interface has changed,
 	 * call rt_build to add/remove the default route. */
 	if (ifp->active &&
-	    ((ifp->options != NULL && ifp->options->options & DHCPCD_IPV6) ||
-		(ifp->options == NULL && ctx->options & DHCPCD_IPV6)) &&
+	    ((ifp->options != NULL && ifp->options->options6 & DHCPCD_IPV6) ||
+		(ifp->options == NULL && ctx->options6 & DHCPCD_IPV6)) &&
 	    !(ctx->options & DHCPCD_RTBUILD) &&
 	    (ipv6_anyglobal(ifp) != NULL) != anyglobal)
 		rt_build(ctx, AF_INET6);
@@ -1445,7 +1445,7 @@ ipv6_addlinklocal(struct interface *ifp)
 		return 0;
 
 	/* Check sanity before malloc */
-	if (!(ifp->options->options & DHCPCD_SLAACPRIVATE)) {
+	if (!(ifp->options->options6 & DHCPCD_SLAACPRIVATE)) {
 		switch (ifp->hwtype) {
 		case ARPHRD_ETHER:
 			/* Check for a valid hardware address */
@@ -1474,7 +1474,7 @@ ipv6_addlinklocal(struct interface *ifp)
 		return -1;
 
 	dadcounter = 0;
-	if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
+	if (ifp->options->options6 & DHCPCD_SLAACPRIVATE) {
 	nextslaacprivate:
 		if (ipv6_makestableprivate(&ap->addr, &ap->prefix,
 			ap->prefix_len, ifp, &dadcounter) == -1) {
@@ -1492,7 +1492,7 @@ ipv6_addlinklocal(struct interface *ifp)
 	TAILQ_FOREACH(ap2, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &ap2->addr)) {
 			if (ap2->addr_flags & IN6_IFF_DUPLICATED) {
-				if (ifp->options->options &
+				if (ifp->options->options6 &
 				    DHCPCD_SLAACPRIVATE) {
 					dadcounter++;
 					goto nextslaacprivate;
