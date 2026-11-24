@@ -123,13 +123,15 @@ ps_inet_startcb(struct ps_process *psp)
 	if (ctx->options & DHCPCD_MANAGER)
 		setproctitle("[network proxy]");
 	else
+#ifdef INET6
 		setproctitle("[network proxy] %s%s%s",
 		    ctx->ifc != 0 ? ctx->ifv[0] : "",
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
-#ifdef INET6
 		    ctx->options6 & DHCPCD_IPV6 ? " [ip6]" : "");
 #else
-		    "");
+		setproctitle("[network proxy] %s%s",
+		    ctx->ifc != 0 ? ctx->ifv[0] : "",
+		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "");
 #endif
 #endif
 

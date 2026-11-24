@@ -2893,13 +2893,15 @@ start_manager:
 #endif
 
 #ifdef HAVE_SETPROCTITLE
+#ifdef INET6
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MANAGER ? "[manager]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
-#ifdef INET6
 	    ctx.options6 & DHCPCD_IPV6 ? " [ip6]" : "");
 #else
-	    "");
+	setproctitle("%s%s",
+	    ctx.options & DHCPCD_MANAGER ? "[manager]" : argv[optind],
+	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "");
 #endif
 #endif
 
