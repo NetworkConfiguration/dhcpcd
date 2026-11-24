@@ -2448,7 +2448,15 @@ main(int argc, char **argv, char **envp)
 				goto exit_success;
 			/* Spin until it exits */
 			loginfox("waiting for pid %d to exit", (int)pid);
-			dhcpcd_pidfile_timeout(&ctx);
+			pid = pidfile_read(ctx.pidfile);
+			if (pid == -1) {
+				if (errno == ENOENT)
+					goto exit_success;
+				eloop_timeout_add_msec(ctx.eloop, 100,
+				    dhcpcd_pidfile_timeout, &ctx);
+			} else
+				eloop_timeout_add_msec(ctx.eloop, 0,
+				    dhcpcd_pidfile_timeout, &ctx);
 			eloop_timeout_add_sec(ctx.eloop, 50,
 			    dhcpcd_exit_timeout, &ctx);
 			goto run_loop;
