@@ -1638,9 +1638,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerrx("invalid IAID %s", arg);
 			return -1;
 		}
-#ifdef INET6
 		ifo->options |= DHCPCD_IAID;
-#endif
 		break;
 #ifdef INET6
 	case O_IPV6RS:
