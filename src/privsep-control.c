@@ -56,8 +56,13 @@ ps_ctl_startcb(struct ps_process *psp)
 #ifdef HAVE_SETPROCTITLE
 		setproctitle("[control proxy] %s%s%s", ctx->ifv[0],
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
+#ifdef INET6
 		    ctx->options6 & DHCPCD_IPV6 ? " [ip6]" : "");
+#else
+		    "");
 #endif
+#endif
+#ifdef INET6
 		if ((ctx->options & DHCPCD_IPV4) &&
 		    !(ctx->options6 & DHCPCD_IPV6))
 			af = AF_INET;
@@ -66,6 +71,12 @@ ps_ctl_startcb(struct ps_process *psp)
 			af = AF_INET6;
 		else
 			af = AF_UNSPEC;
+#else
+		if (ctx->options & DHCPCD_IPV4)
+			af = AF_INET;
+		else
+			af = AF_UNSPEC;
+#endif
 	}
 
 	return control_start(ctx,
