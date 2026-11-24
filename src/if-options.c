@@ -1639,7 +1639,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 #ifdef INET6
-		ifo->options6 |= DHCPCD_IAID;
+		ifo->options |= DHCPCD_IAID;
 #endif
 		break;
 #ifdef INET6

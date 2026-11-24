@@ -623,8 +623,7 @@ configure_interface1(struct interface *ifp)
 	}
 #endif
 
-#ifdef INET6
-	if (!(ifo->options6 & DHCPCD_IAID)) {
+	if (!(ifo->options & DHCPCD_IAID)) {
 		/*
 		 * An IAID is for identifying a unqiue interface within
 		 * the client. It is 4 bytes long. Working out a default
@@ -692,9 +691,8 @@ configure_interface1(struct interface *ifp)
 				memcpy(ifo->iaid, &len, sizeof(ifo->iaid));
 			}
 		}
-		ifo->options6 |= DHCPCD_IAID;
+		ifo->options |= DHCPCD_IAID;
 	}
-#endif
 
 #ifdef DHCP6
 	if (ifo->ia_len == 0 && ifo->options6 & DHCPCD_IPV6 &&

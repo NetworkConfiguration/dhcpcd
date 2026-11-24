@@ -115,8 +115,8 @@
 #define DHCPCD_EXITING	      (1ULL << 44)
 #define DHCPCD_WAITIP4	      (1ULL << 45)
 // unused				(1ULL << 46) /* was WAITIP6 */
-#define DHCPCD_DEV (1ULL << 47)
-// unused				(1ULL << 48) /* was IAID */
+#define DHCPCD_DEV  (1ULL << 47)
+#define DHCPCD_IAID (1ULL << 48)
 #define DHCPCD_DHCP (1ULL << 49)
 // unused				(1ULL << 50) /* was DHCP6 */
 #define DHCPCD_IF_UP (1ULL << 51)
@@ -140,7 +140,7 @@
 #define DHCPCD_IPV6RA_REQRDNSS (1ULL << 3)
 #define DHCPCD_IA_FORCED       (1ULL << 4)
 #define DHCPCD_WAITIP6	       (1ULL << 5)
-#define DHCPCD_IAID	       (1ULL << 6)
+// unused				(1ULL << 6)
 #define DHCPCD_DHCP6	       (1ULL << 7)
 #define DHCPCD_INFORM6	       (1ULL << 8)
 #define DHCPCD_IPV6RA_AUTOCONF (1ULL << 9)
