@@ -688,7 +688,11 @@ ps_root_startcb(struct ps_process *psp)
 	else
 		setproctitle("[privileged proxy] %s%s%s", ctx->ifv[0],
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
+#ifdef INET6
 		    ctx->options6 & DHCPCD_IPV6 ? " [ip6]" : "");
+#else
+		    "");
+#endif
 #endif
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
