@@ -81,6 +81,13 @@ unsigned long long eloop_timespec_diff(const struct timespec *tsp,
 	eloop_q_timeout_add_msec((eloop), ELOOP_QUEUE, (ms), (cb), (ctx))
 #define eloop_timeout_delete(eloop, cb, ctx) \
 	eloop_q_timeout_delete((eloop), ELOOP_QUEUE, (cb), (ctx))
+#ifndef SMALL
+int eloop_monotonic_elapsed(struct eloop *, unsigned long long *,
+    unsigned int *);
+#define eloop_timeout_remaining(eloop, cb, ctx, esecs, ensecs, sec)           \
+	eloop_q_timeout_remaining((eloop), ELOOP_QUEUE, (cb), (ctx), (esecs), \
+	    (ensecs), (sec))
+#endif
 int eloop_q_timeout_add_tv(struct eloop *, int, const struct timespec *,
     void (*)(void *), void *);
 int eloop_q_timeout_add_sec(struct eloop *, int, unsigned int, void (*)(void *),
@@ -88,6 +95,10 @@ int eloop_q_timeout_add_sec(struct eloop *, int, unsigned int, void (*)(void *),
 int eloop_q_timeout_add_msec(struct eloop *, int, unsigned long,
     void (*)(void *), void *);
 int eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
+#ifndef SMALL
+int eloop_q_timeout_remaining(struct eloop *, int, void (*)(void *), void *,
+    unsigned long long, unsigned int, unsigned int *);
+#endif
 
 int eloop_signal_set_cb(struct eloop *, const int *, size_t,
     void (*)(int, void *), void *);

@@ -524,6 +524,11 @@ dumplease:
 		if (append_config(fp, "new",
 			(const char *const *)ifo->config) == -1)
 			goto eexit;
+#ifndef SMALL
+		if (ifp->ctx->options & DHCPCD_DUMPLEASE &&
+		    dhcp_dump_lease_times(fp, ifp) == -1)
+			goto eexit;
+#endif
 	}
 #endif
 #ifdef INET6
@@ -536,6 +541,11 @@ dumplease:
 		if (dhcp6_env(fp, "new", ifp, d6_state->new,
 			d6_state->new_len) == -1)
 			goto eexit;
+#ifndef SMALL
+		if (ifp->ctx->options & DHCPCD_DUMPLEASE &&
+		    dhcp6_dump_lease_times(fp, ifp) == -1)
+			goto eexit;
+#endif
 	}
 #endif
 	if (protocol == PROTO_RA) {
